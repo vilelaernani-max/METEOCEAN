@@ -1,0 +1,1304 @@
+<title>MetOcean OP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style id="tokens">
+/* Layout: painel de operações em coluna única, abas no topo, cartões por etapa, relatório embutido abaixo.
+   Cor: azul-petróleo de carta náutica sobre neutros frios; verde/vermelho só para GO/NO-GO.
+   Tipo: Barlow Condensed (sinalização marítima) nos títulos, IBM Plex Sans no texto, IBM Plex Mono nos números. */
+:root{
+  --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --bg:#eef3f4; --surface:#ffffff; --ink:#13232b; --mut:#52656e; --line:#d2dde1;
+  --accent:#0a5c7d; --accent-ink:#ffffff; --accent-soft:#dcebf1;
+  --go:#2a8a5c; --nogo:#c4452f; --nod:#9aa8af; --warn:#9a5b00; --warnbg:#fff3dc; --danger:#b3372d;
+  --c1:#1f6fb2; --c2:#cf7a1f; --c3:#7b4fa6; --c4:#238b80; --c5:#b5476b;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1519; --surface:#142027; --ink:#e4edf0; --mut:#90a4ad; --line:#26363e;
+  --accent:#58b6d8; --accent-ink:#06222d; --accent-soft:#183540;
+  --go:#48bd86; --nogo:#e8725c; --nod:#5f7079; --warn:#f0b455; --warnbg:#33290f; --danger:#e8725c;
+  --c1:#5aa9e6; --c2:#f0a050; --c3:#b08ae0; --c4:#4fc4b5; --c5:#e07a9c; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0d1519; --surface:#142027; --ink:#e4edf0; --mut:#90a4ad; --line:#26363e;
+  --accent:#58b6d8; --accent-ink:#06222d; --accent-soft:#183540;
+  --go:#48bd86; --nogo:#e8725c; --nod:#5f7079; --warn:#f0b455; --warnbg:#33290f; --danger:#e8725c;
+  --c1:#5aa9e6; --c2:#f0a050; --c3:#b08ae0; --c4:#4fc4b5; --c5:#e07a9c; color-scheme:dark;
+}
+</style>
+<style>
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-body);padding-inline:16px;padding-block:0 48px}
+.wrap{max-width:980px;margin-inline:auto}
+header.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;padding-block:18px 8px}
+header.top h1{font:700 30px/1 var(--font-display);letter-spacing:.02em;margin:0;text-transform:uppercase}
+header.top .sub{color:var(--mut);font-size:13.5px}
+.store{margin-left:auto;font:12px var(--font-mono);color:var(--mut);border:1px solid var(--line);border-radius:4px;padding:1px 8px}
+.store.warn{color:var(--warn);border-color:var(--warn)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:16px}
+nav.tabs button{flex:0 0 auto;background:none;border:0;border-bottom:3px solid transparent;padding:9px 14px;font:600 14px var(--font-body);color:var(--mut);cursor:pointer}
+nav.tabs button[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+nav.tabs button:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+section.panel{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px}
+.card h2{font:600 19px/1.2 var(--font-display);letter-spacing:.03em;text-transform:uppercase;margin:0 0 10px}
+.card h3{font:600 15px var(--font-body);margin:16px 0 6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.grid>*{min-width:0}
+label{display:block;font-size:13px;color:var(--mut)}
+.f{display:block;margin-top:3px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 9px;min-width:0}
+input[type=checkbox]{width:auto;margin-right:6px}
+input[type=number],.mono{font-family:var(--font-mono)}
+textarea{font:12.5px/1.4 var(--font-mono);min-height:84px;resize:vertical}
+button{font:500 14px var(--font-body);padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.danger{color:var(--danger);border-color:var(--danger)}
+button.lnk{border:0;background:none;padding:2px 0;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+button:disabled{opacity:.55;cursor:wait}
+a{color:var(--accent)}
+a.btn{display:inline-block;text-decoration:none;font:500 14px var(--font-body);padding:8px 14px;border-radius:6px;border:1px solid var(--accent);color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.note{color:var(--mut);font-size:13px;margin:4px 0 10px;max-width:68ch}
+.msg{font-size:13.5px;margin-top:6px}
+.msg.ok{color:var(--go)}.msg.bad{color:var(--danger)}.msg.warn{color:var(--warn)}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.list li{border:1px solid var(--line);border-radius:6px;padding:9px 11px;font-size:14px;min-width:0;overflow-wrap:anywhere}
+ul.list li.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.t{font-weight:600}.m{color:var(--mut);font-size:12.5px}
+.mono{font-family:var(--font-mono)}
+.tagrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.tag{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:0 9px;font-size:12px}
+.tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:4px 6px;margin-top:3px}
+.tags input{border:0;flex:1;min-width:110px;padding:4px;background:none}
+.chip{display:inline-flex;align-items:center;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:0 4px 0 9px;font-size:12.5px;color:var(--ink)}
+.chip button{border:0;background:none;padding:0 5px;color:var(--mut);font-size:15px;line-height:1.3}
+.srcs{width:100%;border-collapse:collapse;font-size:13px}
+.srcs th{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);text-align:left;padding:0 6px 4px 0}
+.srcs td{padding:3px 6px 3px 0}
+.srcs input{padding:5px 7px;font-size:12.5px}
+.scroll{overflow-x:auto}
+.empty{color:var(--mut);font-size:14px;padding:6px 0}
+details>summary{cursor:pointer}
+#report-wrap{display:none}
+#report-wrap.on{display:block}
+.rp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));max-width:520px;margin-inline:auto;background:var(--ink);color:var(--bg);border-radius:8px;padding:10px 14px;font-size:14px;z-index:9}
+@media (prefers-reduced-motion:no-preference){.toast{transition:opacity .2s}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <h1>MetOcean OP</h1>
+  <span class="sub">janelas operacionais de vento e onda · uso pessoal</span>
+  <span id="store" class="store" title="Onde ficam salvos seus locais, limites e relatórios">carregando…</span>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Seções">
+  <button role="tab" id="t-analise" data-tab="analise" aria-selected="true" aria-controls="p-analise">Análise</button>
+  <button role="tab" id="t-locais" data-tab="locais" aria-selected="false" aria-controls="p-locais">Locais</button>
+  <button role="tab" id="t-limites" data-tab="limites" aria-selected="false" aria-controls="p-limites">Limites</button>
+  <button role="tab" id="t-historico" data-tab="historico" aria-selected="false" aria-controls="p-historico">Histórico</button>
+  <button role="tab" id="t-avisos" data-tab="avisos" aria-selected="false" aria-controls="p-avisos">Avisos da Marinha</button>
+</nav>
+
+<!-- ANÁLISE -->
+<section class="panel" id="p-analise" role="tabpanel" aria-labelledby="t-analise">
+  <div class="card">
+    <h2>1 · Ponto e operação</h2>
+    <div class="grid">
+      <label>Local <select id="a-loc" class="f"></select></label>
+      <label>Perfil de limites <select id="a-prof" class="f"></select></label>
+      <label>Dias à frente <input id="a-days" class="f" type="number" min="1" max="10" value="5"></label>
+    </div>
+    <div style="margin-top:10px"><label>Tags desta análise<div id="a-tags"></div></label></div>
+    <p id="a-hint" class="msg"></p>
+  </div>
+
+  <div class="card">
+    <h2>2 · Previsão (Open-Meteo)</h2>
+    <div class="row" style="align-items:center"><button id="auto" type="button" class="primary">Buscar previsão automaticamente</button><span id="auto-msg" class="msg"></span></div>
+    <p class="note">O botão busca vento e ondas na Open-Meteo e já gera o relatório. Se o ambiente em que a página está aberta bloquear a busca (é o caso dentro do Claude), ele tenta o navegador do app Claude para desktop; sem isso, abra cada link abaixo, copie todo o texto e cole na caixa correspondente.</p>
+    <div class="scroll"><table class="srcs" aria-label="Fontes de previsão">
+      <thead><tr><th>Fonte</th><th>Modelo de vento</th><th>Modelo de onda</th><th></th></tr></thead>
+      <tbody id="src-body"></tbody>
+    </table></div>
+    <div class="row" style="margin-top:8px"><button id="src-add" type="button">Adicionar fonte</button><button id="src-reset" type="button" class="lnk">Restaurar padrão</button></div>
+    <p class="note">Modelo em branco usa o melhor modelo automático da Open-Meteo. Nomes de modelo inválidos aparecem como erro na resposta colada.</p>
+
+    <h3>Vento</h3>
+    <div class="row"><a id="link-wind" class="btn" target="_blank" rel="noopener" href="#">Abrir previsão de vento</a><button id="copy-wind" type="button" class="lnk">Copiar link</button></div>
+    <label style="margin-top:8px">Cole aqui o texto do vento<textarea id="paste-wind" class="f" spellcheck="false" placeholder='{"latitude":…,"hourly":{…}}'></textarea></label>
+    <div id="msg-wind" class="msg"></div>
+
+    <h3>Ondas</h3>
+    <div class="row"><a id="link-wave" class="btn" target="_blank" rel="noopener" href="#">Abrir previsão de ondas</a><button id="copy-wave" type="button" class="lnk">Copiar link</button></div>
+    <label style="margin-top:8px">Cole aqui o texto das ondas<textarea id="paste-wave" class="f" spellcheck="false" placeholder='{"latitude":…,"hourly":{…}}'></textarea></label>
+    <div id="msg-wave" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Avisos da Marinha</h2>
+    <p id="navy-line" class="note"></p>
+    <div class="row"><button id="go-avisos" type="button" class="lnk">Atualizar avisos</button></div>
+  </div>
+
+  <div class="row"><button id="go" class="primary" type="button">Gerar relatório</button><span id="go-msg" class="msg" aria-live="polite"></span></div>
+
+  <div id="report-wrap" class="card">
+    <div class="rp-actions">
+      <button id="rp-download" type="button" hidden>Baixar relatório (HTML)</button>
+      <span id="rp-saved" class="msg"></span>
+    </div>
+    <div id="report" class="rp"></div>
+  </div>
+</section>
+
+<!-- LOCAIS -->
+<section class="panel" id="p-locais" role="tabpanel" aria-labelledby="t-locais" hidden>
+  <div class="card">
+    <h2>Local</h2>
+    <p class="note">Este ambiente não carrega mapa de fundo. Para escolher o ponto, abra o mapa, toque e segure no lugar desejado, copie as coordenadas que aparecem e cole no primeiro campo.</p>
+    <div class="row" style="margin-bottom:10px">
+      <a class="btn" target="_blank" rel="noopener" href="https://www.openstreetmap.org/">Abrir OpenStreetMap</a>
+      <a id="l-see" class="btn" target="_blank" rel="noopener" href="https://www.openstreetmap.org/" hidden>Ver este ponto no mapa</a>
+    </div>
+    <label>Colar coordenadas (ex.: -22.9519, -43.1859 ou 22°57′S 43°11′W)
+      <input id="l-paste" class="f mono" autocomplete="off" placeholder="-22.9519, -43.1859"></label>
+    <div id="l-pastemsg" class="msg"></div>
+    <div class="grid" style="margin-top:10px">
+      <label>Nome <input id="l-name" class="f" maxlength="80" autocomplete="off"></label>
+      <label>Latitude <input id="l-lat" class="f" type="number" step="any" min="-90" max="90"></label>
+      <label>Longitude <input id="l-lon" class="f" type="number" step="any" min="-180" max="180"></label>
+      <label>Fuso (horas de UTC) <input id="l-tz" class="f" type="number" step="0.5" min="-12" max="14" value="-3"></label>
+      <label>Área(s) da Marinha <input id="l-areas" class="f" maxlength="100" placeholder="ex.: GOLF, COSTEIRA" autocomplete="off"></label>
+    </div>
+    <div style="margin-top:10px"><label>Tags<div id="l-tags"></div></label></div>
+    <div class="row" style="margin-top:12px">
+      <button id="l-save" class="primary" type="button">Salvar local</button>
+      <button id="l-new" type="button">Novo</button>
+      <button id="l-del" type="button" class="danger" hidden>Excluir</button>
+      <span id="l-del-ask" class="msg" hidden>Excluir mesmo? <button id="l-del-yes" type="button" class="lnk">Sim, excluir</button> · <button id="l-del-no" type="button" class="lnk">Cancelar</button></span>
+    </div>
+    <div id="l-msg" class="msg"></div>
+  </div>
+  <div class="card"><h2>Locais salvos</h2><ul id="l-list" class="list"></ul></div>
+</section>
+
+<!-- LIMITES -->
+<section class="panel" id="p-limites" role="tabpanel" aria-labelledby="t-limites" hidden>
+  <div class="card">
+    <h2>Perfil de limites</h2>
+    <label>Perfil <select id="p-sel" class="f"></select></label>
+    <div class="grid" style="margin-top:10px">
+      <label>Nome <input id="p-name" class="f" maxlength="80" autocomplete="off"></label>
+      <label>Hs máxima (m) <input id="p-hs" class="f" type="number" step="0.1" min="0"></label>
+      <label>Tp mínimo (s) <input id="p-tp" class="f" type="number" step="0.5" min="0" placeholder="não usar"></label>
+      <label>Vento máximo (nós) <input id="p-wind" class="f" type="number" step="1" min="0"></label>
+      <label>Rajada máxima (nós) <input id="p-gust" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
+      <label>Janela mínima (h seguidas) <input id="p-win" class="f" type="number" min="1" max="72" value="4"></label>
+    </div>
+    <label style="margin-top:10px"><input id="p-day" type="checkbox">Somente período diurno</label>
+    <p class="note">Campo vazio = limite não usado. Perfis de exemplo trazem valores genéricos: ajuste aos limites reais de cada operação.</p>
+    <div class="row">
+      <button id="p-save" class="primary" type="button">Salvar perfil</button>
+      <button id="p-new" type="button">Novo</button>
+      <button id="p-del" type="button" class="danger" hidden>Excluir</button>
+      <span id="p-del-ask" class="msg" hidden>Excluir mesmo? <button id="p-del-yes" type="button" class="lnk">Sim, excluir</button> · <button id="p-del-no" type="button" class="lnk">Cancelar</button></span>
+      <button id="p-seed" type="button" class="lnk" hidden>Adicionar perfis de exemplo</button>
+    </div>
+    <div id="p-msg" class="msg"></div>
+  </div>
+</section>
+
+<!-- HISTÓRICO -->
+<section class="panel" id="p-historico" role="tabpanel" aria-labelledby="t-historico" hidden>
+  <div class="card">
+    <h2>Relatórios gerados</h2>
+    <label>Filtrar por tag <select id="h-tag" class="f"><option value="">todas</option></select></label>
+    <ul id="h-list" class="list" style="margin-top:10px"></ul>
+  </div>
+</section>
+
+<!-- AVISOS -->
+<section class="panel" id="p-avisos" role="tabpanel" aria-labelledby="t-avisos" hidden>
+  <div class="card">
+    <h2>Avisos de Mau Tempo (METAREA V)</h2>
+    <p class="note">Use “Buscar da Marinha” para tentar importar sozinho. Se o site da Marinha não permitir (comum), abra a página oficial, selecione e copie o texto dos avisos e cole abaixo. Avisos já importados ficam salvos e entram nos relatórios pelo período de vigência.</p>
+    <div class="row"><button id="n-fetch" class="primary" type="button">Buscar da Marinha</button><a class="btn" target="_blank" rel="noopener" href="https://www.marinha.mil.br/chm/dados-do-smm-avisos-de-mau-tempo/avisos-de-mau-tempo">Abrir avisos da Marinha</a></div>
+    <label style="margin-top:10px">Texto copiado da página<textarea id="n-text" class="f" spellcheck="false" style="min-height:140px"></textarea></label>
+    <div class="row" style="margin-top:8px"><button id="n-import" class="primary" type="button">Importar avisos</button></div>
+    <div id="n-msg" class="msg"></div>
+  </div>
+  <div class="card"><h2>Avisos salvos</h2><p id="n-info" class="note"></p><ul id="n-list" class="list"></ul></div>
+</section>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+(() => {
+'use strict';
+
+/* =============================== utilidades =============================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function el(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (v !== undefined && v !== null && v !== false) n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return n;
+}
+const HOUR = 3600;
+const WD = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+const MONTHS = { JAN: 1, FEV: 2, MAR: 3, ABR: 4, MAI: 5, JUN: 6, JUL: 7, AGO: 8, SET: 9, OUT: 10, NOV: 11, DEZ: 12 };
+const p2 = n => String(n).padStart(2, '0');
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const now = () => Math.floor(Date.now() / 1000);
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3800);
+}
+function setMsg(sel, text, kind) { const n = $(sel); n.textContent = text || ''; n.className = 'msg' + (kind ? ' ' + kind : ''); }
+
+/* local() devolve uma Date cujos getters UTC mostram a hora local do ponto */
+const localD = (ts, tz) => new Date((ts + tz * 3600) * 1000);
+function fmt(ts, tz, withDate = true) {
+  const d = localD(ts, tz), hm = `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+  return withDate ? `${WD[(d.getUTCDay() + 6) % 7]} ${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)} ${hm}` : hm;
+}
+const tzlabel = tz => `UTC${tz >= 0 ? '+' : '−'}${Math.abs(tz)}`;
+const num = (v, d = 1) => (v === null || v === undefined) ? '–' : v.toFixed(d);
+const fmtUtc = ts => { const d = new Date(ts * 1000); return `${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}Z`; };
+const fmtUtcFull = ts => { const d = new Date(ts * 1000); return `${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}Z`; };
+function haversineKm(la1, lo1, la2, lo2) {
+  const r = Math.PI / 180, dla = (la2 - la1) * r, dlo = (lo2 - lo1) * r;
+  const a = Math.sin(dla / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dlo / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a));
+}
+
+/* =============================== armazenamento =============================== */
+/* db (conta do Claude) quando disponível; senão localStorage deste navegador. */
+const Store = {
+  kind: 'mem', db: null, mem: {},
+  async init() {
+    try {
+      if (window.claude && window.claude.use) {
+        this.db = await window.claude.use('db');
+        if (this.db) { this.kind = 'db'; return; }
+      }
+    } catch (e) { /* segue com localStorage */ }
+    try { localStorage.setItem('mco:probe', '1'); localStorage.removeItem('mco:probe'); this.kind = 'local'; } catch (e) { this.kind = 'mem'; }
+  },
+  _read(c) {
+    if (this.kind === 'local') { try { return JSON.parse(localStorage.getItem('mco:' + c) || '{}'); } catch (e) { return {}; } }
+    return this.mem[c] || (this.mem[c] = {});
+  },
+  _write(c, m) {
+    if (this.kind === 'local') { localStorage.setItem('mco:' + c, JSON.stringify(m)); return; }
+    this.mem[c] = m;
+  },
+  async list(c) {
+    if (this.db) { const s = await this.db.collection(c).get(); return s.docs.map(d => ({ ...d.data(), id: d.id })); }
+    return Object.entries(this._read(c)).map(([id, v]) => ({ ...v, id }));
+  },
+  async get(c, id) {
+    if (this.db) { const s = await this.db.collection(c).doc(id).get(); return s.exists ? { ...s.data(), id } : null; }
+    const v = this._read(c)[id]; return v ? { ...v, id } : null;
+  },
+  async set(c, id, data) {
+    const body = { ...data }; delete body.id;
+    if (this.db) { await this.db.collection(c).doc(id).set(body); return; }
+    const m = this._read(c); m[id] = body; this._write(c, m);
+  },
+  async del(c, id) {
+    if (this.db) { await this.db.collection(c).doc(id).delete(); return; }
+    const m = this._read(c); delete m[id]; this._write(c, m);
+  },
+};
+
+/* =============================== limites =============================== */
+const DEFAULT_PROFILES = [
+  { name: 'Levantamento multibeam (exemplo)', limits: { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: 25, daylight_only: false, min_window_h: 6 } },
+  { name: 'Mergulho (exemplo)', limits: { hs_max: 1.0, tp_min: null, wind_max: 15, gust_max: 20, daylight_only: true, min_window_h: 4 } },
+  { name: 'Lançamento de equipamento (exemplo)', limits: { hs_max: 2.0, tp_min: null, wind_max: 25, gust_max: 30, daylight_only: false, min_window_h: 3 } },
+];
+
+function normalizeLimits(raw) {
+  const out = { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: null, daylight_only: false, min_window_h: 4 };
+  raw = raw || {};
+  for (const k of ['hs_max', 'tp_min', 'wind_max', 'gust_max']) {
+    if (k in raw) {
+      const v = raw[k];
+      if (v === null || v === undefined || v === '') out[k] = null;
+      else {
+        const f = Number(v);
+        if (!Number.isFinite(f) || f < 0) throw new Error(`Valor inválido em ${k}`);
+        out[k] = f;
+      }
+    }
+  }
+  if ('daylight_only' in raw) out.daylight_only = !!raw.daylight_only;
+  if ('min_window_h' in raw) {
+    const m = Math.trunc(Number(raw.min_window_h));
+    if (!Number.isFinite(m)) throw new Error('Janela mínima inválida');
+    out.min_window_h = Math.max(1, Math.min(m, 72));
+  }
+  return out;
+}
+
+/* nascer/pôr do sol (NOAA simplificado), igual ao app local */
+function sunUtc(y, m, d, lat, lon) {
+  const doy = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
+  const g = 2 * Math.PI / 365 * (doy - 1);
+  const eqtime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const latr = lat * Math.PI / 180;
+  const cosha = Math.cos(90.833 * Math.PI / 180) / (Math.cos(latr) * Math.cos(decl)) - Math.tan(latr) * Math.tan(decl);
+  if (cosha > 1) return null;
+  if (cosha < -1) return 'polar';
+  const ha = Math.acos(cosha) * 180 / Math.PI;
+  const base = Date.UTC(y, m - 1, d) / 1000;
+  return [Math.trunc(base + (720 - 4 * (lon + ha) - eqtime) * 60), Math.trunc(base + (720 - 4 * (lon - ha) - eqtime) * 60)];
+}
+function daylightIntervals(lat, lon, startTs, endTs) {
+  const out = [];
+  const s = new Date(startTs * 1000), e = new Date(endTs * 1000);
+  let t = Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()) - 86400000;
+  const last = Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate()) + 86400000;
+  for (; t <= last; t += 86400000) {
+    const d = new Date(t), r = sunUtc(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), lat, lon);
+    if (r === 'polar') return [[startTs - 86400, endTs + 86400]];
+    if (r) out.push(r);
+  }
+  return out;
+}
+const isDaylight = (ts, iv) => iv.some(([a, b]) => a <= ts && ts + HOUR <= b);
+
+function evaluateHour(row, L, day) {
+  const reasons = [], missing = [];
+  const check = (v, lim, label, unit, kind) => {
+    if (lim === null || lim === undefined) return;
+    if (v === null || v === undefined) missing.push(label);
+    else if (kind === 'max' && v > lim) reasons.push(`${label} ${v.toFixed(1)} > ${lim} ${unit}`);
+    else if (kind === 'min' && v < lim) reasons.push(`${label} ${v.toFixed(1)} < ${lim} ${unit}`);
+  };
+  check(row.hs, L.hs_max, 'Hs', 'm', 'max');
+  check(row.tp, L.tp_min, 'Tp', 's', 'min');
+  check(row.wind_kn, L.wind_max, 'vento', 'kn', 'max');
+  check(row.gust_kn, L.gust_max, 'rajada', 'kn', 'max');
+  if (L.daylight_only && day && !isDaylight(row.ts, day)) reasons.push('fora do período diurno');
+  if (reasons.length) return ['nogo', reasons];
+  if (missing.length) return ['nodata', missing.map(m => `sem dado de ${m}`)];
+  return ['go', []];
+}
+
+/* =============================== análise =============================== */
+const maxv = a => { const v = a.filter(x => x !== null && x !== undefined); return v.length ? Math.max(...v) : null; };
+
+function windowsOf(status, minH, extra) {
+  const wins = []; let dropped = 0, i = 0; const n = status.length;
+  while (i < n) {
+    if (status[i] !== 'go') { i++; continue; }
+    let j = i; while (j < n && status[j] === 'go') j++;
+    if (j - i >= minH) wins.push({ i0: i, i1: j, hours: j - i, ...extra(i, j) }); else dropped++;
+    i = j;
+  }
+  return [wins, dropped];
+}
+
+function analyze(sourceResults, limits, lat, lon, startTs, endTs) {
+  const L = normalizeLimits(limits);
+  const first = Math.floor(startTs / HOUR) * HOUR, grid = [];
+  for (let t = first; t < endTs; t += HOUR) grid.push(t);
+  if (!grid.length) throw new Error('período vazio');
+  const day = L.daylight_only ? daylightIntervals(lat, lon, first, endTs) : null;
+  const minH = L.min_window_h;
+
+  const sources = sourceResults.map(sr => {
+    const idx = new Map(sr.series.map(r => [r.ts, r]));
+    const st = [], cols = { hs: [], tp: [], wind: [], gust: [] };
+    for (const ts of grid) {
+      const row = idx.get(ts);
+      if (!row) { st.push('nodata'); for (const k in cols) cols[k].push(null); continue; }
+      st.push(evaluateHour({ ...row, ts }, L, day)[0]);
+      cols.hs.push(row.hs); cols.tp.push(row.tp); cols.wind.push(row.wind_kn); cols.gust.push(row.gust_kn);
+    }
+    const extra = (i0, i1) => ({ max_hs: maxv(cols.hs.slice(i0, i1)), max_wind: maxv(cols.wind.slice(i0, i1)), max_gust: maxv(cols.gust.slice(i0, i1)) });
+    const [windows, dropped] = windowsOf(st, minH, extra);
+    return { id: sr.id, label: sr.label, note: sr.note || null, meta: sr.meta || {}, fetched_at: sr.fetched_at || null,
+      status: st, hs: cols.hs, tp: cols.tp, wind: cols.wind, gust: cols.gust, windows, dropped_short: dropped,
+      n_go: st.filter(x => x === 'go').length, n_nogo: st.filter(x => x === 'nogo').length, n_nodata: st.filter(x => x === 'nodata').length };
+  });
+
+  const cons = [], opt = [], nsrc = []; let agree = 0, compared = 0;
+  for (let i = 0; i < grid.length; i++) {
+    const decided = sources.map(s => s.status[i]).filter(v => v === 'go' || v === 'nogo');
+    nsrc.push(decided.length);
+    if (!decided.length) { cons.push('nodata'); opt.push('nodata'); continue; }
+    cons.push(decided.includes('nogo') ? 'nogo' : 'go');
+    opt.push(decided.includes('go') ? 'go' : 'nogo');
+    if (decided.length >= 2) { compared++; if (new Set(decided).size === 1) agree++; }
+  }
+  const consExtra = (i0, i1) => {
+    const worst = key => maxv(sources.map(s => maxv(s[key].slice(i0, i1))));
+    return { max_hs: worst('hs'), max_wind: worst('wind'), max_gust: worst('gust'), min_sources: Math.min(...nsrc.slice(i0, i1)) };
+  };
+  const [cw, cdrop] = windowsOf(cons, minH, consExtra);
+  const [ow] = windowsOf(opt, minH, consExtra);
+  return { grid, limits: L, start_ts: startTs, end_ts: endTs, sources,
+    conservative: { status: cons, n_sources: nsrc, windows: cw, dropped_short: cdrop },
+    optimistic: { status: opt, windows: ow },
+    agreement: { compared, agree, disagree: compared - agree, pct: compared ? Math.round(1000 * agree / compared) / 10 : null } };
+}
+
+/* =============================== Open-Meteo (texto colado) =============================== */
+const DEFAULT_SOURCES = [
+  { label: 'Open-Meteo (melhor modelo)', wind: '', wave: '' },
+  { label: 'NOAA GFS / GFS-Wave', wind: 'gfs_seamless', wave: 'ncep_gfswave025' },
+  { label: 'ECMWF IFS / WAM', wind: 'ecmwf_ifs025', wave: 'ecmwf_wam025' },
+];
+const WIND_VARS = 'wind_speed_10m,wind_gusts_10m,wind_direction_10m';
+const WAVE_VARS = 'wave_height,wave_period,wave_direction';
+
+function modelParam(rows, key) {
+  const names = rows.map(r => (r[key] || '').trim());
+  if (names.every(n => !n)) return '';
+  return [...new Set(names.map(n => n || 'best_match'))].join(',');
+}
+function buildUrls(lat, lon, days, rows) {
+  const fd = Math.min(16, days + 1);
+  const common = `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=UTC&timeformat=unixtime&forecast_days=${fd}`;
+  const mw = modelParam(rows, 'wind'), mv = modelParam(rows, 'wave');
+  return {
+    wind: `https://api.open-meteo.com/v1/forecast?${common}&hourly=${WIND_VARS}&wind_speed_unit=kn${mw ? '&models=' + mw : ''}`,
+    wave: `https://marine-api.open-meteo.com/v1/marine?${common}&hourly=${WAVE_VARS}${mv ? '&models=' + mv : ''}`,
+  };
+}
+
+function parseJsonText(text, kind) {
+  const t = (text || '').trim();
+  if (!t) return { empty: true };
+  let j;
+  try { j = JSON.parse(t); } catch (e) { return { error: 'Isso não parece o texto JSON da previsão. Abra o link, selecione tudo e copie de novo.' }; }
+  if (Array.isArray(j)) j = j[0];
+  if (!j || typeof j !== 'object') return { error: 'Formato inesperado.' };
+  if (j.error) return { error: `A Open-Meteo recusou o pedido: ${j.reason || 'motivo não informado'}` };
+  if (!j.hourly || !Array.isArray(j.hourly.time)) return { error: `Resposta sem dados horários de ${kind}.` };
+  return { json: j };
+}
+const toTs = t => (typeof t === 'number') ? t : Math.floor(Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z') / 1000);
+const numOrNull = v => (v === null || v === undefined || Number.isNaN(Number(v))) ? null : Number(v);
+
+function hourlyPick(h, base, model) {
+  const m = model || 'best_match', keys = [`${base}_${m}`, `${base}_marine_${m}`, base];
+  for (const k of keys) if (Array.isArray(h[k])) return h[k];
+  return null;
+}
+function describePaste(j) {
+  const h = j.hourly, n = h.time.length;
+  const models = new Set();
+  for (const k of Object.keys(h)) {
+    const m = k.match(/^(?:wind_speed_10m|wave_height)_(.+)$/);
+    if (m) models.add(m[1]);
+  }
+  const t0 = toTs(h.time[0]), t1 = toTs(h.time[n - 1]);
+  return { n, models: [...models], t0, t1 };
+}
+
+function buildSeries(windJ, waveJ, row, startTs, endTs) {
+  const wh = windJ.hourly, mh = waveJ.hourly;
+  const sp = hourlyPick(wh, 'wind_speed_10m', row.wind.trim()), gu = hourlyPick(wh, 'wind_gusts_10m', row.wind.trim()), wd = hourlyPick(wh, 'wind_direction_10m', row.wind.trim());
+  if (!sp) throw new Error(`modelo de vento "${row.wind.trim() || 'melhor modelo'}" não veio na resposta colada`);
+  const hs = hourlyPick(mh, 'wave_height', row.wave.trim()), tp = hourlyPick(mh, 'wave_period', row.wave.trim()), wv = hourlyPick(mh, 'wave_direction', row.wave.trim());
+  if (!hs) throw new Error(`modelo de onda "${row.wave.trim() || 'melhor modelo'}" não veio na resposta colada`);
+  const by = new Map();
+  wh.time.forEach((t, i) => { const ts = toTs(t); by.set(ts, { ts, hs: null, tp: null, wave_dir: null, wind_kn: numOrNull(sp[i]), gust_kn: gu ? numOrNull(gu[i]) : null, wind_dir: wd ? numOrNull(wd[i]) : null }); });
+  mh.time.forEach((t, i) => {
+    const ts = toTs(t);
+    const r = by.get(ts) || { ts, hs: null, tp: null, wave_dir: null, wind_kn: null, gust_kn: null, wind_dir: null };
+    r.hs = numOrNull(hs[i]); r.tp = tp ? numOrNull(tp[i]) : null; r.wave_dir = wv ? numOrNull(wv[i]) : null; by.set(ts, r);
+  });
+  const series = [...by.values()].filter(r => r.ts > startTs - 3600 && r.ts < endTs + 3600).sort((a, b) => a.ts - b.ts);
+  if (!series.length) throw new Error('a resposta colada não tem horas dentro do período (previsão antiga? abra o link de novo)');
+  const note = series.every(r => r.hs === null) ? 'sem dados de onda neste ponto (terra ou costa muito próxima?)' : null;
+  return { series, note, meta: { wind_model: row.wind.trim() || 'best_match', wave_model: row.wave.trim() || 'best_match',
+    grid_wind: [windJ.latitude, windJ.longitude], grid_wave: [waveJ.latitude, waveJ.longitude] } };
+}
+
+/* =============================== avisos da Marinha =============================== */
+const KNOWN_AREAS = ['ALFA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO', 'FOXTROT', 'GOLF', 'HOTEL', 'NOVEMBER', 'SIERRA', 'COSTEIRA', 'OCEÂNICA', 'OCEANICA'];
+const RE_START = /(?:AVISO|WARNING)\s+(?:NR|N[ºO°]?)\s*\d+\s*\/\s*\d{4}/gi;
+const RE_PT = /^AVISO\s+(?:NR|N[ºO°]?)\s*(\d+)\s*\/\s*(\d{4})/i;
+const RE_ISSUED = /EMITIDO\s+[ÀA]S\s+(\d{2})(\d{2})Z\s*-\s*[A-ZÇÁÉÍÓÚÃÕ]{3}\s*-\s*(\d{1,2})\/([A-Z]{3})\/(\d{4})/i;
+const RE_FROM = /A\s+PARTIR\s+DE\s+(\d{2})(\d{2})(\d{2})Z/i;
+const RE_TO = /V[ÁA]LIDO\s+AT[ÉE]\s+(\d{2})(\d{2})(\d{2})Z/i;
+const RE_NONE = /N[ÃA]O\s+H[ÁA]\s+AVISO|SEM\s+AVISO|\bNIL\b/i;
+
+function resolveDdhhmm(dd, hh, mm, refMs, notBeforeMs) {
+  const ref = new Date(refMs); let y = ref.getUTCFullYear(), mo = ref.getUTCMonth();
+  for (let k = 0; k < 3; k++) {
+    const c = new Date(Date.UTC(y, mo, dd, hh, mm));
+    if (c.getUTCDate() === dd && c.getTime() >= notBeforeMs) return c.getTime();
+    mo++; if (mo > 11) { mo = 0; y++; }
+  }
+  return null;
+}
+function hash32(s) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 + c, 2246822519) >>> 0; }
+  return h1.toString(36) + h2.toString(36) + s.length.toString(36);
+}
+function parseNavy(text) {
+  text = text.replace(/\r/g, '');
+  const starts = [...text.matchAll(RE_START)].map(m => m.index);
+  const out = [];
+  starts.forEach((s, i) => {
+    const chunk = text.slice(s, i + 1 < starts.length ? starts[i + 1] : text.length).trim();
+    const m = chunk.match(RE_PT);
+    if (!m) return;
+    const flat = chunk.replace(/\s+/g, ' ');
+    const after = flat.slice(m[0].length);
+    const k = after.search(/EMITIDO|A PARTIR DE|V[ÁA]LIDO/i);
+    const kind = (k >= 0 ? after.slice(0, k) : after.slice(0, 60)).replace(/^[\s\-:]+|[\s\-:]+$/g, '') || null;
+    let issued = null;
+    const im = flat.match(RE_ISSUED);
+    if (im && MONTHS[im[4].toUpperCase()]) {
+      const d = Date.UTC(+im[5], MONTHS[im[4].toUpperCase()] - 1, +im[3], +im[1], +im[2]);
+      if (!Number.isNaN(d)) issued = d;
+    }
+    const ref = issued ?? Date.now();
+    let vf = null, vt = null;
+    const fm = flat.match(RE_FROM), tm = flat.match(RE_TO);
+    if (fm) vf = resolveDdhhmm(+fm[1], +fm[2], +fm[3], ref, ref - 3 * 86400000);
+    if (tm) vt = resolveDdhhmm(+tm[1], +tm[2], +tm[3], vf ?? ref, vf ?? (ref - 3 * 86400000));
+    const up = flat.toUpperCase();
+    let areas = KNOWN_AREAS.filter(a => new RegExp(`(?:^|[^A-ZÀ-Ý])${a}(?:[^A-ZÀ-Ý]|$)`).test(up)).map(a => a === 'OCEANICA' ? 'OCEÂNICA' : a);
+    areas = [...new Set(areas)].sort();
+    out.push({ number: `${m[1]}/${m[2]}`, kind, areas, issued_ts: issued ? issued / 1000 : null,
+      valid_from_ts: vf ? vf / 1000 : null, valid_to_ts: vt ? vt / 1000 : null, text: chunk.slice(0, 1500), hash: hash32(up) });
+  });
+  if (out.length) return [out, `ok: ${out.length} aviso(s) identificado(s)`];
+  if (RE_NONE.test(text)) return [[], 'ok: a página informa que não há avisos'];
+  return [[], 'formato_nao_reconhecido'];
+}
+function warningsFor(list, startTs, endTs, fetchedAt) {
+  return list.filter(w => {
+    let a = w.valid_from_ts ?? w.issued_ts ?? fetchedAt;
+    const b = w.valid_to_ts ?? ((w.issued_ts ?? fetchedAt) + 72 * 3600);
+    return a < endTs && b > startTs;
+  }).map(w => ({ ...w, validity_known: w.valid_to_ts !== null }));
+}
+
+/* =============================== relatório =============================== */
+const REPORT_CSS = `
+.rp{color:var(--ink);font:15px/1.5 var(--font-body)}
+.rp *{box-sizing:border-box}
+.rp h1{font:700 28px/1.1 var(--font-display);letter-spacing:.02em;text-transform:uppercase;margin:0 0 4px;overflow-wrap:anywhere}
+.rp h2{font:600 18px/1.2 var(--font-display);letter-spacing:.03em;text-transform:uppercase;margin:30px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.rp .sub{color:var(--mut);margin:0 0 10px}
+.rp .meta{display:flex;flex-wrap:wrap;gap:4px 22px;color:var(--mut);font-size:13px}
+.rp .meta b{color:var(--ink);font-weight:600}
+.rp .tag{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:0 9px;font-size:12px;margin-right:4px}
+.rp .verdict{background:var(--bg);border:1px solid var(--line);border-left:6px solid var(--go);border-radius:8px;padding:12px 16px;margin:16px 0}
+.rp .verdict.none{border-left-color:var(--nogo)}
+.rp .verdict h3{margin:0 0 4px;font:600 16px var(--font-body)}
+.rp .alert{background:var(--warnbg);border:1px solid var(--warn);color:var(--ink);border-radius:8px;padding:8px 14px;margin:8px 0;font-size:14px}
+.rp .tw{overflow-x:auto}
+.rp table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+.rp th,.rp td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+.rp th{color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+.rp td.n,.rp th.n{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.rp svg{width:100%;height:auto;display:block}
+.rp svg text{fill:var(--ink);font-family:var(--font-body)}
+.rp svg .mut{fill:var(--mut)}
+.rp .go{fill:var(--go)}.rp .nogo{fill:var(--nogo)}.rp .nod{fill:var(--nod)}
+.rp .grid{stroke:var(--line);stroke-width:1}.rp .lim{stroke:var(--nogo);stroke-width:1.2;stroke-dasharray:5 4}
+.rp .ln{fill:none;stroke-width:1.6}
+.rp .l1{stroke:var(--c1)}.rp .l2{stroke:var(--c2)}.rp .l3{stroke:var(--c3)}.rp .l4{stroke:var(--c4)}.rp .l5{stroke:var(--c5)}
+.rp .k1{fill:var(--c1)}.rp .k2{fill:var(--c2)}.rp .k3{fill:var(--c3)}.rp .k4{fill:var(--c4)}.rp .k5{fill:var(--c5)}
+.rp .legend{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;margin:4px 0 8px}
+.rp .sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.rp .sw.go{background:var(--go)}.rp .sw.nogo{background:var(--nogo)}.rp .sw.nod{background:var(--nod)}
+.rp details{margin:6px 0}.rp summary{cursor:pointer}
+.rp pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;font:12.5px/1.4 var(--font-mono)}
+.rp .foot{color:var(--mut);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
+.rp .mine{color:var(--warn);font-weight:600}
+`;
+
+function dayTicks(grid, tz) {
+  const out = [];
+  grid.forEach((ts, i) => { const d = localD(ts, tz); if (d.getUTCHours() === 0 || i === 0) out.push([i, d, d.getUTCHours() === 0]); });
+  return out;
+}
+const dayLabel = d => `${WD[(d.getUTCDay() + 6) % 7]} ${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}`;
+
+function timelineSvg(res, tz, rows) {
+  const grid = res.grid, n = grid.length, left = 178, right = 12, rowh = 22, top = 34, W = 980;
+  const cw = (W - left - right) / n, H = top + rowh * rows.length + 8;
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Linha do tempo GO / NO-GO por fonte">`];
+  for (const [i, d, mid] of dayTicks(grid, tz)) {
+    const x = left + i * cw;
+    o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top - 6}" x2="${x.toFixed(1)}" y2="${H - 6}"/>`);
+    if (mid && (n - i) * cw > 34) o.push(`<text class="mut" x="${(x + 3).toFixed(1)}" y="${top - 12}" font-size="11">${dayLabel(d)}</text>`);
+  }
+  rows.forEach(([label, status], r) => {
+    const y = top + r * rowh;
+    o.push(`<text x="${left - 8}" y="${y + 14}" font-size="12" text-anchor="end"${r === 0 ? ' font-weight="600"' : ''}>${esc(label)}</text>`);
+    status.forEach((s, i) => o.push(`<rect class="${s === 'go' ? 'go' : s === 'nogo' ? 'nogo' : 'nod'}" x="${(left + i * cw).toFixed(2)}" y="${y}" width="${(cw + 0.35).toFixed(2)}" height="${rowh - 5}"/>`));
+  });
+  o.push('</svg>');
+  return o.join('');
+}
+function niceMax(v) {
+  for (const c of [1, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200]) if (v <= c) return c;
+  return Math.trunc(v) + 1;
+}
+function lineChartSvg(res, tz, key, title, unit, limit, aria) {
+  const grid = res.grid, n = grid.length;
+  const series = res.sources.map(s => [s.label, s[key]]);
+  const vals = series.flatMap(([, a]) => a).filter(v => v !== null && v !== undefined);
+  if (limit !== null && limit !== undefined) vals.push(limit);
+  if (!vals.length) return `<p class="sub">Sem dados de ${esc(title.toLowerCase())} neste ponto.</p>`;
+  const ymax = niceMax(Math.max(...vals) * 1.08);
+  const W = 980, H = 230, left = 46, right = 12, top = 14, bot = 26, pw = W - left - right, ph = H - top - bot;
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, Y = v => top + ph - (v / ymax) * ph;
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`];
+  for (let k = 0; k <= 5; k++) {
+    const v = ymax * k / 5, y = Y(v);
+    o.push(`<line class="grid" x1="${left}" y1="${y.toFixed(1)}" x2="${W - right}" y2="${y.toFixed(1)}"/>`);
+    o.push(`<text class="mut" x="${left - 6}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end">${+v.toFixed(2)}</text>`);
+  }
+  o.push(`<text class="mut" x="4" y="10" font-size="11">${esc(unit)}</text>`);
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) {
+    const x = X(i);
+    o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + ph}"/>`);
+    if ((n - i) / n * pw > 40) o.push(`<text class="mut" x="${(x + 3).toFixed(1)}" y="${H - 8}" font-size="11">${dayLabel(d)}</text>`);
+  }
+  if (limit !== null && limit !== undefined) {
+    o.push(`<line class="lim" x1="${left}" y1="${Y(limit).toFixed(1)}" x2="${W - right}" y2="${Y(limit).toFixed(1)}"/>`);
+    o.push(`<text x="${W - right - 4}" y="${(Y(limit) - 4).toFixed(1)}" font-size="11" text-anchor="end" style="fill:var(--nogo)">limite ${limit} ${esc(unit)}</text>`);
+  }
+  series.forEach(([, arr], si) => {
+    const c = (si % 5) + 1; let seg = [];
+    const flush = () => {
+      if (seg.length > 1) o.push(`<polyline class="ln l${c}" points="${seg.join(' ')}"/>`);
+      else if (seg.length === 1) { const [x, y] = seg[0].split(','); o.push(`<circle class="k${c}" cx="${x}" cy="${y}" r="1.8"/>`); }
+      seg = [];
+    };
+    arr.forEach((v, i) => { if (v === null || v === undefined) flush(); else seg.push(`${X(i).toFixed(1)},${Y(v).toFixed(1)}`); });
+    flush();
+  });
+  o.push('</svg>');
+  const leg = series.map(([l], i) => `<span><i class="sw" style="background:var(--c${(i % 5) + 1})"></i>${esc(l)}</span>`).join('');
+  return `<div class="legend">${leg}</div>${o.join('')}`;
+}
+function windowsTable(wins, grid, tz, showSources) {
+  if (!wins.length) return '<p class="sub">Nenhuma janela.</p>';
+  const head = `<tr><th>Início</th><th>Fim</th><th class="n">Duração</th><th class="n">Hs máx (m)</th><th class="n">Vento máx (kn)</th><th class="n">Rajada máx (kn)</th>${showSources ? '<th class="n">Fontes</th>' : ''}</tr>`;
+  const rows = wins.map(w => `<tr><td>${fmt(grid[w.i0], tz)}</td><td>${fmt(grid[w.i1 - 1] + HOUR, tz)}</td><td class="n">${w.hours} h</td><td class="n">${num(w.max_hs)}</td><td class="n">${num(w.max_wind, 0)}</td><td class="n">${num(w.max_gust, 0)}</td>${showSources ? `<td class="n">${w.min_sources}</td>` : ''}</tr>`).join('');
+  return `<div class="tw"><table>${head}${rows}</table></div>`;
+}
+function limitsTable(L) {
+  const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
+  const rows = [['Hs máxima', v(L.hs_max, 'm')], ['Tp mínima', v(L.tp_min, 's')], ['Vento máximo (10 m)', v(L.wind_max, 'kn')], ['Rajada máxima', v(L.gust_max, 'kn')],
+    ['Somente diurno', L.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${L.min_window_h} h seguidas`]];
+  return `<table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')}</table>`;
+}
+function navySection(ctx, tz) {
+  const ws = ctx.navyWarnings, info = ctx.navyInfo;
+  const mine = (ctx.location.areas || '').split(',').map(a => a.trim().toUpperCase()).filter(Boolean);
+  const o = [];
+  if (!ws.length) o.push('<p class="sub">Nenhum aviso de mau tempo registrado com vigência dentro do período.</p>');
+  for (const w of ws) {
+    const up = (w.text || '').toUpperCase();
+    const isMine = mine.length > 0 && mine.some(a => (w.areas || []).includes(a) || up.includes(a));
+    const vf = w.valid_from_ts ? fmt(w.valid_from_ts, tz) : '?', vt = w.valid_to_ts ? fmt(w.valid_to_ts, tz) : 'não identificada';
+    const areas = (w.areas || []).length ? w.areas.join(', ') : 'não identificadas';
+    o.push(`<details${isMine ? ' open' : ''}><summary><b>Aviso ${esc(w.number)}</b> — ${esc(w.kind || '')}${isMine ? ' <span class="mine">· na sua área</span>' : ''}<br><small class="sub">vigência ${vf} → ${vt} (${tzlabel(tz)}) · áreas: ${esc(areas)}</small></summary><pre>${esc(w.text)}</pre></details>`);
+  }
+  if (ws.length && !mine.length) o.push('<p class="sub">Dica: informe a(s) área(s) da Marinha no cadastro do local (ex.: GOLF, COSTEIRA) para destacar os avisos relevantes. Os avisos acima valem para toda a METAREA V.</p>');
+  const last = info.fetched_at ? fmtUtcFull(info.fetched_at) : 'nunca';
+  o.push(`<p class="sub">Fonte: <a href="https://www.marinha.mil.br/chm/dados-do-smm-avisos-de-mau-tempo/avisos-de-mau-tempo" target="_blank" rel="noopener">Marinha do Brasil / CHM — Avisos de Mau Tempo</a> · última importação: ${last} · situação: ${esc(info.status || 'nunca importado')}</p>`);
+  return o.join('');
+}
+
+function buildReport(ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, errors = ctx.errors, cons = res.conservative, cw = cons.windows;
+  const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
+  const tags = ctx.tags.length ? ctx.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('') : '—';
+  const alerts = [];
+  for (const e of errors) alerts.push(`<b>Fonte indisponível:</b> ${esc(e.label)} — ${esc(e.error)}`);
+  for (const s of res.sources) {
+    if (s.note) alerts.push(`<b>${esc(s.label)}:</b> ${esc(s.note)}`);
+    if (s.n_nodata) alerts.push(`<b>${esc(s.label)}:</b> ${s.n_nodata} h sem dado de algum parâmetro limitado (tratadas como não-GO).`);
+    const g = s.meta && s.meta.grid_wave;
+    if (g && g[0] !== undefined && g[0] !== null) {
+      const km = haversineKm(ctx.location.lat, ctx.location.lon, g[0], g[1]);
+      if (km > 40) alerts.push(`<b>${esc(s.label)}:</b> o ponto de grade de onda fica a ${km.toFixed(0)} km do ponto pedido; verifique se representa o local.`);
+    }
+  }
+  const ni = ctx.navyInfo || {};
+  if ((ni.status || '').startsWith('formato_nao_reconhecido')) alerts.push('<b>Avisos da Marinha:</b> o texto importado não foi reconhecido. Confira os avisos no site oficial antes de decidir.');
+  else if (!ni.fetched_at) alerts.push('<b>Avisos da Marinha:</b> nenhum aviso foi importado nesta ferramenta ainda; confira o site oficial.');
+  else if (ctx.navyStale) alerts.push('<b>Avisos da Marinha:</b> última importação há mais de 7 dias; confira o site oficial.');
+  if (res.sources.length === 1) alerts.push('Apenas <b>uma fonte</b> disponível: não há comparação nem cenário conservador real.');
+  for (const w of cw) if (w.min_sources < res.sources.length) {
+    alerts.push(`A janela de ${fmt(grid[w.i0], tz)} tem horas com menos fontes do que o total (mínimo ${w.min_sources} de ${res.sources.length}); previsão mais incerta.`); break;
+  }
+  const alertHtml = alerts.map(a => `<div class="alert">${a}</div>`).join('');
+
+  let verdict;
+  if (cw.length) {
+    const longest = cw.reduce((a, b) => b.hours > a.hours ? b : a);
+    verdict = `<div class="verdict"><h3>${cw.length} janela(s) operacional(is) no cenário conservador</h3>Primeira: ${fmt(grid[cw[0].i0], tz)} · mais longa: ${longest.hours} h (${fmt(grid[longest.i0], tz)}). Cenário conservador = todas as fontes dentro dos limites.</div>`;
+  } else {
+    const extra = res.optimistic.windows.length ? ` Há ${res.optimistic.windows.length} janela(s) se considerar a fonte mais favorável (veja a tabela otimista).` : '';
+    verdict = `<div class="verdict none"><h3>Nenhuma janela de ${lm.min_window_h} h seguidas no cenário conservador</h3>Nenhum período atende simultaneamente a todas as fontes.${extra}</div>`;
+  }
+  const rows = [['Conservador', cons.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])];
+  const legend = '<div class="legend"><span><i class="sw go"></i>GO</span><span><i class="sw nogo"></i>NO-GO</span><span><i class="sw nod"></i>sem dado</span></div>';
+  const srcRows = res.sources.map(s => {
+    const fa = s.fetched_at ? fmtUtc(s.fetched_at) : '–', m = s.meta || {};
+    const model = m.wind_model ? `${m.wind_model} / ${m.wave_model}` : '–';
+    return `<tr><td>${esc(s.label)}</td><td>${esc(model)}</td><td>${fa}</td><td class="n">${s.n_go}</td><td class="n">${s.n_nogo}</td><td class="n">${s.n_nodata}</td><td class="n">${s.windows.length}</td></tr>`;
+  }).join('');
+  const srcTable = `<div class="tw"><table><tr><th>Fonte</th><th>Modelos (vento / onda)</th><th>Importado (UTC)</th><th class="n">h GO</th><th class="n">h NO-GO</th><th class="n">h sem dado</th><th class="n">Janelas</th></tr>${srcRows}</table></div>`;
+  const ag = res.agreement;
+  const agTxt = ag.pct === null ? 'Concordância não calculável (menos de duas fontes com dados).'
+    : `As fontes decidiram igual (GO ou NO-GO) em <b>${Math.round(ag.pct)}%</b> das ${ag.compared} horas comparáveis; divergiram em ${ag.disagree} h. Divergência alta significa previsão incerta: prefira o cenário conservador.`;
+  const perSource = res.sources.map(s => `<h3 style="font:600 14px var(--font-body);margin:14px 0 2px">${esc(s.label)}</h3>${windowsTable(s.windows, grid, tz, false)}${s.dropped_short ? `<p class="sub">${s.dropped_short} trecho(s) GO menor(es) que ${lm.min_window_h} h descartado(s).</p>` : ''}`).join('');
+
+  return `
+<h1>Relatório MetOcean — ${esc(ctx.location.name)}</h1>
+<p class="sub">Análise de janelas operacionais</p>
+<div class="meta">
+ <span>Ponto: <b>${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°</b></span>
+ <span>Operação: <b>${esc(ctx.profileName)}</b></span>
+ <span>Período: <b>${startL} → ${endL}</b> (${tzlabel(tz)})</span>
+ <span>Tags: ${tags}</span>
+ <span>Gerado: <b>${fmtUtcFull(ctx.generatedTs)}</b></span>
+</div>
+${alertHtml}
+${verdict}
+<h2>Janelas — cenário conservador</h2>
+${windowsTable(cw, grid, tz, true)}
+<h2>Linha do tempo por fonte</h2>
+${legend}
+${timelineSvg(res, tz, rows)}
+<h2>Altura significativa de onda (Hs)</h2>
+${lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')}
+<h2>Vento a 10 m</h2>
+${lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')}
+<h2>Comparação entre fontes</h2>
+<p>${agTxt}</p>
+${srcTable}
+<details><summary>Janelas de cada fonte</summary>${perSource}</details>
+<details><summary>Cenário otimista (qualquer fonte dentro dos limites)</summary>${windowsTable(res.optimistic.windows, grid, tz, true)}</details>
+<h2>Avisos de Mau Tempo da Marinha</h2>
+${navySection(ctx, tz)}
+<h2>Limites aplicados</h2>
+${limitsTable(lm)}
+<p class="foot">Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em ${tzlabel(tz)}; dados originais em UTC. Previsões de vento e onda: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.</p>`;
+}
+
+/* =============================== estado e telas =============================== */
+const S = { locs: [], profs: [], analyses: [], navy: { warnings: [], fetched_at: null, status: null }, tags: [],
+  selLoc: null, selProf: null, rows: [], wind: null, wave: null, current: null };
+
+/* ---- tags ---- */
+function refreshTagList() {
+  let dl = $('#taglist');
+  if (!dl) { dl = el('datalist', { id: 'taglist' }); document.body.append(dl); }
+  dl.replaceChildren(...S.tags.map(t => el('option', { value: t })));
+}
+function TagInput(host) {
+  let tags = [];
+  const input = el('input', { type: 'text', placeholder: 'adicionar tag e Enter', list: 'taglist', 'aria-label': 'Adicionar tag', autocomplete: 'off' });
+  const wrap = el('div', { class: 'tags' });
+  host.replaceChildren(wrap);
+  const draw = () => wrap.replaceChildren(...tags.map(t => el('span', { class: 'chip' }, t,
+    el('button', { type: 'button', 'aria-label': `Remover tag ${t}`, onclick: () => { tags = tags.filter(x => x !== t); draw(); } }, '×'))), input);
+  const add = raw => {
+    for (const t of raw.split(',')) { const v = t.trim().slice(0, 30); if (v && !tags.some(x => x.toLowerCase() === v.toLowerCase())) tags.push(v); }
+    draw();
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(input.value); input.value = ''; input.focus(); }
+    else if (e.key === 'Backspace' && !input.value && tags.length) { tags.pop(); draw(); input.focus(); }
+  });
+  input.addEventListener('blur', () => { if (input.value.trim()) { add(input.value); input.value = ''; } });
+  draw();
+  return { get: () => { if (input.value.trim()) { add(input.value); input.value = ''; } return [...tags]; }, set: a => { tags = [...(a || [])]; draw(); } };
+}
+let locTags, anTags;
+
+/* ---- abas ---- */
+function showTab(name) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  document.querySelectorAll('section.panel').forEach(p => { p.hidden = p.id !== `p-${name}`; });
+  try { sessionStorage.setItem('mco:tab', name); } catch (e) { /* opcional */ }
+  if (name === 'historico') renderHistory();
+}
+
+/* ---- carregar tudo ---- */
+async function loadAll() {
+  try {
+    const [locs, profs, an, navy] = await Promise.all([Store.list('locations'), Store.list('profiles'), Store.list('analyses'), Store.get('navy', 'latest')]);
+    S.locs = locs.sort((a, b) => a.name.localeCompare(b.name, 'pt'));
+    S.profs = profs.sort((a, b) => a.name.localeCompare(b.name, 'pt'));
+    S.analyses = an.sort((a, b) => b.created_at - a.created_at);
+    S.navy = navy || { warnings: [], fetched_at: null, status: null };
+    S.tags = [...new Map([...S.locs, ...S.analyses].flatMap(x => x.tags || []).map(t => [t.toLowerCase(), t])).values()].sort((a, b) => a.localeCompare(b, 'pt'));
+    refreshTagList();
+  } catch (e) {
+    toast('Não consegui ler os dados salvos: ' + (e.message || e));
+  }
+  renderAll();
+}
+function renderAll() { renderLocs(); renderProfs(); renderHistory(); renderNavy(); renderSources(); updateLinks(); renderStoreBadge(); }
+
+function renderStoreBadge() {
+  const b = $('#store');
+  const m = { db: ['salvo na sua conta', ''], local: ['salvo só neste navegador', 'warn'], mem: ['não salvo (armazenamento bloqueado)', 'warn'] }[Store.kind];
+  b.textContent = m[0]; b.className = 'store ' + m[1];
+}
+
+/* ---- locais ---- */
+function parseCoords(text) {
+  const t = text.trim();
+  if (!t) return null;
+  const dms = [...t.matchAll(/(\d{1,3})\s*[°º:]\s*(\d{1,2})\s*['′’:]?\s*(?:([\d.,]+)\s*(?:["″”]|'')?)?\s*([NSLOEW])/gi)];
+  if (dms.length >= 2) {
+    const conv = m => { const v = +m[1] + (+m[2]) / 60 + (m[3] ? parseFloat(m[3].replace(',', '.')) / 3600 : 0); return ['S', 'O', 'W'].includes(m[4].toUpperCase()) ? -v : v; };
+    const a = dms[0], b = dms[1];
+    const latFirst = ['N', 'S'].includes(a[4].toUpperCase());
+    const lat = conv(latFirst ? a : b), lon = conv(latFirst ? b : a);
+    if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { lat, lon };
+    return null;
+  }
+  const m = t.match(/(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)/);
+  if (m) {
+    const lat = parseFloat(m[1].replace(',', '.')), lon = parseFloat(m[2].replace(',', '.'));
+    if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { lat, lon };
+  }
+  return null;
+}
+function updateSeeLink() {
+  const la = parseFloat($('#l-lat').value), lo = parseFloat($('#l-lon').value), a = $('#l-see');
+  if (Number.isFinite(la) && Number.isFinite(lo)) { a.href = `https://www.openstreetmap.org/?mlat=${la}&mlon=${lo}#map=9/${la}/${lo}`; a.hidden = false; } else a.hidden = true;
+}
+function renderLocs() {
+  const sel = $('#a-loc');
+  sel.replaceChildren(...(S.locs.length ? S.locs.map(l => el('option', { value: l.id }, l.name)) : [el('option', { value: '' }, 'Nenhum local salvo')]));
+  if (S.selLoc && S.locs.some(l => l.id === S.selLoc)) sel.value = S.selLoc;
+  $('#l-list').replaceChildren(...(S.locs.length ? S.locs.map(l => el('li', { class: l.id === S.selLoc ? 'sel' : '' },
+    el('div', { class: 't' }, l.name),
+    el('div', { class: 'm mono' }, `${l.lat.toFixed(4)}°, ${l.lon.toFixed(4)}° · ${tzlabel(l.tz_offset)}${l.areas ? ' · ' + l.areas : ''}`),
+    el('div', { class: 'tagrow' }, ...(l.tags || []).map(t => el('span', { class: 'tag' }, t))),
+    el('div', { style: 'margin-top:4px' }, el('button', { class: 'lnk', type: 'button', onclick: () => selectLoc(l.id) }, 'Editar')))) :
+    [el('li', { class: 'empty' }, 'Nenhum local salvo. Cole as coordenadas acima, dê um nome e salve.')]));
+  $('#l-del').hidden = !S.selLoc;
+  hintAnalysis();
+}
+function selectLoc(id) {
+  const l = S.locs.find(x => x.id === id); if (!l) return;
+  S.selLoc = id;
+  $('#l-name').value = l.name; $('#l-lat').value = l.lat; $('#l-lon').value = l.lon; $('#l-tz').value = l.tz_offset; $('#l-areas').value = l.areas || '';
+  locTags.set(l.tags); anTags.set(l.tags); $('#l-paste').value = ''; setMsg('#l-pastemsg', ''); setMsg('#l-msg', '');
+  updateSeeLink(); renderLocs(); updateLinks(); showTab('locais');
+}
+function newLoc() {
+  S.selLoc = null;
+  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-paste']) $(id).value = '';
+  $('#l-tz').value = -3; locTags.set([]); setMsg('#l-msg', ''); setMsg('#l-pastemsg', ''); updateSeeLink(); renderLocs();
+}
+async function saveLoc() {
+  const name = $('#l-name').value.trim(), lat = parseFloat($('#l-lat').value), lon = parseFloat($('#l-lon').value), tz = parseFloat($('#l-tz').value);
+  if (!name) return setMsg('#l-msg', 'Dê um nome ao local.', 'bad');
+  if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return setMsg('#l-msg', 'Latitude (−90 a 90) e longitude (−180 a 180) são obrigatórias.', 'bad');
+  if (!(tz >= -12 && tz <= 14)) return setMsg('#l-msg', 'Fuso deve estar entre −12 e 14.', 'bad');
+  const id = S.selLoc || newId();
+  const rec = { name, lat, lon, tz_offset: tz, areas: $('#l-areas').value.trim().slice(0, 100), tags: locTags.get(), created_at: (S.locs.find(l => l.id === id) || {}).created_at || now() };
+  try { await Store.set('locations', id, rec); S.selLoc = id; await loadAll(); setMsg('#l-msg', 'Local salvo.', 'ok'); anTags.set(rec.tags); }
+  catch (e) { setMsg('#l-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
+}
+async function delLoc() {
+  try { await Store.del('locations', S.selLoc); newLoc(); await loadAll(); toast('Local excluído. Relatórios antigos continuam no histórico.'); }
+  catch (e) { setMsg('#l-msg', 'Não foi possível excluir: ' + (e.message || e), 'bad'); }
+}
+
+/* ---- perfis ---- */
+const nOrNull = sel => { const v = $(sel).value.trim(); return v === '' ? null : Number(v); };
+function renderProfs() {
+  const opts = S.profs.map(p => el('option', { value: p.id }, p.name));
+  $('#p-sel').replaceChildren(...(opts.length ? opts : [el('option', { value: '' }, 'Nenhum perfil salvo')]));
+  $('#a-prof').replaceChildren(...(S.profs.length ? S.profs.map(p => el('option', { value: p.id }, p.name)) : [el('option', { value: '' }, 'Nenhum perfil salvo')]));
+  if (!S.selProf && S.profs.length) S.selProf = S.profs[0].id;
+  if (S.selProf && S.profs.some(p => p.id === S.selProf)) { $('#p-sel').value = S.selProf; $('#a-prof').value = S.selProf; fillProf(S.selProf, true); }
+  $('#p-seed').hidden = S.profs.length > 0;
+  $('#p-del').hidden = !S.selProf;
+}
+function fillProf(id, quiet) {
+  const p = S.profs.find(x => x.id === id); if (!p) return;
+  S.selProf = id; const l = p.limits;
+  $('#p-name').value = p.name; $('#p-hs').value = l.hs_max ?? ''; $('#p-tp').value = l.tp_min ?? '';
+  $('#p-wind').value = l.wind_max ?? ''; $('#p-gust').value = l.gust_max ?? ''; $('#p-win').value = l.min_window_h; $('#p-day').checked = !!l.daylight_only;
+  $('#p-sel').value = id; $('#a-prof').value = id;
+  if (!quiet) setMsg('#p-msg', '');
+}
+function newProf() {
+  S.selProf = null; $('#p-name').value = ''; $('#p-hs').value = 1.5; $('#p-tp').value = ''; $('#p-wind').value = 20; $('#p-gust').value = ''; $('#p-win').value = 4; $('#p-day').checked = false;
+  $('#p-del').hidden = true; setMsg('#p-msg', '');
+}
+async function saveProf() {
+  const name = $('#p-name').value.trim();
+  if (!name) return setMsg('#p-msg', 'Dê um nome ao perfil.', 'bad');
+  let limits;
+  try { limits = normalizeLimits({ hs_max: nOrNull('#p-hs'), tp_min: nOrNull('#p-tp'), wind_max: nOrNull('#p-wind'), gust_max: nOrNull('#p-gust'), min_window_h: $('#p-win').value, daylight_only: $('#p-day').checked }); }
+  catch (e) { return setMsg('#p-msg', e.message, 'bad'); }
+  const id = S.selProf || newId();
+  try { await Store.set('profiles', id, { name, limits, created_at: (S.profs.find(p => p.id === id) || {}).created_at || now() }); S.selProf = id; await loadAll(); setMsg('#p-msg', 'Perfil salvo.', 'ok'); }
+  catch (e) { setMsg('#p-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
+}
+async function delProf() {
+  try { await Store.del('profiles', S.selProf); S.selProf = null; await loadAll(); toast('Perfil excluído.'); }
+  catch (e) { setMsg('#p-msg', 'Não foi possível excluir: ' + (e.message || e), 'bad'); }
+}
+async function seedProfs() {
+  try { for (const p of DEFAULT_PROFILES) await Store.set('profiles', newId(), { ...p, created_at: now() }); await loadAll(); toast('Perfis de exemplo adicionados. Ajuste aos seus limites reais.'); }
+  catch (e) { setMsg('#p-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
+}
+
+/* ---- fontes e links ---- */
+function loadRows() {
+  try { const v = JSON.parse(localStorage.getItem('mco:rows') || 'null'); if (Array.isArray(v) && v.length) return v; } catch (e) { /* padrão */ }
+  return DEFAULT_SOURCES.map(r => ({ ...r }));
+}
+function saveRows() { try { localStorage.setItem('mco:rows', JSON.stringify(S.rows)); } catch (e) { /* opcional */ } }
+function renderSources() {
+  if (!S.rows.length) S.rows = loadRows();
+  const mk = (i, key, ph, label) => el('input', { value: S.rows[i][key], placeholder: ph, 'aria-label': label, autocomplete: 'off', spellcheck: 'false',
+    oninput: e => { S.rows[i][key] = e.target.value; saveRows(); updateLinks(); revalidatePastes(); } });
+  $('#src-body').replaceChildren(...S.rows.map((r, i) => el('tr', {},
+    el('td', {}, mk(i, 'label', 'Nome da fonte', `Nome da fonte ${i + 1}`)),
+    el('td', {}, mk(i, 'wind', '(melhor modelo)', `Modelo de vento ${i + 1}`)),
+    el('td', {}, mk(i, 'wave', '(melhor modelo)', `Modelo de onda ${i + 1}`)),
+    el('td', {}, S.rows.length > 1 ? el('button', { type: 'button', class: 'lnk', 'aria-label': `Remover fonte ${i + 1}`, onclick: () => { S.rows.splice(i, 1); saveRows(); renderSources(); updateLinks(); revalidatePastes(); } }, 'remover') : null))));
+}
+function currentLoc() { return S.locs.find(l => l.id === ($('#a-loc').value || S.selLoc)) || null; }
+function currentUrls() {
+  const loc = currentLoc(); if (!loc) return null;
+  const days = Math.max(1, Math.min(10, parseInt($('#a-days').value, 10) || 5));
+  return buildUrls(loc.lat, loc.lon, days, S.rows);
+}
+function updateLinks() {
+  const u = currentUrls();
+  for (const k of ['wind', 'wave']) {
+    const a = $(`#link-${k}`);
+    if (u) { a.href = u[k]; a.removeAttribute('aria-disabled'); a.style.opacity = ''; } else { a.href = '#'; a.setAttribute('aria-disabled', 'true'); a.style.opacity = '.5'; }
+  }
+}
+function hintAnalysis() {
+  const n = $('#a-hint');
+  if (!S.locs.length) { n.textContent = 'Cadastre um local na aba Locais para começar.'; n.className = 'msg warn'; }
+  else if (!S.profs.length) { n.textContent = 'Crie um perfil de limites na aba Limites (há perfis de exemplo).'; n.className = 'msg warn'; }
+  else { n.textContent = ''; n.className = 'msg'; }
+}
+function describeGrid(j, loc) {
+  if (j.latitude === undefined || !loc) return '';
+  const km = haversineKm(loc.lat, loc.lon, j.latitude, j.longitude);
+  return ` Ponto de grade a ${km.toFixed(km < 10 ? 1 : 0)} km do local.`;
+}
+function validatePaste(kind) {
+  const ta = $(`#paste-${kind}`), r = parseJsonText(ta.value, kind === 'wind' ? 'vento' : 'onda'), loc = currentLoc();
+  S[kind] = null;
+  if (r.empty) { setMsg(`#msg-${kind}`, ''); return; }
+  if (r.error) { setMsg(`#msg-${kind}`, r.error, 'bad'); return; }
+  const d = describePaste(r.json);
+  const missing = S.rows.filter(row => !hourlyPick(r.json.hourly, kind === 'wind' ? 'wind_speed_10m' : 'wave_height', (kind === 'wind' ? row.wind : row.wave).trim()));
+  S[kind] = r.json;
+  let msg = `${d.n} horas, de ${fmtUtc(d.t0)} a ${fmtUtc(d.t1)}.${describeGrid(r.json, loc)}`;
+  if (missing.length) { setMsg(`#msg-${kind}`, `${msg} Faltam modelos para: ${missing.map(m => m.label).join(', ')}.`, 'warn'); }
+  else setMsg(`#msg-${kind}`, msg, 'ok');
+}
+function revalidatePastes() { validatePaste('wind'); validatePaste('wave'); }
+
+
+/* ---- busca automática via navegador do app desktop (host:claude_browser) ---- */
+const HOSTB = 'host:claude_browser';
+function textOf(res) {
+  if (!res) return '';
+  if (typeof res.payload === 'string') return res.payload;
+  return (res.content || []).filter(b => b && b.type === 'text').map(b => b.text).join('\n');
+}
+function extractJson(txt) {
+  const cut = txt.indexOf('Tab Context:'), body = cut > 0 ? txt.slice(0, cut) : txt;
+  const a = body.indexOf('{'), z = body.lastIndexOf('}');
+  if (a < 0 || z < a) throw new Error('não encontrei o JSON na página');
+  const raw = body.slice(a, z + 1);
+  JSON.parse(raw);
+  return raw;
+}
+async function fetchViaBrowser(mcp, url) {
+  const opened = textOf(await mcp.callTool(HOSTB, 'preview_start', { url }));
+  const m = opened.match(/tabId\s+([A-Za-z0-9_-]+)/);
+  if (!m) throw new Error('o navegador do app não devolveu a aba aberta');
+  const tabId = m[1];
+  try {
+    const txt = textOf(await mcp.callTool(HOSTB, 'get_page_text', { tabId, max_chars: 4000000 }));
+    return extractJson(txt);
+  } finally { mcp.callTool(HOSTB, 'tabs_close', { tabId }).catch(() => {}); }
+}
+async function fetchDirect(url) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch(url, { signal: ctl.signal });
+    const txt = await r.text();
+    if (!r.ok) { let why = ''; try { why = JSON.parse(txt).reason || ''; } catch (e) { /* texto simples */ } throw new Error(`Open-Meteo respondeu ${r.status}${why ? ': ' + why : ''}`); }
+    JSON.parse(txt);
+    return txt;
+  } finally { clearTimeout(t); }
+}
+async function getRaw(mcp, url) {
+  try { return await fetchDirect(url); }   // páginas fora do ambiente restrito do Claude buscam direto
+  catch (e) {
+    if (e && /respondeu \d+/.test(e.message || '')) throw e;   // a API respondeu com erro: não adianta tentar outro caminho
+    if (!mcp) throw new Error('o navegador bloqueou a busca direta');
+    return fetchViaBrowser(mcp, url);
+  }
+}
+async function autoFetch() {
+  const msg = (t, k) => setMsg('#auto-msg', t, k);
+  const u = currentUrls();
+  if (!u) return msg('Escolha um local primeiro (aba Locais).', 'bad');
+  let mcp = null;
+  try { mcp = await claude.use('mcp'); } catch (e) { mcp = null; }
+  const btn = $('#auto'); btn.disabled = true;
+  try {
+    for (const k of ['wind', 'wave']) {
+      msg(`Buscando ${k === 'wind' ? 'vento' : 'ondas'}…`, '');
+      const raw = await getRaw(mcp, u[k]);
+      $(`#paste-${k}`).value = raw; validatePaste(k);
+    }
+    if (!S.wind || !S.wave) return msg('A resposta veio, mas não tem dados horários. Confira o local e os modelos.', 'bad');
+    msg('Previsão carregada.', 'ok');
+    await generate();
+  } catch (e) {
+    const c = e && e.code;
+    const t = c === 'server_not_connected' ? 'Só funciona dentro do app Claude para desktop, com o navegador do app ligado. Use os links abaixo.'
+      : (c === 'not_in_manifest' || c === 'approval_required' || c === 'cancelled') ? 'A permissão para abrir a Open-Meteo foi negada. Aceite no app ou use os links abaixo.'
+      : `Não consegui buscar automaticamente (${(e && e.message) || c || 'erro'}). Use os links abaixo.`;
+    msg(t, 'bad');
+  } finally { btn.disabled = false; }
+}
+
+/* ---- Marinha ---- */
+function renderNavy() {
+  const n = S.navy, ws = (n.warnings || []).slice().sort((a, b) => (b.issued_ts || 0) - (a.issued_ts || 0));
+  const act = warningsFor(ws, now(), now() + 10 * 86400, n.fetched_at || 0);
+  const line = !n.fetched_at ? 'Nenhum aviso importado ainda. Os relatórios vão alertar isso.' :
+    `Última importação: ${fmtUtcFull(n.fetched_at)} · ${n.status || ''} · ${act.length} aviso(s) com vigência nos próximos dias.`;
+  $('#navy-line').textContent = line; $('#n-info').textContent = line;
+  $('#n-list').replaceChildren(...(ws.length ? ws.map(w => el('li', {},
+    el('div', { class: 't' }, `Aviso ${w.number} — ${w.kind || ''}`),
+    el('div', { class: 'm' }, `Áreas: ${(w.areas || []).join(', ') || 'não identificadas'}${w.valid_to_ts ? ' · válido até ' + fmt(w.valid_to_ts, -3) + ' (UTC−3)' : ' · validade não identificada'}`),
+    el('details', {}, el('summary', {}, 'Texto original'), el('pre', { style: 'white-space:pre-wrap;font:12px var(--font-mono)' }, w.text)))) : [el('li', { class: 'empty' }, 'Nenhum aviso salvo.')]));
+}
+
+async function fetchNavy() {
+  setMsg('#n-msg', 'Buscando no site da Marinha…', '');
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch('https://www.marinha.mil.br/chm/dados-do-smm-avisos-de-mau-tempo/avisos-de-mau-tempo', { signal: ctl.signal });
+    if (!r.ok) throw new Error('o site respondeu ' + r.status);
+    const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+    doc.querySelectorAll('script,style,noscript').forEach(n => n.remove());
+    $('#n-text').value = (doc.body.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n');
+    await importNavy();
+  } catch (e) {
+    setMsg('#n-msg', 'O navegador não deixou buscar direto do site da Marinha. Abra a página, copie o texto e cole na caixa abaixo.', 'warn');
+  } finally { clearTimeout(t); }
+}
+async function importNavy() {
+  const text = $('#n-text').value;
+  if (text.trim().length < 20) return setMsg('#n-msg', 'Cole o texto copiado da página de avisos.', 'bad');
+  const [found, status] = parseNavy(text);
+  const known = new Map((S.navy.warnings || []).map(w => [w.hash, w]));
+  let added = 0; for (const w of found) { if (!known.has(w.hash)) added++; known.set(w.hash, w); }
+  const merged = [...known.values()].sort((a, b) => (b.issued_ts || 0) - (a.issued_ts || 0)).slice(0, 60);
+  const rec = { warnings: merged, fetched_at: now(), status };
+  try { await Store.set('navy', 'latest', rec); S.navy = rec; $('#n-text').value = ''; renderNavy();
+    setMsg('#n-msg', status === 'formato_nao_reconhecido' ? 'Formato não reconhecido. Copie o texto direto da página oficial.' : `${status} · ${added} novo(s).`, status === 'formato_nao_reconhecido' ? 'bad' : 'ok'); }
+  catch (e) { setMsg('#n-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
+}
+
+/* ---- gerar ---- */
+function injectReportCss() { const s = el('style', { id: 'report-css' }); s.textContent = REPORT_CSS; document.head.append(s); }
+
+async function generate() {
+  const loc = currentLoc(), profId = $('#a-prof').value, prof = S.profs.find(p => p.id === profId);
+  const msg = (t, k) => setMsg('#go-msg', t, k);
+  if (!loc) return msg('Escolha um local (aba Locais).', 'bad');
+  if (!prof) return msg('Escolha um perfil de limites (aba Limites).', 'bad');
+  revalidatePastes();
+  if (!S.wind || !S.wave) return msg('Cole o texto do vento e o das ondas (etapa 2).', 'bad');
+  const days = Math.max(1, Math.min(10, parseInt($('#a-days').value, 10) || 5));
+  const startTs = Math.floor(now() / HOUR) * HOUR, endTs = startTs + days * 86400;
+  const ok = [], errors = [];
+  for (const row of S.rows) {
+    try { const r = buildSeries(S.wind, S.wave, row, startTs, endTs); ok.push({ id: row.label, label: row.label || 'Fonte', fetched_at: now(), ...r }); }
+    catch (e) { errors.push({ label: row.label || 'Fonte', error: e.message }); }
+  }
+  if (!ok.length) return msg('Nenhuma fonte pôde ser montada: ' + errors.map(e => `${e.label}: ${e.error}`).join('; '), 'bad');
+  let result;
+  try { result = analyze(ok, prof.limits, loc.lat, loc.lon, startTs, endTs); } catch (e) { return msg('Erro na análise: ' + e.message, 'bad'); }
+  const tags = anTags.get();
+  const ctx = { result, errors, location: { name: loc.name, lat: loc.lat, lon: loc.lon, tz_offset: loc.tz_offset, areas: loc.areas || '' }, profileName: prof.name, tags,
+    navyWarnings: warningsFor(S.navy.warnings || [], startTs, endTs, S.navy.fetched_at || 0), navyInfo: { fetched_at: S.navy.fetched_at, status: S.navy.status },
+    navyStale: !S.navy.fetched_at || (now() - S.navy.fetched_at) > 7 * 86400, generatedTs: now() };
+  showReport(ctx);
+  msg(errors.length ? `Relatório gerado; ${errors.length} fonte(s) com problema (veja os alertas).` : 'Relatório gerado.', errors.length ? 'warn' : 'ok');
+  await saveAnalysis(ctx, loc, prof);
+}
+function showReport(ctx) {
+  S.current = ctx;
+  $('#report').innerHTML = buildReport(ctx);
+  $('#report-wrap').classList.add('on');
+  $('#report-wrap').scrollIntoView({ block: 'start' });
+}
+async function saveAnalysis(ctx, loc, prof) {
+  const id = newId(), res = ctx.result, cw = res.conservative.windows;
+  const longest = cw.length ? cw.reduce((a, b) => b.hours > a.hours ? b : a) : null;
+  const summary = { windows: cw.length, longest_h: longest ? longest.hours : 0, agreement_pct: res.agreement.pct, sources_ok: res.sources.length, sources_failed: ctx.errors.length };
+  const slim = { ...ctx, result: { ...res, sources: res.sources.map(s => ({ ...s })) } };
+  try {
+    await Store.set('results', id, slim);
+    await Store.set('analyses', id, { location_name: loc.name, profile_name: prof.name, start_ts: res.start_ts, end_ts: res.end_ts, tags: ctx.tags, summary, created_at: now() });
+    S.analyses.unshift({ id, location_name: loc.name, profile_name: prof.name, start_ts: res.start_ts, end_ts: res.end_ts, tags: ctx.tags, summary, created_at: now() });
+    for (const t of ctx.tags) if (!S.tags.some(x => x.toLowerCase() === t.toLowerCase())) S.tags.push(t);
+    refreshTagList(); renderHistory(); setMsg('#rp-saved', 'Salvo no histórico.', 'ok');
+    // mantém só os 40 mais recentes
+    for (const old of S.analyses.splice(40)) { await Store.del('analyses', old.id); await Store.del('results', old.id); }
+  } catch (e) { setMsg('#rp-saved', 'Relatório gerado, mas não foi possível salvar no histórico: ' + (e.message || e), 'warn'); }
+}
+
+/* ---- histórico ---- */
+function renderHistory() {
+  const sel = $('#h-tag'), keep = sel.value;
+  sel.replaceChildren(el('option', { value: '' }, 'todas'), ...S.tags.map(t => el('option', { value: t }, t)));
+  sel.value = S.tags.includes(keep) ? keep : '';
+  const tag = sel.value.toLowerCase();
+  const list = S.analyses.filter(a => !tag || (a.tags || []).some(t => t.toLowerCase() === tag));
+  $('#h-list').replaceChildren(...(list.length ? list.map(a => {
+    const s = a.summary || {}, d = new Date(a.created_at * 1000);
+    const ask = el('span', { class: 'msg', hidden: true }, 'Excluir mesmo? ',
+      el('button', { type: 'button', class: 'lnk', onclick: () => deleteAnalysis(a.id) }, 'Sim'), ' · ',
+      el('button', { type: 'button', class: 'lnk', onclick: () => { ask.hidden = true; } }, 'Não'));
+    return el('li', {},
+      el('div', { class: 't' }, `${a.location_name} — ${a.profile_name}`),
+      el('div', { class: 'm' }, `gerado ${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${p2(d.getHours())}:${p2(d.getMinutes())} · ${s.windows ?? 0} janela(s) conservadora(s)${s.longest_h ? ' · mais longa ' + s.longest_h + ' h' : ''}${s.agreement_pct !== null && s.agreement_pct !== undefined ? ' · concordância ' + Math.round(s.agreement_pct) + '%' : ''}`),
+      el('div', { class: 'tagrow' }, ...(a.tags || []).map(t => el('span', { class: 'tag' }, t))),
+      el('div', { class: 'row', style: 'margin-top:4px' }, el('button', { type: 'button', class: 'lnk', onclick: () => openAnalysis(a.id) }, 'Abrir relatório'),
+        el('button', { type: 'button', class: 'lnk', onclick: () => { ask.hidden = false; } }, 'Excluir'), ask));
+  }) : [el('li', { class: 'empty' }, S.analyses.length ? 'Nenhuma análise com essa tag.' : 'Nenhum relatório gerado ainda.')]));
+}
+async function openAnalysis(id) {
+  try {
+    const r = await Store.get('results', id);
+    if (!r) return toast('Esse relatório não está mais disponível.');
+    showTab('analise'); showReport(r); setMsg('#rp-saved', 'Relatório do histórico.', '');
+  } catch (e) { toast('Não foi possível abrir: ' + (e.message || e)); }
+}
+async function deleteAnalysis(id) {
+  try { await Store.del('analyses', id); await Store.del('results', id); S.analyses = S.analyses.filter(a => a.id !== id); renderHistory(); }
+  catch (e) { toast('Não foi possível excluir: ' + (e.message || e)); }
+}
+
+/* ---- baixar ---- */
+async function downloadReport() {
+  if (!S.current) return;
+  let dl = null; try { dl = await window.claude.use('downloads'); } catch (e) { /* ausente */ }
+  if (!dl) return toast('Download indisponível neste ambiente.');
+  const tokens = $('#tokens').textContent, ctx = S.current;
+  const slug = ctx.location.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'relatorio';
+  const d = new Date(ctx.generatedTs * 1000);
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}</style></head><body><main class="rp">${buildReport(ctx)}</main></body></html>`;
+  try { await dl.save({ filename: `metocean-${slug}-${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}.html`, data: html }); }
+  catch (e) { if (e && e.code !== 'declined') toast('Não foi possível baixar: ' + (e.message || e)); }
+}
+async function initDownloads() {
+  try { const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; $('#rp-download').hidden = !dl; } catch (e) { $('#rp-download').hidden = true; }
+}
+
+/* =============================== início =============================== */
+async function init() {
+  injectReportCss();
+  document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  locTags = TagInput($('#l-tags')); anTags = TagInput($('#a-tags'));
+  S.rows = loadRows(); renderSources();
+
+  $('#l-paste').addEventListener('input', e => {
+    const c = parseCoords(e.target.value);
+    if (!e.target.value.trim()) return setMsg('#l-pastemsg', '');
+    if (!c) return setMsg('#l-pastemsg', 'Não reconheci as coordenadas. Use -22.9519, -43.1859 ou 22°57′S 43°11′W.', 'bad');
+    $('#l-lat').value = +c.lat.toFixed(5); $('#l-lon').value = +c.lon.toFixed(5); updateSeeLink();
+    setMsg('#l-pastemsg', `Latitude ${c.lat.toFixed(5)}, longitude ${c.lon.toFixed(5)}.`, 'ok');
+  });
+  for (const id of ['#l-lat', '#l-lon']) $(id).addEventListener('input', updateSeeLink);
+  $('#l-save').addEventListener('click', saveLoc);
+  $('#l-new').addEventListener('click', newLoc);
+  $('#l-del').addEventListener('click', () => { $('#l-del-ask').hidden = false; });
+  $('#l-del-no').addEventListener('click', () => { $('#l-del-ask').hidden = true; });
+  $('#l-del-yes').addEventListener('click', () => { $('#l-del-ask').hidden = true; delLoc(); });
+
+  $('#p-sel').addEventListener('change', e => fillProf(e.target.value));
+  $('#a-prof').addEventListener('change', e => fillProf(e.target.value));
+  $('#p-save').addEventListener('click', saveProf);
+  $('#p-new').addEventListener('click', newProf);
+  $('#p-del').addEventListener('click', () => { $('#p-del-ask').hidden = false; });
+  $('#p-del-no').addEventListener('click', () => { $('#p-del-ask').hidden = true; });
+  $('#p-del-yes').addEventListener('click', () => { $('#p-del-ask').hidden = true; delProf(); });
+  $('#p-seed').addEventListener('click', seedProfs);
+
+  $('#a-loc').addEventListener('change', e => { const l = S.locs.find(x => x.id === e.target.value); if (l) { S.selLoc = l.id; anTags.set(l.tags); } updateLinks(); revalidatePastes(); });
+  $('#a-days').addEventListener('input', updateLinks);
+  $('#src-add').addEventListener('click', () => { S.rows.push({ label: `Fonte ${S.rows.length + 1}`, wind: '', wave: '' }); saveRows(); renderSources(); updateLinks(); });
+  $('#src-reset').addEventListener('click', () => { S.rows = DEFAULT_SOURCES.map(r => ({ ...r })); saveRows(); renderSources(); updateLinks(); revalidatePastes(); });
+  for (const k of ['wind', 'wave']) {
+    let t = null;
+    $(`#paste-${k}`).addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => validatePaste(k), 250); });
+    $(`#copy-${k}`).addEventListener('click', async () => {
+      const u = currentUrls(); if (!u) return toast('Escolha um local primeiro.');
+      try { await navigator.clipboard.writeText(u[k]); toast('Link copiado.'); } catch (e) { toast('Não consegui copiar; use o botão Abrir.'); }
+    });
+  }
+  $('#auto').addEventListener('click', autoFetch);
+  $('#go-avisos').addEventListener('click', () => showTab('avisos'));
+  $('#n-import').addEventListener('click', importNavy);
+  $('#n-fetch').addEventListener('click', fetchNavy);
+  $('#h-tag').addEventListener('change', renderHistory);
+  $('#go').addEventListener('click', async () => { $('#go').disabled = true; try { await generate(); } finally { $('#go').disabled = false; } });
+  $('#rp-download').addEventListener('click', downloadReport);
+
+  renderAll();
+  let tab = 'analise'; try { tab = sessionStorage.getItem('mco:tab') || 'analise'; } catch (e) { /* padrão */ }
+  showTab(['analise', 'locais', 'limites', 'historico', 'avisos'].includes(tab) ? tab : 'analise');
+  await Store.init();
+  renderStoreBadge();
+  initDownloads();
+  await loadAll();
+  if (S.locs.length && !S.selLoc) { S.selLoc = S.locs[0].id; anTags.set(S.locs[0].tags); renderLocs(); updateLinks(); }
+}
+init();
+})();
+</script>

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MetOcean OP</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M2 12c4-5 7-5 10 0s6 5 10 0 5-4 8-1M2 21c4-5 7-5 10 0s6 5 10 0 5-4 8-1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+  <h1>MetOcean OP</h1></div>
+  <span class="sub">janelas operacionais de vento e onda · uso pessoal</span>
+  <span id="demo-badge" class="badge" hidden>MODO DEMONSTRAÇÃO</span>
+</header>
+
+<div id="navy-banner" class="banner" hidden></div>
+
+<div class="layout">
+  <section class="mapcol">
+    <div id="map" role="application" aria-label="Mapa para escolher o ponto da análise"></div>
+    <p class="hint">Clique no mapa para escolher o ponto. Arraste o marcador para ajustar.</p>
+  </section>
+
+  <section class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="analise" aria-selected="true">Análise</button>
+      <button role="tab" data-tab="locais" aria-selected="false">Locais</button>
+      <button role="tab" data-tab="limites" aria-selected="false">Limites</button>
+      <button role="tab" data-tab="historico" aria-selected="false">Histórico</button>
+      <button role="tab" data-tab="marinha" aria-selected="false">Marinha</button>
+    </div>
+
+    <!-- ANÁLISE -->
+    <div class="tabpanel" id="tab-analise">
+      <form id="form-analise" autocomplete="off">
+        <label>Local
+          <select id="an-location" required></select>
+        </label>
+        <label>Perfil de limites
+          <select id="an-profile" required></select>
+        </label>
+        <label>Período (dias a partir de agora)
+          <input id="an-days" type="number" min="1" max="10" value="5" required>
+        </label>
+        <div class="field">Tags desta análise
+          <div id="an-tags"></div>
+        </div>
+        <button type="submit" class="primary" id="an-submit">Solicitar análise</button>
+      </form>
+      <div id="an-status" class="status" aria-live="polite"></div>
+    </div>
+
+    <!-- LOCAIS -->
+    <div class="tabpanel" id="tab-locais" hidden>
+      <form id="form-local" autocomplete="off">
+        <label>Nome <input id="loc-name" maxlength="80" required></label>
+        <div class="row">
+          <label>Latitude <input id="loc-lat" type="number" step="any" min="-90" max="90" required></label>
+          <label>Longitude <input id="loc-lon" type="number" step="any" min="-180" max="180" required></label>
+        </div>
+        <div class="row">
+          <label>Fuso (horas de UTC) <input id="loc-tz" type="number" step="0.5" min="-12" max="14" value="-3" required></label>
+          <label>Área(s) da Marinha <input id="loc-areas" maxlength="100" placeholder="ex.: GOLF, COSTEIRA"></label>
+        </div>
+        <div class="field">Tags
+          <div id="loc-tags"></div>
+        </div>
+        <div class="row buttons">
+          <button type="submit" class="primary">Salvar local</button>
+          <button type="button" id="loc-new">Novo</button>
+          <button type="button" id="loc-del" class="danger">Excluir</button>
+        </div>
+      </form>
+      <h3>Locais salvos</h3>
+      <ul id="loc-list" class="list"></ul>
+    </div>
+
+    <!-- LIMITES -->
+    <div class="tabpanel" id="tab-limites" hidden>
+      <label>Perfil
+        <select id="pf-select"></select>
+      </label>
+      <form id="form-perfil" autocomplete="off">
+        <label>Nome <input id="pf-name" maxlength="80" required></label>
+        <div class="row">
+          <label>Hs máxima (m) <input id="pf-hs" type="number" step="0.1" min="0"></label>
+          <label>Tp mínimo (s) <input id="pf-tp" type="number" step="0.5" min="0" placeholder="não usar"></label>
+        </div>
+        <div class="row">
+          <label>Vento máximo (nós) <input id="pf-wind" type="number" step="1" min="0"></label>
+          <label>Rajada máxima (nós) <input id="pf-gust" type="number" step="1" min="0" placeholder="não usar"></label>
+        </div>
+        <div class="row">
+          <label>Janela mínima (h seguidas) <input id="pf-win" type="number" min="1" max="72" required></label>
+          <label class="check"><input id="pf-day" type="checkbox"> Somente período diurno</label>
+        </div>
+        <p class="hint">Campo vazio = limite não usado. Os perfis de exemplo trazem valores genéricos: ajuste aos limites reais de cada operação.</p>
+        <div class="row buttons">
+          <button type="submit" class="primary">Salvar perfil</button>
+          <button type="button" id="pf-new">Novo</button>
+          <button type="button" id="pf-del" class="danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="tabpanel" id="tab-historico" hidden>
+      <label>Filtrar por tag
+        <select id="hist-tag"><option value="">todas</option></select>
+      </label>
+      <ul id="hist-list" class="list"></ul>
+    </div>
+
+    <!-- MARINHA -->
+    <div class="tabpanel" id="tab-marinha" hidden>
+      <p id="navy-info" class="sub"></p>
+      <div class="row buttons">
+        <button id="navy-refresh" class="primary">Buscar agora</button>
+      </div>
+      <details>
+        <summary>Colar o texto dos avisos manualmente</summary>
+        <p class="hint">Se a busca automática falhar, copie o texto da página oficial de Avisos de Mau Tempo e cole aqui.</p>
+        <textarea id="navy-text" rows="6"></textarea>
+        <button id="navy-paste">Importar texto</button>
+      </details>
+      <h3>Avisos com vigência nos próximos dias</h3>
+      <ul id="navy-list" class="list"></ul>
+    </div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
