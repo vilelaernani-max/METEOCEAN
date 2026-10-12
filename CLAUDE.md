@@ -1,5 +1,6 @@
 # METEOCEAN
-nMetOcean OP: versão web (GitHub Pages, `index.html`) e versão local em Python (`local/`).
+
+MetOcean OP: versão web (GitHub Pages, `index.html`) e versão local em Python (`local/`).
 
 
 ## Regras (definidas pelo usuário)
