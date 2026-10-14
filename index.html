@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light dark}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
 <title>MetOcean OP</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1357,6 +1365,16 @@ async function init() {
   $('#q-go').addEventListener('click', quickRun);
   $('#q-coords').addEventListener('keydown', e => { if (e.key === 'Enter') quickRun(); });
   quickLoad();
+  // link com parâmetros: ?lat=-22.1&lon=-41.1&hs=1.5&vento=20&dias=5&gerar=1
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('lat') && q.get('lon')) {
+      $('#q-coords').value = `${q.get('lat')}, ${q.get('lon')}`;
+      for (const [k, id] of [['hs', '#q-hs'], ['vento', '#q-wind'], ['rajada', '#q-gust'], ['tp', '#q-tp'], ['janela', '#q-win'], ['dias', '#q-days']]) if (q.get(k) !== null) $(id).value = q.get(k);
+      if (q.get('diurno') === '1') $('#q-day').checked = true;
+      if (q.get('gerar') === '1') setTimeout(quickRun, 300);
+    }
+  } catch (e) { /* sem parâmetros */ }
   $('#go-avisos').addEventListener('click', () => showTab('avisos'));
   $('#n-import').addEventListener('click', importNavy);
   $('#n-fetch').addEventListener('click', fetchNavy);
@@ -1376,3 +1394,6 @@ async function init() {
 init();
 })();
 </script>
+
+</body>
+</html>
