@@ -684,6 +684,9 @@ const REPORT_CSS = `
 .rp .bar .g{background:var(--go)}.rp .bar .r{background:var(--nogo)}
 .rp .day .m{color:var(--mut);font-family:var(--font-mono);font-size:11.5px}
 .rp .dir{fill:none}
+.rp .wind2{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr);gap:12px 24px;align-items:start}
+.rp .wind2 svg{max-width:420px;margin:0 auto}
+@media (max-width:760px){.rp .wind2{grid-template-columns:1fr}}
 @media (max-width:700px){.rp .charts{grid-template-columns:1fr}}
 `;
 
@@ -781,17 +784,80 @@ function dirChartSvg(res, tz, key, aria) {
   const leg = series.map(([l], i) => `<span><i class="sw" style="background:var(--c${(i % 5) + 1})"></i>${esc(l)}</span>`).join('');
   return `<div class="legend">${leg}</div>${o.join('')}`;
 }
+const SECT16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+const SPD_CLASSES = [[0, 10, '< 10 kn'], [10, 20, '10–20 kn'], [20, 30, '20–30 kn'], [30, 1e9, '> 30 kn']];
+const sect16 = d => Math.round((((d % 360) + 360) % 360) / 22.5) % 16;
+/* estatística de vento: todas as horas de todas as fontes (ou de um subconjunto de índices) */
+function windStats(res, idxs) {
+  const cnt = new Array(16).fill(0), sum = new Array(16).fill(0), cls = Array.from({ length: 16 }, () => [0, 0, 0, 0]);
+  let n = 0, spdSum = 0, spdMax = null, gustMax = null;
+  for (const s of res.sources) {
+    const ii = idxs || res.grid.map((_, i) => i);
+    for (const i of ii) {
+      const d = s.wdir[i], v = s.wind[i];
+      if (v !== null && v !== undefined) { spdSum += v; n++; spdMax = Math.max(spdMax ?? -1, v); }
+      const g = s.gust[i]; if (g !== null && g !== undefined) gustMax = Math.max(gustMax ?? -1, g);
+      if (d === null || d === undefined || v === null || v === undefined) continue;
+      const k = sect16(d); cnt[k]++; sum[k] += v;
+      cls[k][SPD_CLASSES.findIndex(([a, b]) => v >= a && v < b)]++;
+    }
+  }
+  const tot = cnt.reduce((a, b) => a + b, 0);
+  if (!tot) return null;
+  let k = 0; cnt.forEach((c, i) => { if (c > cnt[k]) k = i; });
+  // setor predominante agrupado com os vizinhos (quadrante de 67,5°)
+  const grp = cnt[k] + cnt[(k + 1) % 16] + cnt[(k + 15) % 16];
+  return { sector: SECT16[k], pct: 100 * cnt[k] / tot, pctGroup: 100 * grp / tot, meanInSector: sum[k] / cnt[k], mean: n ? spdSum / n : null, max: spdMax, gustMax, cnt, cls, tot };
+}
+function windRoseSvg(res) {
+  const st = windStats(res);
+  if (!st) return '<p class="sub">Sem dados de direção do vento neste ponto.</p>';
+  const W = 420, H = 400, cx = W / 2, cy = 196, R = 150, maxc = Math.max(...st.cnt);
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Rosa dos ventos: frequência por direção e classe de velocidade">`];
+  for (const f of [0.25, 0.5, 0.75, 1]) o.push(`<circle class="dir" cx="${cx}" cy="${cy}" r="${(R * f).toFixed(1)}" style="stroke:var(--line)"/>`);
+  for (let k = 0; k < 16; k++) {
+    const a = (k * 22.5 - 90) * Math.PI / 180;
+    if (k % 4 === 0) o.push(`<line class="grid" x1="${cx}" y1="${cy}" x2="${(cx + R * Math.cos(a)).toFixed(1)}" y2="${(cy + R * Math.sin(a)).toFixed(1)}"/>`);
+    const lx = cx + (R + 14) * Math.cos(a), ly = cy + (R + 14) * Math.sin(a) + 4;
+    o.push(`<text class="mut" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="${k % 2 ? 9 : 11}" text-anchor="middle"${k % 4 === 0 ? ' font-weight="600"' : ''}>${SECT16[k]}</text>`);
+  }
+  const fills = ['var(--c4)', 'var(--c1)', 'var(--c2)', 'var(--nogo)'];
+  for (let k = 0; k < 16; k++) {
+    let r0 = 0;
+    st.cls[k].forEach((c, ci) => {
+      if (!c) return;
+      const r1 = r0 + R * c / maxc, half = 10 * Math.PI / 180, a0 = (k * 22.5 - 90) * Math.PI / 180 - half, a1 = a0 + 2 * half;
+      const P = (r, a) => `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
+      o.push(`<path d="M${P(r0, a0)} L${P(r1, a0)} A${r1.toFixed(1)},${r1.toFixed(1)} 0 0 1 ${P(r1, a1)} L${P(r0, a1)} A${r0.toFixed(1)},${r0.toFixed(1)} 0 0 0 ${P(r0, a0)} Z" fill="${fills[ci]}" stroke="var(--surface)" stroke-width="0.8"/>`);
+      r0 = r1;
+    });
+  }
+  o.push(`<text class="mut" x="12" y="14" font-size="10">anel externo = ${Math.round(100 * maxc / st.tot)}% das horas</text>`);
+  const ly = H - 14; let lx = 12;
+  SPD_CLASSES.forEach(([, , l], i) => { o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="10" fill="${fills[i]}"/><text x="${lx + 14}" y="${ly}" font-size="11">${l}</text>`); lx += 100; });
+  o.push('</svg>');
+  return o.join('');
+}
+function windSummaryHtml(res, tz) {
+  const st = windStats(res);
+  if (!st) return '';
+  const per = res.sources.map(s => { const w = windStats({ sources: [s], grid: res.grid }); return w ? `<tr><td>${esc(s.label)}</td><td><b>${w.sector}</b> (${Math.round(w.pct)}% das horas)</td><td class="n">${num(w.meanInSector, 0)}</td><td class="n">${num(w.mean, 0)}</td><td class="n">${num(w.max, 0)}</td><td class="n">${num(w.gustMax, 0)}</td></tr>` : ''; }).join('');
+  return `<div class="wind2"><div>
+<p>Direção predominante <b>${st.sector}</b>: ${Math.round(st.pct)}% das horas previstas (${Math.round(st.pctGroup)}% somando os setores vizinhos), com velocidade média de <b>${num(st.meanInSector, 0)} kn</b> nesse setor. No período todo: média <b>${num(st.mean, 0)} kn</b>, máximo <b>${num(st.max, 0)} kn</b>${st.gustMax !== null ? `, rajada máxima <b>${num(st.gustMax, 0)} kn</b>` : ''}. Direções indicam de onde o vento vem; todas as fontes somadas.</p>
+<div class="tw"><table><tr><th>Fonte</th><th>Predominante</th><th class="n">Média no setor (kn)</th><th class="n">Média (kn)</th><th class="n">Máx (kn)</th><th class="n">Rajada máx (kn)</th></tr>${per}</table></div>
+</div><div>${windRoseSvg(res)}</div></div>`;
+}
 function dailySummary(res, tz) {
   const grid = res.grid, st = res.conservative.status, days = new Map();
   grid.forEach((ts, i) => {
     const d = localD(ts, tz), k = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
-    if (!days.has(k)) days.set(k, { d, go: 0, nogo: 0, nod: 0, hs: null, wind: null });
-    const o = days.get(k); o[st[i] === 'go' ? 'go' : st[i] === 'nogo' ? 'nogo' : 'nod']++;
+    if (!days.has(k)) days.set(k, { d, go: 0, nogo: 0, nod: 0, hs: null, wind: null, idx: [] });
+    const o = days.get(k); o[st[i] === 'go' ? 'go' : st[i] === 'nogo' ? 'nogo' : 'nod']++; o.idx.push(i);
     for (const s of res.sources) { if (s.hs[i] !== null) o.hs = Math.max(o.hs ?? -1, s.hs[i]); if (s.wind[i] !== null) o.wind = Math.max(o.wind ?? -1, s.wind[i]); }
   });
   return `<div class="days">${[...days.values()].map(o => {
-    const n = o.go + o.nogo + o.nod;
-    return `<div class="day"><b>${dayLabel(o.d)}</b><div class="bar"><i class="g" style="width:${(100 * o.go / n).toFixed(1)}%"></i><i class="r" style="width:${(100 * o.nogo / n).toFixed(1)}%"></i></div>${o.go} h GO de ${n}<div class="m">Hs ${num(o.hs)} m · ${num(o.wind, 0)} kn</div></div>`;
+    const n = o.go + o.nogo + o.nod, w = windStats(res, o.idx);
+    return `<div class="day"><b>${dayLabel(o.d)}</b><div class="bar"><i class="g" style="width:${(100 * o.go / n).toFixed(1)}%"></i><i class="r" style="width:${(100 * o.nogo / n).toFixed(1)}%"></i></div>${o.go} h GO de ${n}<div class="m">Hs ${num(o.hs)} m · ${num(o.wind, 0)} kn</div>${w ? `<div class="m">vento ${w.sector} ${num(w.mean, 0)} kn</div>` : ''}</div>`;
   }).join('')}</div>`;
 }
 function kpis(res, tz) {
@@ -897,6 +963,8 @@ ${dailySummary(res, tz)}
 <h2>Linha do tempo por fonte</h2>
 ${legend}
 ${timelineSvg(res, tz, rows)}
+<h2>Vento predominante</h2>
+${windSummaryHtml(res, tz)}
 <div class="charts">
 <div><h2>Altura significativa (Hs)</h2>${lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')}</div>
 <div><h2>Período de pico (Tp)</h2>${lineChartSvg(res, tz, 'tp', 'Tp', 's', lm.tp_min, 'Tp por fonte com o limite operacional')}</div>
@@ -1114,11 +1182,11 @@ function pdfDays(pdf, res, tz) {
   const grid = res.grid, st = res.conservative.status, days = new Map();
   grid.forEach((ts, i) => {
     const d = localD(ts, tz), k = `${d.getUTCMonth()}-${d.getUTCDate()}`;
-    if (!days.has(k)) days.set(k, { d, go: 0, nogo: 0, nod: 0, hs: null, wind: null });
-    const o = days.get(k); o[st[i] === 'go' ? 'go' : st[i] === 'nogo' ? 'nogo' : 'nod']++;
+    if (!days.has(k)) days.set(k, { d, go: 0, nogo: 0, nod: 0, hs: null, wind: null, idx: [] });
+    const o = days.get(k); o[st[i] === 'go' ? 'go' : st[i] === 'nogo' ? 'nogo' : 'nod']++; o.idx.push(i);
     for (const s of res.sources) { if (s.hs[i] !== null) o.hs = Math.max(o.hs ?? -1, s.hs[i]); if (s.wind[i] !== null) o.wind = Math.max(o.wind ?? -1, s.wind[i]); }
   });
-  const list = [...days.values()], gap = 6, w = (PDF_W - 2 * PDF_M - gap * (list.length - 1)) / list.length, h = 46;
+  const list = [...days.values()], gap = 6, w = (PDF_W - 2 * PDF_M - gap * (list.length - 1)) / list.length, h = 56;
   pdf.ensure(h + 8);
   list.forEach((o, i) => {
     const x = PDF_M + i * (w + gap), n = o.go + o.nogo + o.nod;
@@ -1129,8 +1197,48 @@ function pdfDays(pdf, res, tz) {
     if (o.nogo) pdf.rect(x + 5 + (w - 10) * o.go / n, pdf.y + 16, (w - 10) * o.nogo / n, 5, { fill: PDF_COL.nogo });
     pdf.text(x + 5, pdf.y + 31, `${o.go} h GO de ${n}`, 7);
     pdf.text(x + 5, pdf.y + 41, `Hs ${num(o.hs)} m · ${num(o.wind, 0)} kn`, 6.5, { color: PDF_COL.mut });
+    const wst = windStats(res, o.idx); if (wst) pdf.text(x + 5, pdf.y + 50, `vento ${wst.sector} ${num(wst.mean, 0)} kn`, 6.5, { color: PDF_COL.mut });
   });
   pdf.y += h + 8;
+}
+function pdfWindRose(pdf, res, cx, cy, R) {
+  const st = windStats(res); if (!st) return;
+  const maxc = Math.max(...st.cnt), fills = [PDF_COL.c[3], PDF_COL.c[0], PDF_COL.c[1], PDF_COL.nogo];
+  for (const f of [0.25, 0.5, 0.75, 1]) { const pts = []; for (let a = 0; a <= 64; a++) { const t = a / 64 * 2 * Math.PI; pts.push([cx + R * f * Math.cos(t), cy + R * f * Math.sin(t)]); } pdf.poly(pts, { color: PDF_COL.line, lw: 0.4 }); }
+  for (let k = 0; k < 16; k++) {
+    const a = (k * 22.5 - 90) * Math.PI / 180;
+    if (k % 4 === 0) pdf.line(cx, cy, cx + R * Math.cos(a), cy + R * Math.sin(a));
+    pdf.text(cx + (R + 9) * Math.cos(a), cy + (R + 9) * Math.sin(a) + 2.5, SECT16[k], k % 2 ? 5.5 : 7, { color: PDF_COL.mut, align: 'center', bold: k % 4 === 0 });
+    let r0 = 0;
+    st.cls[k].forEach((c, ci) => {
+      if (!c) return;
+      const r1 = r0 + R * c / maxc, half = 10 * Math.PI / 180, a0 = a - half, a1 = a + half, pts = [];
+      for (let j = 0; j <= 6; j++) { const t = a0 + (a1 - a0) * j / 6; pts.push([cx + r1 * Math.cos(t), cy + r1 * Math.sin(t)]); }
+      for (let j = 6; j >= 0; j--) { const t = a0 + (a1 - a0) * j / 6; pts.push([cx + r0 * Math.cos(t), cy + r0 * Math.sin(t)]); }
+      pdf.cur.push(`${hexRgb(fills[ci])} rg ` + pts.map(([x, y], i) => `${x.toFixed(2)} ${pdf.py(y)} ${i ? 'l' : 'm'}`).join(' ') + ' h f');
+      r0 = r1;
+    });
+  }
+  pdf.text(cx - R - 10, cy - R - 4, `anel externo = ${Math.round(100 * maxc / st.tot)}% das horas`, 6, { color: PDF_COL.mut });
+  let lx = cx - R - 10; const ly = cy + R + 22;
+  SPD_CLASSES.forEach(([, , l], i) => { pdf.rect(lx, ly - 6, 6, 6, { fill: fills[i] }); pdf.text(lx + 9, ly, l, 6.5, { color: PDF_COL.mut }); lx += 52; });
+}
+function pdfWindSection(pdf, res) {
+  const st = windStats(res); if (!st) return;
+  pdf.ensure(230); pdf.h2('Vento predominante');
+  const R = 72, cx = PDF_W - PDF_M - R - 24, cy = pdf.y + R + 12, textW = PDF_W - 2 * PDF_M - 2 * R - 60, y0 = pdf.y;
+  pdf.para(`Direção predominante ${st.sector}: ${Math.round(st.pct)}% das horas previstas (${Math.round(st.pctGroup)}% com os setores vizinhos), velocidade média de ${num(st.meanInSector, 0)} kn nesse setor. Período todo: média ${num(st.mean, 0)} kn, máximo ${num(st.max, 0)} kn${st.gustMax !== null ? `, rajada máxima ${num(st.gustMax, 0)} kn` : ''}. Direções indicam de onde o vento vem; todas as fontes somadas.`, 8.5, { w: textW, gap: 6 });
+  const size = 7.5, lh = 11, cols = [['Fonte', 0.42], ['Predominante', 0.2], ['Méd. setor', 0.13, 'r'], ['Média', 0.12, 'r'], ['Máx', 0.13, 'r']];
+  let x = PDF_M; cols.forEach(([h, w, al]) => { pdf.text(al ? x + w * textW - 2 : x, pdf.y + size, h, size - 0.5, { bold: true, color: PDF_COL.mut, align: al ? 'right' : undefined }); x += w * textW; });
+  pdf.y += lh; pdf.line(PDF_M, pdf.y - 2, PDF_M + textW, pdf.y - 2);
+  for (const s of res.sources) {
+    const w = windStats({ sources: [s], grid: res.grid }); if (!w) continue;
+    const row = [s.label, `${w.sector} (${Math.round(w.pct)}%)`, num(w.meanInSector, 0) + ' kn', num(w.mean, 0) + ' kn', num(w.max, 0) + ' kn'];
+    x = PDF_M; cols.forEach(([, wd, al], i) => { pdf.text(al ? x + wd * textW - 2 : x, pdf.y + size, row[i], size, { align: al ? 'right' : undefined }); x += wd * textW; });
+    pdf.y += lh;
+  }
+  pdfWindRose(pdf, res, cx, cy, R);
+  pdf.y = Math.max(pdf.y, cy + R + 30) + 6;
 }
 function buildPdf(ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, cw = res.conservative.windows;
@@ -1181,6 +1289,7 @@ function buildPdf(ctx) {
   pdfDays(pdf, res, tz);
   pdf.ensure(res.sources.length * 13 + 90); pdf.h2('Linha do tempo por fonte');
   pdfTimeline(pdf, res, tz, [['Conservador', res.conservative.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])]);
+  pdfWindSection(pdf, res);
   pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
   pdfLineChart(pdf, res, tz, 'tp', 'Período de pico (Tp)', 's', lm.tp_min);
   pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
