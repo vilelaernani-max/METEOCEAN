@@ -30,6 +30,11 @@
 </style>
 <style>
 *{box-sizing:border-box}
+details.card>summary{cursor:pointer;font:600 14px var(--font-body);color:var(--accent);list-style:revert}
+details.card[open]>summary{margin-bottom:12px}
+details.card>.card{border:0;padding-inline:0;box-shadow:none}
+label.check{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font:400 14px var(--font-body);color:var(--ink)}
+label.check input{width:auto;margin:0}
 html,body{min-height:100%}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-body);padding-inline:16px;padding-block:0 48px}
 .wrap{max-width:980px;margin-inline:auto}
@@ -109,6 +114,25 @@ details>summary{cursor:pointer}
 <!-- ANÁLISE -->
 <section class="panel" id="p-analise" role="tabpanel" aria-labelledby="t-analise">
   <div class="card">
+    <h2>Análise rápida</h2>
+    <p class="note">Coordenadas, limites, e pronto: a previsão de vento e onda é buscada na Open-Meteo e o relatório sai na hora.</p>
+    <label>Coordenadas do ponto<input id="q-coords" class="f" placeholder="ex.: -22.9519, -43.1859  ou  22°57′S 43°11′W" autocomplete="off"></label>
+    <div id="q-coordsmsg" class="msg"></div>
+    <div class="grid" style="margin-top:8px">
+      <label>Hs máxima (m)<input id="q-hs" class="f" type="number" step="0.1" min="0" value="1.5"></label>
+      <label>Vento máximo (nós)<input id="q-wind" class="f" type="number" step="1" min="0" value="20"></label>
+      <label>Rajada máxima (nós)<input id="q-gust" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
+      <label>Tp mínimo (s)<input id="q-tp" class="f" type="number" step="0.5" min="0" placeholder="não usar"></label>
+      <label>Janela mínima (h seguidas)<input id="q-win" class="f" type="number" min="1" max="72" value="4"></label>
+      <label>Dias à frente<input id="q-days" class="f" type="number" min="1" max="10" value="5"></label>
+    </div>
+    <label class="check" style="margin-top:8px"><input id="q-day" type="checkbox"> Somente período diurno</label>
+    <div class="row" style="margin-top:12px;align-items:center"><button id="q-go" type="button" class="primary">Gerar previsão</button><span id="q-msg" class="msg" aria-live="polite"></span></div>
+  </div>
+
+  <details class="card" id="adv">
+  <summary>Modo completo: locais salvos, perfis de limites, fontes e colagem manual</summary>
+  <div class="card">
     <h2>1 · Ponto e operação</h2>
     <div class="grid">
       <label>Local <select id="a-loc" class="f"></select></label>
@@ -148,6 +172,7 @@ details>summary{cursor:pointer}
   </div>
 
   <div class="row"><button id="go" class="primary" type="button">Gerar relatório</button><span id="go-msg" class="msg" aria-live="polite"></span></div>
+  </details>
 
   <div id="report-wrap" class="card">
     <div class="rp-actions">
@@ -1010,8 +1035,8 @@ function updateLinks() {
 }
 function hintAnalysis() {
   const n = $('#a-hint');
-  if (!S.locs.length) { n.textContent = 'Cadastre um local na aba Locais para começar.'; n.className = 'msg warn'; }
-  else if (!S.profs.length) { n.textContent = 'Crie um perfil de limites na aba Limites (há perfis de exemplo).'; n.className = 'msg warn'; }
+  if (!S.locs.length) { n.textContent = 'Nenhum local salvo. Para o modo completo, cadastre um na aba Locais.'; n.className = 'msg'; }
+  else if (!S.profs.length) { n.textContent = 'Nenhum perfil salvo. Para o modo completo, crie um na aba Limites.'; n.className = 'msg'; }
   else { n.textContent = ''; n.className = 'msg'; }
 }
 function describeGrid(j, loc) {
@@ -1153,6 +1178,53 @@ async function generate() {
   revalidatePastes();
   if (!S.wind || !S.wave) return msg('Cole o texto do vento e o das ondas (etapa 2).', 'bad');
   const days = Math.max(1, Math.min(10, parseInt($('#a-days').value, 10) || 5));
+  await runAnalysis(loc, prof, days, anTags.get(), msg);
+}
+/* ---- análise rápida: coordenadas + limites → busca + relatório ---- */
+const QKEY = 'mco:quick';
+function quickLoad() {
+  try { const q = JSON.parse(localStorage.getItem(QKEY) || 'null'); if (!q) return;
+    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['win', '#q-win'], ['days', '#q-days']]) if (q[k] !== undefined) $(id).value = q[k];
+    $('#q-day').checked = !!q.day;
+  } catch (e) { /* opcional */ }
+}
+function quickSave() {
+  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked })); } catch (e) { /* opcional */ }
+}
+async function quickRun() {
+  const msg = (t, k) => setMsg('#q-msg', t, k);
+  const c = parseCoords($('#q-coords').value);
+  if (!c) return msg('Coordenadas não reconhecidas. Use -22.9519, -43.1859 ou 22°57′S 43°11′W.', 'bad');
+  let limits;
+  try { limits = normalizeLimits({ hs_max: nOrNull('#q-hs'), tp_min: nOrNull('#q-tp'), wind_max: nOrNull('#q-wind'), gust_max: nOrNull('#q-gust'), min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
+  catch (e) { return msg(e.message, 'bad'); }
+  const days = Math.max(1, Math.min(10, parseInt($('#q-days').value, 10) || 5));
+  quickSave();
+  const tz = -new Date().getTimezoneOffset() / 60;
+  const loc = { id: null, name: `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`, lat: c.lat, lon: c.lon, tz_offset: tz, areas: '', tags: [] };
+  const parts = [];
+  if (limits.hs_max !== null) parts.push(`Hs ≤ ${limits.hs_max} m`);
+  if (limits.wind_max !== null) parts.push(`vento ≤ ${limits.wind_max} kn`);
+  if (limits.gust_max !== null) parts.push(`rajada ≤ ${limits.gust_max} kn`);
+  if (limits.tp_min !== null) parts.push(`Tp ≥ ${limits.tp_min} s`);
+  const prof = { id: null, name: parts.join(', ') || 'sem limites', limits };
+  const btn = $('#q-go'); btn.disabled = true;
+  try {
+    let mcp = null;
+    try { mcp = await claude.use('mcp'); } catch (e) { mcp = null; }
+    const u = buildUrls(c.lat, c.lon, days, S.rows);
+    for (const k of ['wind', 'wave']) {
+      msg(`Buscando ${k === 'wind' ? 'vento' : 'ondas'}…`, '');
+      const raw = await getRaw(mcp, u[k]);
+      $(`#paste-${k}`).value = raw; validatePaste(k);
+    }
+    if (!S.wind || !S.wave) return msg('A resposta veio sem dados horários. Confira as coordenadas (ponto em terra?).', 'bad');
+    await runAnalysis(loc, prof, days, [], msg);
+  } catch (e) {
+    msg(`Não consegui buscar a previsão (${(e && e.message) || (e && e.code) || 'erro'}). Verifique a internet ou use o modo completo abaixo.`, 'bad');
+  } finally { btn.disabled = false; }
+}
+async function runAnalysis(loc, prof, days, tags, msg) {
   const startTs = Math.floor(now() / HOUR) * HOUR, endTs = startTs + days * 86400;
   const ok = [], errors = [];
   for (const row of S.rows) {
@@ -1162,7 +1234,6 @@ async function generate() {
   if (!ok.length) return msg('Nenhuma fonte pôde ser montada: ' + errors.map(e => `${e.label}: ${e.error}`).join('; '), 'bad');
   let result;
   try { result = analyze(ok, prof.limits, loc.lat, loc.lon, startTs, endTs); } catch (e) { return msg('Erro na análise: ' + e.message, 'bad'); }
-  const tags = anTags.get();
   const ctx = { result, errors, location: { name: loc.name, lat: loc.lat, lon: loc.lon, tz_offset: loc.tz_offset, areas: loc.areas || '' }, profileName: prof.name, tags,
     navyWarnings: warningsFor(S.navy.warnings || [], startTs, endTs, S.navy.fetched_at || 0), navyInfo: { fetched_at: S.navy.fetched_at, status: S.navy.status },
     navyStale: !S.navy.fetched_at || (now() - S.navy.fetched_at) > 7 * 86400, generatedTs: now() };
@@ -1283,6 +1354,9 @@ async function init() {
     });
   }
   $('#auto').addEventListener('click', autoFetch);
+  $('#q-go').addEventListener('click', quickRun);
+  $('#q-coords').addEventListener('keydown', e => { if (e.key === 'Enter') quickRun(); });
+  quickLoad();
   $('#go-avisos').addEventListener('click', () => showTab('avisos'));
   $('#n-import').addEventListener('click', importNavy);
   $('#n-fetch').addEventListener('click', fetchNavy);
