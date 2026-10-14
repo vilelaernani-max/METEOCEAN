@@ -812,8 +812,11 @@ function windStats(res, idxs) {
 function windRoseSvg(res) {
   const st = windStats(res);
   if (!st) return '<p class="sub">Sem dados de direção do vento neste ponto.</p>';
+  return roseSvg(st, SPD_CLASSES, ['var(--c4)', 'var(--c1)', 'var(--c2)', 'var(--nogo)'], 'Rosa dos ventos: frequência por direção e classe de velocidade');
+}
+function roseSvg(st, classes, fills, aria) {
   const W = 420, H = 400, cx = W / 2, cy = 196, R = 150, maxc = Math.max(...st.cnt);
-  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Rosa dos ventos: frequência por direção e classe de velocidade">`];
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`];
   for (const f of [0.25, 0.5, 0.75, 1]) o.push(`<circle class="dir" cx="${cx}" cy="${cy}" r="${(R * f).toFixed(1)}" style="stroke:var(--line)"/>`);
   for (let k = 0; k < 16; k++) {
     const a = (k * 22.5 - 90) * Math.PI / 180;
@@ -821,7 +824,6 @@ function windRoseSvg(res) {
     const lx = cx + (R + 14) * Math.cos(a), ly = cy + (R + 14) * Math.sin(a) + 4;
     o.push(`<text class="mut" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="${k % 2 ? 9 : 11}" text-anchor="middle"${k % 4 === 0 ? ' font-weight="600"' : ''}>${SECT16[k]}</text>`);
   }
-  const fills = ['var(--c4)', 'var(--c1)', 'var(--c2)', 'var(--nogo)'];
   for (let k = 0; k < 16; k++) {
     let r0 = 0;
     st.cls[k].forEach((c, ci) => {
@@ -834,7 +836,7 @@ function windRoseSvg(res) {
   }
   o.push(`<text class="mut" x="12" y="14" font-size="10">anel externo = ${Math.round(100 * maxc / st.tot)}% das horas</text>`);
   const ly = H - 14; let lx = 12;
-  SPD_CLASSES.forEach(([, , l], i) => { o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="10" fill="${fills[i]}"/><text x="${lx + 14}" y="${ly}" font-size="11">${l}</text>`); lx += 100; });
+  classes.forEach(([, , l], i) => { o.push(`<rect x="${lx}" y="${ly - 9}" width="10" height="10" fill="${fills[i]}"/><text x="${lx + 14}" y="${ly}" font-size="11">${l}</text>`); lx += 100; });
   o.push('</svg>');
   return o.join('');
 }
@@ -897,6 +899,85 @@ function navySection(ctx, tz) {
   return o.join('');
 }
 
+/* ---- regime de ondas no período previsto ---- */
+const HS_CLASSES = [[0, 1, '< 1 m'], [1, 1.5, '1–1,5 m'], [1.5, 2.5, '1,5–2,5 m'], [2.5, 1e9, '> 2,5 m']];
+const QUAD = [['N', 15, 0, 1], ['NE', 1, 2, 3], ['E', 3, 4, 5], ['SE', 5, 6, 7], ['S', 7, 8, 9], ['SW', 9, 10, 11], ['W', 11, 12, 13], ['NW', 13, 14, 15]];
+const quantile = (arr, q) => { if (!arr.length) return null; const a = [...arr].sort((x, y) => x - y), i = (a.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return a[lo] + (a[hi] - a[lo]) * (i - lo); };
+const mean = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+const stdev = arr => { if (arr.length < 2) return null; const m = mean(arr); return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / (arr.length - 1)); };
+const circMean = arr => { if (!arr.length) return null; let x = 0, y = 0; for (const d of arr) { x += Math.cos(d * Math.PI / 180); y += Math.sin(d * Math.PI / 180); } return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360; };
+const descr = arr => ({ n: arr.length, mean: mean(arr), median: quantile(arr, 0.5), p95: quantile(arr, 0.95), min: arr.length ? Math.min(...arr) : null, max: arr.length ? Math.max(...arr) : null, sd: stdev(arr) });
+function waveStats(res, tz) {
+  const hs = [], tp = [], dir = [], recs = [];
+  let maxRec = null;
+  for (const s of res.sources) res.grid.forEach((ts, i) => {
+    const h = s.hs[i], t = s.tp[i], d = s.wvdir[i];
+    if (h === null || h === undefined) return;
+    hs.push(h); if (t !== null && t !== undefined) tp.push(t); if (d !== null && d !== undefined) dir.push(d);
+    recs.push({ h, t, d, i });
+    if (!maxRec || h > maxRec.h) maxRec = { h, t, d, ts, src: s.label };
+  });
+  if (!hs.length) return null;
+  // rosa (16 setores x classes de Hs) e quadrantes
+  const cnt = new Array(16).fill(0), cls = Array.from({ length: 16 }, () => HS_CLASSES.map(() => 0));
+  for (const r of recs) if (r.d !== null && r.d !== undefined) { const k = sect16(r.d); cnt[k]++; cls[k][HS_CLASSES.findIndex(([a, b]) => r.h >= a && r.h < b)]++; }
+  const tot = cnt.reduce((a, b) => a + b, 0);
+  const q8 = new Array(8).fill(0);
+  for (const r of recs) if (r.d !== null && r.d !== undefined) q8[Math.round((((r.d % 360) + 360) % 360) / 45) % 8]++;
+  const quads = QUAD.map(([name, a, , c], qi) => ({ name, label: `${SECT16[a]}–${SECT16[c]}`, n: q8[qi], pct: tot ? 100 * q8[qi] / tot : 0 })).sort((x, y) => y.n - x.n);
+  // sea vs swell pelo Tp
+  const part = (pred) => { const r = recs.filter(x => x.t !== null && x.t !== undefined && pred(x.t)); const ds = r.filter(x => x.d !== null).map(x => x.d); return { n: r.length, pct: recs.length ? 100 * r.length / recs.length : 0, hs: mean(r.map(x => x.h)), tp: mean(r.map(x => x.t)), dir: circMean(ds), sector: ds.length ? SECT16[sect16(circMean(ds))] : null }; };
+  const swell = part(t => t >= 10), sea = part(t => t < 8), mixed = part(t => t >= 8 && t < 10);
+  // excedência (Hs conservador por hora = maior entre as fontes) e persistência abaixo do limite
+  const L = res.limits.hs_max, hsCons = res.grid.map((_, i) => { const v = res.sources.map(s => s.hs[i]).filter(x => x !== null && x !== undefined); return v.length ? Math.max(...v) : null; });
+  const valid = hsCons.filter(v => v !== null), thr = L !== null && L !== undefined ? [L, L + 1] : [1.5, 2.5];
+  const exc = { thr, below: 100 * valid.filter(v => v <= thr[0]).length / valid.length, mid: 100 * valid.filter(v => v > thr[0] && v <= thr[1]).length / valid.length, above: 100 * valid.filter(v => v > thr[1]).length / valid.length, curve: [0.5, 1, 1.5, 2, 2.5, 3, 4].map(h => [h, 100 * valid.filter(v => v > h).length / valid.length]) };
+  const runs = []; let run = 0; for (const v of hsCons) { if (v !== null && v <= thr[0]) run++; else { if (run) runs.push(run); run = 0; } } if (run) runs.push(run);
+  const persist = { mean: mean(runs), max: runs.length ? Math.max(...runs) : 0, n: runs.length };
+  return { hs: descr(hs), tp: descr(tp), dir: { mean: circMean(dir), min: dir.length ? Math.min(...dir) : null, max: dir.length ? Math.max(...dir) : null, n: dir.length }, maxRec, cnt, cls, tot, quads, swell, sea, mixed, exc, persist, nHours: res.grid.length, nSources: res.sources.length };
+}
+const WAVE_LABELS = /^(Metodologia e conjunto de dados|Regime geral|Distribuição direcional e sea vs\. swell|Excedência e janelas operacionais)\.\s/;
+const f2 = v => (v === null || v === undefined) ? '–' : v.toFixed(2).replace('.', ',');
+const f1 = v => (v === null || v === undefined) ? '–' : v.toFixed(1).replace('.', ',');
+const f0 = v => (v === null || v === undefined) ? '–' : String(Math.round(v));
+function waveClimateText(ctx, w) {
+  const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid;
+  const models = res.sources.map(s => s.label).join(', ');
+  const q1 = w.quads[0], q2 = w.quads[1];
+  const L = w.exc.thr, coordsTxt = `${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°`;
+  const comp = (c, nome, crit) => c.n ? `${f0(c.pct)}% dos registros correspondem a ${nome} (${crit}; Hs média ${f2(c.hs)} m, Tp médio ${f1(c.tp)} s${c.sector ? `, direção média ${c.sector}` : ''})` : `não há registros de ${nome} (${crit})`;
+  return [
+    `Caracterização do regime de ondas — ${ctx.location.name === coordsTxt ? coordsTxt : ctx.location.name + ' (' + coordsTxt + ')'}`,
+    `Metodologia e conjunto de dados. A caracterização foi realizada com base nas previsões numéricas de ondas da Open-Meteo (${models}), com resolução horária, cobrindo o período de ${fmt(grid[0], tz)} a ${fmt(grid[grid.length - 1] + HOUR, tz)} (${tzlabel(tz)}), totalizando ${w.nHours} horas de previsão por fonte (${w.hs.n} registros horários somando ${w.nSources} fonte(s)). Os parâmetros analisados compreendem a altura significativa (Hs), o período de pico (Tp) e a direção média de proveniência (Dir). Todas as direções seguem a convenção oceanográfica (de onde as ondas vêm, em relação ao Norte verdadeiro). Trata-se de previsão de curto prazo, não de climatologia: os valores descrevem apenas o período previsto.`,
+    `Regime geral. No período previsto, a altura significativa média foi de ${f2(w.hs.mean)} m, com valor máximo de ${f2(w.maxRec.h)} m em ${fmt(w.maxRec.ts, tz)} (${tzlabel(tz)}), fonte ${w.maxRec.src}. O período de pico (Tp) apresentou média de ${f1(w.tp.mean)} s, variando entre ${f1(w.tp.min)} s e ${f1(w.tp.max)} s. Estatística descritiva — Hs (m): média ${f2(w.hs.mean)}, mediana ${f2(w.hs.median)}, P95 ${f2(w.hs.p95)}, mínimo ${f2(w.hs.min)}, máximo ${f2(w.hs.max)}, desvio padrão ${f2(w.hs.sd)}; Tp (s): média ${f1(w.tp.mean)}, mediana ${f1(w.tp.median)}, P95 ${f1(w.tp.p95)}, mínimo ${f1(w.tp.min)}, máximo ${f1(w.tp.max)}, desvio padrão ${f1(w.tp.sd)}; Dir (°): média vetorial ${f0(w.dir.mean)}, mínimo ${f0(w.dir.min)}, máximo ${f0(w.dir.max)}.`,
+    w.tot ? `Distribuição direcional e sea vs. swell. A rosa de ondas demonstra predominância de ondas provenientes do quadrante ${q1.name} (${q1.label}), que responde por ${f0(q1.pct)}% das ocorrências.${q2 && q2.n ? ` A segunda componente com expressão significativa provém do quadrante ${q2.name} (${q2.label}), representando ${f0(q2.pct)}% dos registros.` : ''} Pela separação por período de pico: ${comp(w.swell, 'mar de fundo (swell)', 'Tp ≥ 10 s')}; ${comp(w.sea, 'vagas geradas localmente (sea)', 'Tp < 8 s')}; ${comp(w.mixed, 'mar misto', '8 s ≤ Tp < 10 s')}.` : 'Distribuição direcional: sem dados de direção de onda neste ponto.',
+    `Excedência e janelas operacionais. Considerando, hora a hora, a maior Hs entre as fontes (critério conservador): Hs ≤ ${f1(L[0])} m (operação contínua) em ${f1(w.exc.below)}% do tempo; ${f1(L[0])} m < Hs ≤ ${f1(L[1])} m (atenção operacional) em ${f1(w.exc.mid)}%; Hs > ${f1(L[1])} m (condição limite) em ${f1(w.exc.above)}% do período. O tempo médio de permanência contínua abaixo de ${f1(L[0])} m é de ${f0(w.persist.mean)} h (máximo ${w.persist.max} h, em ${w.persist.n} trecho(s)).`,
+  ].join('\n\n');
+}
+function waveClimateHtml(ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, w = waveStats(res, tz);
+  if (!w) return '<p class="sub">Sem dados de onda neste ponto.</p>';
+  const text = waveClimateText(ctx, w), L = w.exc.thr, body = i => text.split('\n\n')[i].replace(WAVE_LABELS, '');
+  const row = (p, d, u) => `<tr><td>${p}</td><td class="n">${u(d.mean)}</td><td class="n">${u(d.median)}</td><td class="n">${d.p95 === undefined ? '—' : u(d.p95)}</td><td class="n">${u(d.min)}</td><td class="n">${u(d.max)}</td><td class="n">${d.sd === undefined ? '—' : u(d.sd)}</td></tr>`;
+  const table = `<div class="tw"><table><tr><th>Parâmetro</th><th class="n">Média</th><th class="n">Mediana</th><th class="n">P95</th><th class="n">Mínimo</th><th class="n">Máximo</th><th class="n">Desvio padrão</th></tr>${row('Hs (m)', w.hs, f2)}${row('Tp (s)', w.tp, f1)}${row('Dir (°)', { mean: w.dir.mean, median: w.dir.mean, min: w.dir.min, max: w.dir.max }, f0)}</table></div><p class="sub">P95 = percentil 95. Dir: média vetorial (circular); mediana não calculada. Registros horários de todas as fontes somados (${w.hs.n}).</p>`;
+  const quadRows = w.quads.filter(q => q.n).map(q => `<tr><td>${q.name} (${q.label})</td><td class="n">${f1(q.pct)}%</td></tr>`).join('');
+  const comp = `<div class="tw"><table><tr><th>Componente</th><th>Critério</th><th class="n">Ocorrência</th><th class="n">Hs média (m)</th><th class="n">Tp médio (s)</th><th>Direção média</th></tr>
+<tr><td>Swell (mar de fundo)</td><td>Tp ≥ 10 s</td><td class="n">${f0(w.swell.pct)}%</td><td class="n">${f2(w.swell.hs)}</td><td class="n">${f1(w.swell.tp)}</td><td>${w.swell.sector || '–'}</td></tr>
+<tr><td>Mar misto</td><td>8 ≤ Tp &lt; 10 s</td><td class="n">${f0(w.mixed.pct)}%</td><td class="n">${f2(w.mixed.hs)}</td><td class="n">${f1(w.mixed.tp)}</td><td>${w.mixed.sector || '–'}</td></tr>
+<tr><td>Sea (vagas locais)</td><td>Tp &lt; 8 s</td><td class="n">${f0(w.sea.pct)}%</td><td class="n">${f2(w.sea.hs)}</td><td class="n">${f1(w.sea.tp)}</td><td>${w.sea.sector || '–'}</td></tr></table></div>`;
+  const exc = `<div class="tw"><table><tr><th>Faixa de Hs (maior entre as fontes)</th><th>Condição</th><th class="n">% do tempo</th></tr>
+<tr><td>Hs ≤ ${f1(L[0])} m</td><td>operação contínua</td><td class="n">${f1(w.exc.below)}%</td></tr>
+<tr><td>${f1(L[0])} m &lt; Hs ≤ ${f1(L[1])} m</td><td>atenção operacional</td><td class="n">${f1(w.exc.mid)}%</td></tr>
+<tr><td>Hs &gt; ${f1(L[1])} m</td><td>condição limite / paralisação</td><td class="n">${f1(w.exc.above)}%</td></tr></table></div>
+<div class="tw"><table><tr><th>Curva de excedência</th>${w.exc.curve.map(([h]) => `<th class="n">Hs &gt; ${f1(h)} m</th>`).join('')}</tr><tr><td>% do tempo</td>${w.exc.curve.map(([, p]) => `<td class="n">${f1(p)}%</td>`).join('')}</tr></table></div>
+<p>Permanência contínua abaixo de ${f1(L[0])} m: média <b>${f0(w.persist.mean)} h</b>, máxima <b>${w.persist.max} h</b>, em ${w.persist.n} trecho(s).</p>`;
+  return `<h3 style="font:600 14px var(--font-body);margin:10px 0 2px">Metodologia e conjunto de dados</h3><p>${esc(body(1))}</p>
+<h3 style="font:600 14px var(--font-body);margin:14px 0 2px">Regime geral</h3><p>${esc(body(2).split(' Estatística descritiva')[0])}</p>${table}
+<h3 style="font:600 14px var(--font-body);margin:14px 0 2px">Distribuição direcional e sea vs. swell</h3>
+<div class="wind2"><div><p>${esc(body(3))}</p><div class="tw"><table><tr><th>Quadrante</th><th class="n">Ocorrência</th></tr>${quadRows}</table></div>${comp}</div><div>${w.tot ? roseSvg(w, HS_CLASSES, ['var(--c4)', 'var(--c1)', 'var(--c2)', 'var(--nogo)'], 'Rosa de ondas: frequência por direção e classe de Hs') : ''}</div></div>
+<h3 style="font:600 14px var(--font-body);margin:14px 0 2px">Excedência e janelas operacionais</h3>${exc}
+<details><summary>Texto pronto para o relatório (copiar)</summary><p><button type="button" class="lnk" data-copy="wave">Copiar texto</button></p><pre id="wave-text">${esc(text)}</pre></details>`;
+}
 function buildReport(ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, errors = ctx.errors, cons = res.conservative, cw = cons.windows;
   const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
@@ -973,6 +1054,8 @@ ${windSummaryHtml(res, tz)}
 <div><h2>Direção do vento</h2>${dirChartSvg(res, tz, 'wdir', 'Direção do vento por fonte')}</div>
 <div><h2>Direção das ondas</h2>${dirChartSvg(res, tz, 'wvdir', 'Direção das ondas por fonte')}</div>
 </div>
+<h2>Regime de ondas no período previsto</h2>
+${waveClimateHtml(ctx)}
 <h2>Comparação entre fontes</h2>
 <p>${agTxt}</p>
 ${srcTable}
@@ -1203,7 +1286,10 @@ function pdfDays(pdf, res, tz) {
 }
 function pdfWindRose(pdf, res, cx, cy, R) {
   const st = windStats(res); if (!st) return;
-  const maxc = Math.max(...st.cnt), fills = [PDF_COL.c[3], PDF_COL.c[0], PDF_COL.c[1], PDF_COL.nogo];
+  pdfRose(pdf, st, SPD_CLASSES, [PDF_COL.c[3], PDF_COL.c[0], PDF_COL.c[1], PDF_COL.nogo], cx, cy, R);
+}
+function pdfRose(pdf, st, classes, fills, cx, cy, R) {
+  const maxc = Math.max(...st.cnt);
   for (const f of [0.25, 0.5, 0.75, 1]) { const pts = []; for (let a = 0; a <= 64; a++) { const t = a / 64 * 2 * Math.PI; pts.push([cx + R * f * Math.cos(t), cy + R * f * Math.sin(t)]); } pdf.poly(pts, { color: PDF_COL.line, lw: 0.4 }); }
   for (let k = 0; k < 16; k++) {
     const a = (k * 22.5 - 90) * Math.PI / 180;
@@ -1219,9 +1305,9 @@ function pdfWindRose(pdf, res, cx, cy, R) {
       r0 = r1;
     });
   }
-  pdf.text(cx - R - 10, cy - R - 4, `anel externo = ${Math.round(100 * maxc / st.tot)}% das horas`, 6, { color: PDF_COL.mut });
+  pdf.text(cx - R - 10, cy - R - 12, `anel = ${Math.round(100 * maxc / st.tot)}% das horas`, 6, { color: PDF_COL.mut });
   let lx = cx - R - 10; const ly = cy + R + 22;
-  SPD_CLASSES.forEach(([, , l], i) => { pdf.rect(lx, ly - 6, 6, 6, { fill: fills[i] }); pdf.text(lx + 9, ly, l, 6.5, { color: PDF_COL.mut }); lx += 52; });
+  classes.forEach(([, , l], i) => { pdf.rect(lx, ly - 6, 6, 6, { fill: fills[i] }); pdf.text(lx + 9, ly, l, 6.5, { color: PDF_COL.mut }); lx += 52; });
 }
 function pdfWindSection(pdf, res) {
   const st = windStats(res); if (!st) return;
@@ -1239,6 +1325,29 @@ function pdfWindSection(pdf, res) {
   }
   pdfWindRose(pdf, res, cx, cy, R);
   pdf.y = Math.max(pdf.y, cy + R + 30) + 6;
+}
+function pdfWaveSection(pdf, ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, w = waveStats(res, tz);
+  if (!w) return;
+  const text = waveClimateText(ctx, w).split('\n\n').map(t => t.replace(WAVE_LABELS, '')), L = w.exc.thr;
+  pdf.newPage();
+  pdf.h2('Regime de ondas no período previsto');
+  pdf.para('Metodologia e conjunto de dados', 9.5, { bold: true, gap: 1 }); pdf.para(text[1], 8.5);
+  pdf.para('Regime geral', 9.5, { bold: true, gap: 1 }); pdf.para(text[2].split(' Estatística descritiva')[0], 8.5);
+  pdf.table([{ h: 'Parâmetro', w: 0.22 }, { h: 'Média', w: 0.13, align: 'right' }, { h: 'Mediana', w: 0.13, align: 'right' }, { h: 'P95', w: 0.13, align: 'right' }, { h: 'Mínimo', w: 0.13, align: 'right' }, { h: 'Máximo', w: 0.13, align: 'right' }, { h: 'Desvio padrão', w: 0.13, align: 'right' }],
+    [['Hs (m)', f2(w.hs.mean), f2(w.hs.median), f2(w.hs.p95), f2(w.hs.min), f2(w.hs.max), f2(w.hs.sd)], ['Tp (s)', f1(w.tp.mean), f1(w.tp.median), f1(w.tp.p95), f1(w.tp.min), f1(w.tp.max), f1(w.tp.sd)], ['Dir (°)', f0(w.dir.mean), '—', '—', f0(w.dir.min), f0(w.dir.max), '—']]);
+  pdf.para(`P95 = percentil 95. Dir: média vetorial. ${w.hs.n} registros horários somando todas as fontes.`, 7.5, { color: PDF_COL.mut });
+  pdf.ensure(230);
+  pdf.para('Distribuição direcional e sea vs. swell', 9.5, { bold: true, gap: 1 });
+  const R = 72, cx = PDF_W - PDF_M - R - 24, cy = pdf.y + R + 12, textW = PDF_W - 2 * PDF_M - 2 * R - 60;
+  pdf.para(text[3], 8.5, { w: textW });
+  const y0 = pdf.y;
+  if (w.tot) pdfRose(pdf, w, HS_CLASSES, [PDF_COL.c[3], PDF_COL.c[0], PDF_COL.c[1], PDF_COL.nogo], cx, cy, R);
+  pdf.y = Math.max(y0, cy + R + 30) + 4;
+  pdf.table([{ h: 'Componente', w: 0.25 }, { h: 'Critério', w: 0.17 }, { h: 'Ocorrência', w: 0.14, align: 'right' }, { h: 'Hs média (m)', w: 0.15, align: 'right' }, { h: 'Tp médio (s)', w: 0.15, align: 'right' }, { h: 'Direção média', w: 0.14 }],
+    [['Swell (mar de fundo)', 'Tp >= 10 s', f0(w.swell.pct) + '%', f2(w.swell.hs), f1(w.swell.tp), w.swell.sector || '–'], ['Mar misto', '8 <= Tp < 10 s', f0(w.mixed.pct) + '%', f2(w.mixed.hs), f1(w.mixed.tp), w.mixed.sector || '–'], ['Sea (vagas locais)', 'Tp < 8 s', f0(w.sea.pct) + '%', f2(w.sea.hs), f1(w.sea.tp), w.sea.sector || '–']]);
+  pdf.para('Excedência e janelas operacionais', 9.5, { bold: true, gap: 1 }); pdf.para(text[4], 8.5);
+  pdf.table([{ h: 'Curva de excedência', w: 0.3 }, ...w.exc.curve.map(([h]) => ({ h: `Hs > ${f1(h)} m`, w: 0.1, align: 'right' }))], [['% do tempo', ...w.exc.curve.map(([, p]) => f1(p) + '%')]]);
 }
 function buildPdf(ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, cw = res.conservative.windows;
@@ -1296,6 +1405,7 @@ function buildPdf(ctx) {
   pdfLineChart(pdf, res, tz, 'gust', 'Rajada', 'kn', lm.gust_max);
   pdfDirChart(pdf, res, tz, 'wdir', 'Direção do vento (de onde vem)');
   pdfDirChart(pdf, res, tz, 'wvdir', 'Direção das ondas (de onde vêm)');
+  pdfWaveSection(pdf, ctx);
   // comparação
   pdf.h2('Comparação entre fontes');
   const ag = res.agreement;
@@ -1893,6 +2003,12 @@ async function init() {
   $('#go').addEventListener('click', async () => { $('#go').disabled = true; try { await generate(); } finally { $('#go').disabled = false; } });
   $('#rp-download').addEventListener('click', downloadReport);
   $('#rp-pdf').addEventListener('click', downloadPdf);
+  $('#report').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-copy]'); if (!b) return;
+    const t = $('#wave-text'); if (!t) return;
+    try { await navigator.clipboard.writeText(t.textContent); toast('Texto copiado.'); }
+    catch (err) { const r = document.createRange(); r.selectNodeContents(t); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Selecionei o texto: use Ctrl+C.'); }
+  });
   $('#rp-print').addEventListener('click', printReport);
 
   renderAll();
