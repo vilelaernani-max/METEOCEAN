@@ -184,7 +184,9 @@ details>summary{cursor:pointer}
 
   <div id="report-wrap" class="card">
     <div class="rp-actions">
-      <button id="rp-download" type="button" hidden>Baixar relatório (HTML)</button>
+      <button id="rp-pdf" type="button" class="primary">Baixar PDF</button>
+      <button id="rp-download" type="button">Baixar HTML</button>
+      <button id="rp-print" type="button" hidden>Imprimir</button>
       <span id="rp-saved" class="msg"></span>
     </div>
     <div id="report" class="rp"></div>
@@ -459,17 +461,17 @@ function analyze(sourceResults, limits, lat, lon, startTs, endTs) {
 
   const sources = sourceResults.map(sr => {
     const idx = new Map(sr.series.map(r => [r.ts, r]));
-    const st = [], cols = { hs: [], tp: [], wind: [], gust: [] };
+    const st = [], cols = { hs: [], tp: [], wind: [], gust: [], wdir: [], wvdir: [] };
     for (const ts of grid) {
       const row = idx.get(ts);
       if (!row) { st.push('nodata'); for (const k in cols) cols[k].push(null); continue; }
       st.push(evaluateHour({ ...row, ts }, L, day)[0]);
-      cols.hs.push(row.hs); cols.tp.push(row.tp); cols.wind.push(row.wind_kn); cols.gust.push(row.gust_kn);
+      cols.hs.push(row.hs); cols.tp.push(row.tp); cols.wind.push(row.wind_kn); cols.gust.push(row.gust_kn); cols.wdir.push(row.wind_dir ?? null); cols.wvdir.push(row.wave_dir ?? null);
     }
     const extra = (i0, i1) => ({ max_hs: maxv(cols.hs.slice(i0, i1)), max_wind: maxv(cols.wind.slice(i0, i1)), max_gust: maxv(cols.gust.slice(i0, i1)) });
     const [windows, dropped] = windowsOf(st, minH, extra);
     return { id: sr.id, label: sr.label, note: sr.note || null, meta: sr.meta || {}, fetched_at: sr.fetched_at || null,
-      status: st, hs: cols.hs, tp: cols.tp, wind: cols.wind, gust: cols.gust, windows, dropped_short: dropped,
+      status: st, hs: cols.hs, tp: cols.tp, wind: cols.wind, gust: cols.gust, wdir: cols.wdir, wvdir: cols.wvdir, windows, dropped_short: dropped,
       n_go: st.filter(x => x === 'go').length, n_nogo: st.filter(x => x === 'nogo').length, n_nodata: st.filter(x => x === 'nodata').length };
   });
 
@@ -666,6 +668,23 @@ const REPORT_CSS = `
 .rp pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;font:12.5px/1.4 var(--font-mono)}
 .rp .foot{color:var(--mut);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .rp .mine{color:var(--warn);font-weight:600}
+.rp .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.rp .kpi{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:8px;padding:10px 12px}
+.rp .kpi.go{border-top-color:var(--go)}.rp .kpi.nogo{border-top-color:var(--nogo)}.rp .kpi.warn{border-top-color:var(--warn)}
+.rp .kpi .v{font:600 26px/1.1 var(--font-display);font-variant-numeric:tabular-nums}
+.rp .kpi .l{color:var(--mut);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.rp .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:8px 24px}
+.rp .charts h2{margin-top:18px}
+.rp .charts>div{min-width:0}
+.rp .days{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:6px;margin:8px 0}
+.rp .day{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12.5px}
+.rp .day b{display:block;font-size:12px}
+.rp .bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--nod);margin:5px 0 3px}
+.rp .bar i{display:block;height:100%}
+.rp .bar .g{background:var(--go)}.rp .bar .r{background:var(--nogo)}
+.rp .day .m{color:var(--mut);font-family:var(--font-mono);font-size:11.5px}
+.rp .dir{fill:none}
+@media (max-width:700px){.rp .charts{grid-template-columns:1fr}}
 `;
 
 function dayTicks(grid, tz) {
@@ -703,7 +722,7 @@ function lineChartSvg(res, tz, key, title, unit, limit, aria) {
   if (limit !== null && limit !== undefined) vals.push(limit);
   if (!vals.length) return `<p class="sub">Sem dados de ${esc(title.toLowerCase())} neste ponto.</p>`;
   const ymax = niceMax(Math.max(...vals) * 1.08);
-  const W = 980, H = 230, left = 46, right = 12, top = 14, bot = 26, pw = W - left - right, ph = H - top - bot;
+  const W = 560, H = 190, left = 40, right = 10, top = 14, bot = 24, pw = W - left - right, ph = H - top - bot;
   const X = i => left + (i / Math.max(n - 1, 1)) * pw, Y = v => top + ph - (v / ymax) * ph;
   const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`];
   for (let k = 0; k <= 5; k++) {
@@ -734,6 +753,53 @@ function lineChartSvg(res, tz, key, title, unit, limit, aria) {
   o.push('</svg>');
   const leg = series.map(([l], i) => `<span><i class="sw" style="background:var(--c${(i % 5) + 1})"></i>${esc(l)}</span>`).join('');
   return `<div class="legend">${leg}</div>${o.join('')}`;
+}
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const compass = d => (d === null || d === undefined) ? '–' : COMPASS[Math.round(d / 45) % 8];
+function dirChartSvg(res, tz, key, aria) {
+  const grid = res.grid, n = grid.length;
+  const series = res.sources.map(s => [s.label, s[key] || []]);
+  if (!series.some(([, a]) => a.some(v => v !== null && v !== undefined))) return `<p class="sub">Sem dados de direção neste ponto.</p>`;
+  const W = 560, H = 160, left = 40, right = 10, top = 14, bot = 24, pw = W - left - right, ph = H - top - bot;
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, Y = v => top + ph - (v / 360) * ph;
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`];
+  [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W'], [360, 'N']].forEach(([v, l]) => {
+    o.push(`<line class="grid" x1="${left}" y1="${Y(v).toFixed(1)}" x2="${W - right}" y2="${Y(v).toFixed(1)}"/>`);
+    o.push(`<text class="mut" x="${left - 6}" y="${(Y(v) + 4).toFixed(1)}" font-size="11" text-anchor="end">${l}</text>`);
+  });
+  o.push(`<text class="mut" x="4" y="10" font-size="11">de onde vem</text>`);
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) {
+    const x = X(i);
+    o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + ph}"/>`);
+    if ((n - i) / n * pw > 40) o.push(`<text class="mut" x="${(x + 3).toFixed(1)}" y="${H - 8}" font-size="11">${dayLabel(d)}</text>`);
+  }
+  series.forEach(([, arr], si) => {
+    const c = (si % 5) + 1;
+    arr.forEach((v, i) => { if (v !== null && v !== undefined) o.push(`<circle class="k${c}" cx="${X(i).toFixed(1)}" cy="${Y(((v % 360) + 360) % 360).toFixed(1)}" r="2"/>`); });
+  });
+  o.push('</svg>');
+  const leg = series.map(([l], i) => `<span><i class="sw" style="background:var(--c${(i % 5) + 1})"></i>${esc(l)}</span>`).join('');
+  return `<div class="legend">${leg}</div>${o.join('')}`;
+}
+function dailySummary(res, tz) {
+  const grid = res.grid, st = res.conservative.status, days = new Map();
+  grid.forEach((ts, i) => {
+    const d = localD(ts, tz), k = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+    if (!days.has(k)) days.set(k, { d, go: 0, nogo: 0, nod: 0, hs: null, wind: null });
+    const o = days.get(k); o[st[i] === 'go' ? 'go' : st[i] === 'nogo' ? 'nogo' : 'nod']++;
+    for (const s of res.sources) { if (s.hs[i] !== null) o.hs = Math.max(o.hs ?? -1, s.hs[i]); if (s.wind[i] !== null) o.wind = Math.max(o.wind ?? -1, s.wind[i]); }
+  });
+  return `<div class="days">${[...days.values()].map(o => {
+    const n = o.go + o.nogo + o.nod;
+    return `<div class="day"><b>${dayLabel(o.d)}</b><div class="bar"><i class="g" style="width:${(100 * o.go / n).toFixed(1)}%"></i><i class="r" style="width:${(100 * o.nogo / n).toFixed(1)}%"></i></div>${o.go} h GO de ${n}<div class="m">Hs ${num(o.hs)} m · ${num(o.wind, 0)} kn</div></div>`;
+  }).join('')}</div>`;
+}
+function kpis(res, tz) {
+  const cw = res.conservative.windows, st = res.conservative.status, grid = res.grid;
+  const goH = st.filter(x => x === 'go').length, longest = cw.length ? cw.reduce((a, b) => b.hours > a.hours ? b : a) : null;
+  const ag = res.agreement.pct;
+  const k = (v, l, cls = '') => `<div class="kpi ${cls}"><div class="v"${String(v).length > 7 ? ' style="font-size:19px"' : ''}>${v}</div><div class="l">${l}</div></div>`;
+  return `<div class="kpis">${k(cw.length, 'janelas (conservador)', cw.length ? 'go' : 'nogo')}${k(cw.length ? fmt(grid[cw[0].i0], tz) : '—', 'próxima janela', cw.length ? 'go' : 'nogo')}${k(longest ? longest.hours + ' h' : '—', 'janela mais longa')}${k(`${Math.round(100 * goH / st.length)}%`, 'horas GO no período', goH / st.length >= 0.5 ? 'go' : goH ? 'warn' : 'nogo')}${k(ag === null ? '—' : Math.round(ag) + '%', 'concordância entre fontes', ag === null ? '' : ag >= 75 ? 'go' : ag >= 50 ? 'warn' : 'nogo')}</div>`;
 }
 function windowsTable(wins, grid, tz, showSources) {
   if (!wins.length) return '<p class="sub">Nenhuma janela.</p>';
@@ -821,17 +887,24 @@ function buildReport(ctx) {
  <span>Tags: ${tags}</span>
  <span>Gerado: <b>${fmtUtcFull(ctx.generatedTs)}</b></span>
 </div>
+${kpis(res, tz)}
 ${alertHtml}
 ${verdict}
 <h2>Janelas — cenário conservador</h2>
 ${windowsTable(cw, grid, tz, true)}
+<h2>Resumo por dia (cenário conservador)</h2>
+${dailySummary(res, tz)}
 <h2>Linha do tempo por fonte</h2>
 ${legend}
 ${timelineSvg(res, tz, rows)}
-<h2>Altura significativa de onda (Hs)</h2>
-${lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')}
-<h2>Vento a 10 m</h2>
-${lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')}
+<div class="charts">
+<div><h2>Altura significativa (Hs)</h2>${lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')}</div>
+<div><h2>Período de pico (Tp)</h2>${lineChartSvg(res, tz, 'tp', 'Tp', 's', lm.tp_min, 'Tp por fonte com o limite operacional')}</div>
+<div><h2>Vento a 10 m</h2>${lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')}</div>
+<div><h2>Rajada</h2>${lineChartSvg(res, tz, 'gust', 'Rajada', 'kn', lm.gust_max, 'Rajada por fonte com o limite operacional')}</div>
+<div><h2>Direção do vento</h2>${dirChartSvg(res, tz, 'wdir', 'Direção do vento por fonte')}</div>
+<div><h2>Direção das ondas</h2>${dirChartSvg(res, tz, 'wvdir', 'Direção das ondas por fonte')}</div>
+</div>
 <h2>Comparação entre fontes</h2>
 <p>${agTxt}</p>
 ${srcTable}
@@ -843,6 +916,304 @@ ${navySection(ctx, tz)}
 ${limitsTable(lm)}
 <p class="foot">Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em ${tzlabel(tz)}; dados originais em UTC. Previsões de vento e onda: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.</p>`;
 }
+
+/* ===PDF:start=== */
+/* =============================== PDF (gerador próprio, vetorial, A4) =============================== */
+const PDF_W = 595.28, PDF_H = 841.89, PDF_M = 40;
+const HELV = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,350,556,350,222,556,333,1000,556,556,333,1000,667,333,1000,350,611,350,350,222,222,333,333,350,556,1000,333,1000,500,333,944,350,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500];
+const HELVB = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,350,556,350,278,556,500,1000,556,556,333,1000,667,333,1000,350,611,350,350,278,278,500,500,350,556,1000,333,1000,556,333,944,350,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556];
+const CP1252 = { '€': 128, '…': 133, '‘': 145, '’': 146, '“': 147, '”': 148, '•': 149, '–': 150, '—': 151, '™': 153 };
+const PDF_SUBST = { '−': '-', '→': '->', '≤': '<=', '≥': '>=', '′': "'", '″': '"', '×': 'x', '≈': '~' };
+function pdfBytes(str) {
+  let out = '';
+  for (const ch of String(str)) {
+    const sub = PDF_SUBST[ch]; if (sub) { out += sub; continue; }
+    const c = ch.codePointAt(0);
+    if (CP1252[ch] !== undefined) out += String.fromCharCode(CP1252[ch]);
+    else if (c < 128 || (c >= 160 && c < 256)) out += ch;
+    else out += '?';
+  }
+  return out;
+}
+const PDF_COL = { ink: '#13232b', mut: '#52656e', line: '#d2dde1', bg: '#eef3f4', accent: '#0a5c7d', go: '#2a8a5c', nogo: '#c4452f', nod: '#b9c3c8', warn: '#9a5b00', warnbg: '#fff3dc', surface: '#ffffff',
+  c: ['#1f6fb2', '#cf7a1f', '#7b4fa6', '#238b80', '#b5476b'] };
+const hexRgb = h => [1, 3, 5].map(i => (parseInt(h.slice(i, i + 2), 16) / 255).toFixed(3)).join(' ');
+
+class Pdf {
+  constructor() { this.pages = []; this.y = PDF_M; this.newPage(); }
+  newPage() { this.cur = []; this.pages.push(this.cur); this.y = PDF_M; }
+  ensure(h) { if (this.y + h > PDF_H - PDF_M - 22) this.newPage(); }
+  py(y) { return (PDF_H - y).toFixed(2); }
+  width(str, size, bold) { const w = bold ? HELVB : HELV; let t = 0; for (const ch of pdfBytes(str)) { const c = ch.charCodeAt(0); t += (c >= 32 && c < 256 ? w[c - 32] : 556) || 556; } return t * size / 1000; }
+  wrap(str, maxW, size, bold) {
+    const lines = [];
+    for (const para of String(str).split('\n')) {
+      let line = '';
+      for (const word of para.split(/\s+/)) {
+        if (!word) continue;
+        const t = line ? line + ' ' + word : word;
+        if (this.width(t, size, bold) <= maxW || !line) line = t; else { lines.push(line); line = word; }
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+  text(x, y, str, size = 10, o = {}) {
+    const s = pdfBytes(str).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+    let xx = x;
+    if (o.align === 'right') xx = x - this.width(str, size, o.bold); else if (o.align === 'center') xx = x - this.width(str, size, o.bold) / 2;
+    this.cur.push(`BT /${o.bold ? 'F2' : 'F1'} ${size} Tf ${hexRgb(o.color || PDF_COL.ink)} rg ${xx.toFixed(2)} ${this.py(y)} Td (${s}) Tj ET`);
+  }
+  para(str, size = 10, o = {}) {
+    const x = o.x ?? PDF_M, w = o.w ?? (PDF_W - 2 * PDF_M), lh = size * 1.35;
+    for (const ln of this.wrap(str, w, size, o.bold)) { this.ensure(lh); this.text(x, this.y + size, ln, size, o); this.y += lh; }
+    this.y += o.gap ?? 3;
+  }
+  rect(x, y, w, h, o = {}) {
+    const ops = [];
+    if (o.fill) ops.push(`${hexRgb(o.fill)} rg`);
+    if (o.stroke) ops.push(`${hexRgb(o.stroke)} RG ${(o.lw || 0.6).toFixed(2)} w`);
+    ops.push(`${x.toFixed(2)} ${(PDF_H - y - h).toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re ${o.fill && o.stroke ? 'B' : o.fill ? 'f' : 'S'}`);
+    this.cur.push(ops.join(' '));
+  }
+  line(x1, y1, x2, y2, o = {}) {
+    this.cur.push(`${hexRgb(o.color || PDF_COL.line)} RG ${(o.lw || 0.6).toFixed(2)} w ${o.dash ? '[3 2] 0 d' : '[] 0 d'} ${x1.toFixed(2)} ${this.py(y1)} m ${x2.toFixed(2)} ${this.py(y2)} l S`);
+  }
+  poly(pts, o = {}) {
+    if (pts.length < 2) return;
+    this.cur.push(`${hexRgb(o.color || PDF_COL.ink)} RG ${(o.lw || 1.1).toFixed(2)} w [] 0 d 1 J 1 j ` + pts.map(([x, y], i) => `${x.toFixed(2)} ${this.py(y)} ${i ? 'l' : 'm'}`).join(' ') + ' S');
+  }
+  dot(x, y, r, color) { const k = 0.5523 * r, X = x, Y = PDF_H - y; this.cur.push(`${hexRgb(color)} rg ${(X + r).toFixed(2)} ${Y.toFixed(2)} m ${(X + r).toFixed(2)} ${(Y + k).toFixed(2)} ${(X + k).toFixed(2)} ${(Y + r).toFixed(2)} ${X.toFixed(2)} ${(Y + r).toFixed(2)} c ${(X - k).toFixed(2)} ${(Y + r).toFixed(2)} ${(X - r).toFixed(2)} ${(Y + k).toFixed(2)} ${(X - r).toFixed(2)} ${Y.toFixed(2)} c ${(X - r).toFixed(2)} ${(Y - k).toFixed(2)} ${(X - k).toFixed(2)} ${(Y - r).toFixed(2)} ${X.toFixed(2)} ${(Y - r).toFixed(2)} c ${(X + k).toFixed(2)} ${(Y - r).toFixed(2)} ${(X + r).toFixed(2)} ${(Y - k).toFixed(2)} ${(X + r).toFixed(2)} ${Y.toFixed(2)} c f`); }
+  h2(str) { this.ensure(34); this.y += 10; this.text(PDF_M, this.y + 11, str.toUpperCase(), 11.5, { bold: true, color: PDF_COL.accent }); this.y += 15; this.line(PDF_M, this.y, PDF_W - PDF_M, this.y); this.y += 7; }
+  table(cols, rows, o = {}) {
+    const size = o.size || 8.5, lh = size * 1.5, x0 = PDF_M, totalW = PDF_W - 2 * PDF_M;
+    const ws = cols.map(c => c.w * totalW);
+    const header = () => {
+      this.ensure(lh * 2);
+      this.rect(x0, this.y, totalW, lh, { fill: PDF_COL.bg });
+      let x = x0; cols.forEach((c, i) => { this.text(c.align === 'right' ? x + ws[i] - 4 : x + 4, this.y + size + 2, c.h, size - 0.5, { bold: true, color: PDF_COL.mut, align: c.align === 'right' ? 'right' : undefined }); x += ws[i]; });
+      this.y += lh;
+    };
+    header();
+    if (!rows.length) { this.text(x0 + 4, this.y + size + 2, 'Nenhuma.', size, { color: PDF_COL.mut }); this.y += lh; return; }
+    for (const r of rows) {
+      if (this.y + lh > PDF_H - PDF_M - 22) { this.newPage(); header(); }
+      let x = x0; cols.forEach((c, i) => { this.text(c.align === 'right' ? x + ws[i] - 4 : x + 4, this.y + size + 2, String(r[i] ?? ''), size, { align: c.align === 'right' ? 'right' : undefined }); x += ws[i]; });
+      this.y += lh; this.line(x0, this.y, x0 + totalW, this.y);
+    }
+    this.y += 4;
+  }
+  build(meta) {
+    const N = this.pages.length;
+    this.pages.forEach((pg, i) => {
+      const y = PDF_H - PDF_M + 8;
+      pg.push(`${hexRgb(PDF_COL.line)} RG 0.5 w [] 0 d ${PDF_M} ${this.py(y - 8)} m ${PDF_W - PDF_M} ${this.py(y - 8)} l S`);
+      const foot = pdfBytes(meta.footer).replace(/[\\()]/g, m => '\\' + m);
+      pg.push(`BT /F1 7.5 Tf ${hexRgb(PDF_COL.mut)} rg ${PDF_M} ${this.py(y + 2)} Td (${foot}) Tj ET`);
+      const pn = `página ${i + 1} de ${N}`;
+      pg.push(`BT /F1 7.5 Tf ${hexRgb(PDF_COL.mut)} rg ${(PDF_W - PDF_M - this.width(pn, 7.5)).toFixed(2)} ${this.py(y + 2)} Td (${pn}) Tj ET`);
+    });
+    const objs = [];
+    const add = s => { objs.push(s); return objs.length; };
+    const fontN = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+    const fontB = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    const pagesIdx = objs.length + 1 + this.pages.length * 2;
+    const pageIds = [];
+    for (const pg of this.pages) {
+      const content = pg.join('\n');
+      const cid = add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+      pageIds.push(add(`<< /Type /Page /Parent ${pagesIdx} 0 R /MediaBox [0 0 ${PDF_W} ${PDF_H}] /Resources << /Font << /F1 ${fontN} 0 R /F2 ${fontB} 0 R >> >> /Contents ${cid} 0 R >>`));
+    }
+    const pagesId = add(`<< /Type /Pages /Kids [${pageIds.map(i => i + ' 0 R').join(' ')}] /Count ${pageIds.length} >>`);
+    const info = add(`<< /Title (${pdfBytes(meta.title).replace(/[\\()]/g, m => '\\' + m)}) /Producer (MetOcean OP) /CreationDate (D:${meta.date}) >>`);
+    const cat = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+    let out = '%PDF-1.4\n%âãÏÓ\n'; const offs = [];
+    objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+    const xref = out.length;
+    out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+    out += `trailer\n<< /Size ${objs.length + 1} /Root ${cat} 0 R /Info ${info} 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    const bytes = new Uint8Array(out.length);
+    for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+    return bytes;
+  }
+}
+
+function pdfLineChart(pdf, res, tz, key, title, unit, limit) {
+  const grid = res.grid, n = grid.length, series = res.sources.map(s => [s.label, s[key] || []]);
+  const vals = series.flatMap(([, a]) => a).filter(v => v !== null && v !== undefined);
+  if (limit !== null && limit !== undefined) vals.push(limit);
+  const H = 120, left = PDF_M + 30, right = PDF_W - PDF_M, pw = right - left, ph = H - 22;
+  pdf.ensure(H + 60);
+  pdf.h2(title);
+  if (!vals.length) { pdf.para('Sem dados neste ponto.', 9, { color: PDF_COL.mut }); return; }
+  const top = pdf.y + 4;
+  const ymax = niceMax(Math.max(...vals) * 1.08);
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, Y = v => top + ph - (v / ymax) * ph;
+  for (let k = 0; k <= 4; k++) { const v = ymax * k / 4, y = Y(v); pdf.line(left, y, right, y); pdf.text(left - 4, y + 3, String(+v.toFixed(2)), 7, { color: PDF_COL.mut, align: 'right' }); }
+  pdf.text(PDF_M, top + 2, unit, 7, { color: PDF_COL.mut });
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(i); pdf.line(x, top, x, top + ph); if ((n - i) / n * pw > 30) pdf.text(x + 2, top + ph + 10, dayLabel(d), 7, { color: PDF_COL.mut }); }
+  if (limit !== null && limit !== undefined) { pdf.line(left, Y(limit), right, Y(limit), { color: PDF_COL.nogo, dash: true, lw: 0.9 }); pdf.text(right - 2, Y(limit) - 3, `limite ${limit} ${unit}`, 7, { color: PDF_COL.nogo, align: 'right' }); }
+  series.forEach(([, arr], si) => {
+    const color = PDF_COL.c[si % 5]; let seg = [];
+    const flush = () => { if (seg.length > 1) pdf.poly(seg, { color }); else if (seg.length === 1) pdf.dot(seg[0][0], seg[0][1], 1.2, color); seg = []; };
+    arr.forEach((v, i) => { if (v === null || v === undefined) flush(); else seg.push([X(i), Y(Math.min(v, ymax))]); });
+    flush();
+  });
+  pdf.y = top + H - 6;
+  let lx = left; series.forEach(([l], si) => { pdf.rect(lx, pdf.y - 1, 7, 7, { fill: PDF_COL.c[si % 5] }); pdf.text(lx + 10, pdf.y + 5.5, l, 7.5, { color: PDF_COL.mut }); lx += 14 + pdf.width(l, 7.5) + 10; });
+  pdf.y += 12;
+}
+function pdfDirChart(pdf, res, tz, key, title) {
+  const grid = res.grid, n = grid.length, series = res.sources.map(s => [s.label, s[key] || []]);
+  const H = 100, left = PDF_M + 30, right = PDF_W - PDF_M, pw = right - left, ph = H - 22;
+  pdf.ensure(H + 60);
+  pdf.h2(title);
+  if (!series.some(([, a]) => a.some(v => v !== null && v !== undefined))) { pdf.para('Sem dados neste ponto.', 9, { color: PDF_COL.mut }); return; }
+  const top = pdf.y + 4;
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, Y = v => top + ph - (v / 360) * ph;
+  [[0, 'N'], [90, 'E'], [180, 'S'], [270, 'W'], [360, 'N']].forEach(([v, l]) => { pdf.line(left, Y(v), right, Y(v)); pdf.text(left - 4, Y(v) + 3, l, 7, { color: PDF_COL.mut, align: 'right' }); });
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(i); pdf.line(x, top, x, top + ph); if ((n - i) / n * pw > 30) pdf.text(x + 2, top + ph + 10, dayLabel(d), 7, { color: PDF_COL.mut }); }
+  series.forEach(([, arr], si) => arr.forEach((v, i) => { if (v !== null && v !== undefined) pdf.dot(X(i), Y(((v % 360) + 360) % 360), 1.3, PDF_COL.c[si % 5]); }));
+  pdf.y = top + H - 6;
+  let lx = left; series.forEach(([l], si) => { pdf.rect(lx, pdf.y - 1, 7, 7, { fill: PDF_COL.c[si % 5] }); pdf.text(lx + 10, pdf.y + 5.5, l, 7.5, { color: PDF_COL.mut }); lx += 14 + pdf.width(l, 7.5) + 10; });
+  pdf.y += 12;
+}
+function pdfTimeline(pdf, res, tz, rows) {
+  const grid = res.grid, n = grid.length, left = PDF_M + 118, right = PDF_W - PDF_M, rowh = 13, cw = (right - left) / n;
+  const top = pdf.y + 14;
+  for (const [i, d, mid] of dayTicks(grid, tz)) { const x = left + i * cw; pdf.line(x, top - 4, x, top + rows.length * rowh); if (mid && (n - i) * cw > 26) pdf.text(x + 2, top - 6, dayLabel(d), 7, { color: PDF_COL.mut }); }
+  rows.forEach(([label, st], r) => {
+    const y = top + r * rowh;
+    pdf.text(left - 5, y + 8.5, label, 7.5, { align: 'right', bold: r === 0 });
+    let i = 0;
+    while (i < n) { let j = i; while (j < n && st[j] === st[i]) j++; pdf.rect(left + i * cw, y + 1, (j - i) * cw, rowh - 3, { fill: st[i] === 'go' ? PDF_COL.go : st[i] === 'nogo' ? PDF_COL.nogo : PDF_COL.nod }); i = j; }
+  });
+  pdf.y = top + rows.length * rowh + 4;
+  let lx = left; [['GO', PDF_COL.go], ['NO-GO', PDF_COL.nogo], ['sem dado', PDF_COL.nod]].forEach(([l, c]) => { pdf.rect(lx, pdf.y, 7, 7, { fill: c }); pdf.text(lx + 10, pdf.y + 6.5, l, 7.5, { color: PDF_COL.mut }); lx += 60; });
+  pdf.y += 14;
+}
+function pdfKpis(pdf, res, tz) {
+  const cw = res.conservative.windows, st = res.conservative.status, grid = res.grid;
+  const goH = st.filter(x => x === 'go').length, longest = cw.length ? cw.reduce((a, b) => b.hours > a.hours ? b : a) : null, ag = res.agreement.pct;
+  const items = [[String(cw.length), 'janelas (conservador)', cw.length ? PDF_COL.go : PDF_COL.nogo], [cw.length ? fmt(grid[cw[0].i0], tz) : '—', 'próxima janela', cw.length ? PDF_COL.go : PDF_COL.nogo],
+    [longest ? longest.hours + ' h' : '—', 'janela mais longa', PDF_COL.accent], [`${Math.round(100 * goH / st.length)}%`, 'horas GO no período', goH / st.length >= 0.5 ? PDF_COL.go : goH ? PDF_COL.warn : PDF_COL.nogo],
+    [ag === null ? '—' : Math.round(ag) + '%', 'concordância', ag === null ? PDF_COL.accent : ag >= 75 ? PDF_COL.go : ag >= 50 ? PDF_COL.warn : PDF_COL.nogo]];
+  const gap = 8, w = (PDF_W - 2 * PDF_M - gap * (items.length - 1)) / items.length, h = 44;
+  pdf.ensure(h + 10);
+  items.forEach(([v, l, c], i) => {
+    const x = PDF_M + i * (w + gap);
+    pdf.rect(x, pdf.y, w, h, { fill: PDF_COL.surface, stroke: PDF_COL.line });
+    pdf.rect(x, pdf.y, w, 3, { fill: c });
+    const size = pdf.width(v, 15, true) > w - 12 ? 10.5 : 15;
+    pdf.text(x + 7, pdf.y + 24, v, size, { bold: true });
+    pdf.text(x + 7, pdf.y + 37, l.toUpperCase(), 6.3, { color: PDF_COL.mut });
+  });
+  pdf.y += h + 10;
+}
+function pdfDays(pdf, res, tz) {
+  const grid = res.grid, st = res.conservative.status, days = new Map();
+  grid.forEach((ts, i) => {
+    const d = localD(ts, tz), k = `${d.getUTCMonth()}-${d.getUTCDate()}`;
+    if (!days.has(k)) days.set(k, { d, go: 0, nogo: 0, nod: 0, hs: null, wind: null });
+    const o = days.get(k); o[st[i] === 'go' ? 'go' : st[i] === 'nogo' ? 'nogo' : 'nod']++;
+    for (const s of res.sources) { if (s.hs[i] !== null) o.hs = Math.max(o.hs ?? -1, s.hs[i]); if (s.wind[i] !== null) o.wind = Math.max(o.wind ?? -1, s.wind[i]); }
+  });
+  const list = [...days.values()], gap = 6, w = (PDF_W - 2 * PDF_M - gap * (list.length - 1)) / list.length, h = 46;
+  pdf.ensure(h + 8);
+  list.forEach((o, i) => {
+    const x = PDF_M + i * (w + gap), n = o.go + o.nogo + o.nod;
+    pdf.rect(x, pdf.y, w, h, { stroke: PDF_COL.line });
+    pdf.text(x + 5, pdf.y + 11, dayLabel(o.d), 7.5, { bold: true });
+    pdf.rect(x + 5, pdf.y + 16, w - 10, 5, { fill: PDF_COL.nod });
+    if (o.go) pdf.rect(x + 5, pdf.y + 16, (w - 10) * o.go / n, 5, { fill: PDF_COL.go });
+    if (o.nogo) pdf.rect(x + 5 + (w - 10) * o.go / n, pdf.y + 16, (w - 10) * o.nogo / n, 5, { fill: PDF_COL.nogo });
+    pdf.text(x + 5, pdf.y + 31, `${o.go} h GO de ${n}`, 7);
+    pdf.text(x + 5, pdf.y + 41, `Hs ${num(o.hs)} m · ${num(o.wind, 0)} kn`, 6.5, { color: PDF_COL.mut });
+  });
+  pdf.y += h + 8;
+}
+function buildPdf(ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, cw = res.conservative.windows;
+  const pdf = new Pdf();
+  // cabeçalho
+  pdf.rect(0, 0, PDF_W, 62, { fill: PDF_COL.accent });
+  pdf.text(PDF_M, 30, 'RELATÓRIO METOCEAN', 17, { bold: true, color: '#ffffff' });
+  const coords = `${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°`;
+  pdf.text(PDF_M, 48, ctx.location.name === coords ? coords : `${ctx.location.name}  ·  ${coords}`, 10, { color: '#dcebf1' });
+  pdf.text(PDF_W - PDF_M, 30, 'MetOcean OP', 9, { color: '#dcebf1', align: 'right' });
+  pdf.text(PDF_W - PDF_M, 46, `gerado ${fmtUtcFull(ctx.generatedTs)}`, 8.5, { color: '#dcebf1', align: 'right' });
+  pdf.y = 76;
+  const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
+  pdf.para(`Operação: ${ctx.profileName}    ·    Período: ${startL} → ${endL} (${tzlabel(tz)})${ctx.tags.length ? '    ·    Tags: ' + ctx.tags.join(', ') : ''}`, 9, { color: PDF_COL.mut, gap: 6 });
+  pdfKpis(pdf, res, tz);
+  // alertas
+  const alerts = [];
+  for (const e of ctx.errors) alerts.push(`Fonte indisponível: ${e.label} — ${e.error}`);
+  for (const s of res.sources) { if (s.note) alerts.push(`${s.label}: ${s.note}`); if (s.n_nodata) alerts.push(`${s.label}: ${s.n_nodata} h sem dado de algum parâmetro limitado (tratadas como não-GO).`); }
+  const ni = ctx.navyInfo || {};
+  if ((ni.status || '').startsWith('formato_nao_reconhecido')) alerts.push('Avisos da Marinha: o texto importado não foi reconhecido. Confira o site oficial.');
+  else if (!ni.fetched_at) alerts.push('Avisos da Marinha: nenhum aviso importado nesta ferramenta; confira o site oficial.');
+  else if (ctx.navyStale) alerts.push('Avisos da Marinha: última importação há mais de 7 dias; confira o site oficial.');
+  if (res.sources.length === 1) alerts.push('Apenas uma fonte disponível: não há comparação nem cenário conservador real.');
+  for (const a of alerts) {
+    const lines = pdf.wrap(a, PDF_W - 2 * PDF_M - 16, 8.5), h = lines.length * 11.5 + 8;
+    pdf.ensure(h + 4);
+    pdf.rect(PDF_M, pdf.y, PDF_W - 2 * PDF_M, h, { fill: PDF_COL.warnbg, stroke: PDF_COL.warn });
+    lines.forEach((ln, i) => pdf.text(PDF_M + 8, pdf.y + 12 + i * 11.5, ln, 8.5));
+    pdf.y += h + 4;
+  }
+  // veredito
+  const verdict = cw.length ? [`${cw.length} janela(s) operacional(is) no cenário conservador`, `Primeira: ${fmt(grid[cw[0].i0], tz)} · mais longa: ${cw.reduce((a, b) => b.hours > a.hours ? b : a).hours} h. Cenário conservador = todas as fontes dentro dos limites.`]
+    : [`Nenhuma janela de ${lm.min_window_h} h seguidas no cenário conservador`, `Nenhum período atende simultaneamente a todas as fontes.${res.optimistic.windows.length ? ` Há ${res.optimistic.windows.length} janela(s) considerando a fonte mais favorável.` : ''}`];
+  const vl = pdf.wrap(verdict[1], PDF_W - 2 * PDF_M - 24, 9), vh = 26 + vl.length * 12;
+  pdf.ensure(vh + 6);
+  pdf.rect(PDF_M, pdf.y, PDF_W - 2 * PDF_M, vh, { fill: PDF_COL.bg, stroke: PDF_COL.line });
+  pdf.rect(PDF_M, pdf.y, 5, vh, { fill: cw.length ? PDF_COL.go : PDF_COL.nogo });
+  pdf.text(PDF_M + 14, pdf.y + 16, verdict[0], 11, { bold: true });
+  vl.forEach((ln, i) => pdf.text(PDF_M + 14, pdf.y + 30 + i * 12, ln, 9));
+  pdf.y += vh + 6;
+  // janelas
+  pdf.h2('Janelas — cenário conservador');
+  const wcols = [{ h: 'Início', w: 0.2 }, { h: 'Fim', w: 0.2 }, { h: 'Duração', w: 0.12, align: 'right' }, { h: 'Hs máx (m)', w: 0.12, align: 'right' }, { h: 'Vento máx (kn)', w: 0.14, align: 'right' }, { h: 'Rajada máx (kn)', w: 0.14, align: 'right' }, { h: 'Fontes', w: 0.08, align: 'right' }];
+  const wrow = w => [fmt(grid[w.i0], tz), fmt(grid[w.i1 - 1] + HOUR, tz), `${w.hours} h`, num(w.max_hs), num(w.max_wind, 0), num(w.max_gust, 0), w.min_sources ?? ''];
+  pdf.table(wcols, cw.map(wrow));
+  pdf.ensure(100); pdf.h2('Resumo por dia (cenário conservador)');
+  pdfDays(pdf, res, tz);
+  pdf.ensure(res.sources.length * 13 + 90); pdf.h2('Linha do tempo por fonte');
+  pdfTimeline(pdf, res, tz, [['Conservador', res.conservative.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])]);
+  pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
+  pdfLineChart(pdf, res, tz, 'tp', 'Período de pico (Tp)', 's', lm.tp_min);
+  pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
+  pdfLineChart(pdf, res, tz, 'gust', 'Rajada', 'kn', lm.gust_max);
+  pdfDirChart(pdf, res, tz, 'wdir', 'Direção do vento (de onde vem)');
+  pdfDirChart(pdf, res, tz, 'wvdir', 'Direção das ondas (de onde vêm)');
+  // comparação
+  pdf.h2('Comparação entre fontes');
+  const ag = res.agreement;
+  pdf.para(ag.pct === null ? 'Concordância não calculável (menos de duas fontes com dados).' : `As fontes decidiram igual (GO ou NO-GO) em ${Math.round(ag.pct)}% das ${ag.compared} horas comparáveis; divergiram em ${ag.disagree} h. Divergência alta significa previsão incerta: prefira o cenário conservador.`, 9);
+  pdf.table([{ h: 'Fonte', w: 0.3 }, { h: 'Modelos (vento / onda)', w: 0.3 }, { h: 'h GO', w: 0.1, align: 'right' }, { h: 'h NO-GO', w: 0.1, align: 'right' }, { h: 'h sem dado', w: 0.1, align: 'right' }, { h: 'Janelas', w: 0.1, align: 'right' }],
+    res.sources.map(s => [s.label, s.meta && s.meta.wind_model ? `${s.meta.wind_model} / ${s.meta.wave_model}` : '–', s.n_go, s.n_nogo, s.n_nodata, s.windows.length]));
+  if (res.optimistic.windows.length) { pdf.h2('Cenário otimista (qualquer fonte dentro dos limites)'); pdf.table(wcols, res.optimistic.windows.map(wrow)); }
+  // marinha
+  pdf.h2('Avisos de Mau Tempo da Marinha (METAREA V)');
+  if (!ctx.navyWarnings.length) pdf.para('Nenhum aviso de mau tempo registrado com vigência dentro do período.', 9, { color: PDF_COL.mut });
+  for (const w of ctx.navyWarnings) {
+    pdf.para(`Aviso ${w.number} — ${w.kind || ''} · vigência ${w.valid_from_ts ? fmt(w.valid_from_ts, tz) : '?'} → ${w.valid_to_ts ? fmt(w.valid_to_ts, tz) : 'não identificada'} · áreas: ${(w.areas || []).join(', ') || 'não identificadas'}`, 9, { bold: true, gap: 1 });
+    pdf.para((w.text || '').slice(0, 1500), 8, { color: PDF_COL.mut, gap: 6 });
+  }
+  pdf.para(`Fonte: Marinha do Brasil / CHM · última importação: ${ni.fetched_at ? fmtUtcFull(ni.fetched_at) : 'nunca'}`, 8, { color: PDF_COL.mut });
+  // limites
+  pdf.h2('Limites aplicados');
+  const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
+  pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
+  pdf.y += 6;
+  pdf.para(`Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.`, 7.5, { color: PDF_COL.mut });
+  const d = new Date(ctx.generatedTs * 1000);
+  const stamp = `${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}00Z`;
+  return pdf.build({ title: `MetOcean — ${ctx.location.name}`, date: stamp, footer: `MetOcean OP · ${ctx.location.name} · gerado ${fmtUtcFull(ctx.generatedTs)} · apoio à decisão` });
+}
+
+/* ===PDF:end=== */
 
 /* =============================== estado e telas =============================== */
 const S = { locs: [], profs: [], analyses: [], navy: { warnings: [], fetched_at: null, status: null }, tags: [],
@@ -1304,19 +1675,50 @@ async function deleteAnalysis(id) {
 }
 
 /* ---- baixar ---- */
+function reportSlug(ctx) {
+  const d = new Date(ctx.generatedTs * 1000);
+  const slug = ctx.location.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'relatorio';
+  return `metocean-${slug}-${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}`;
+}
+async function saveFile(filename, data, mime) {
+  let dl = null;
+  try { dl = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
+  if (dl) {
+    try { await dl.save({ filename, data }); return true; }
+    catch (e) { if (e && e.code !== 'declined') toast('Não foi possível baixar: ' + (e.message || e.code || e)); return false; }
+  }
+  if (window.claude) { toast('Download indisponível neste ambiente.'); return false; }
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+  const url = URL.createObjectURL(blob), a = el('a', { href: url, download: filename });
+  document.body.append(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 2000);
+  return true;
+}
+function reportHtml(ctx) {
+  const tokens = $('#tokens').textContent;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}@media print{body{background:#fff;padding:0}}</style></head><body><div class="rp">${buildReport(ctx)}</div></body></html>`;
+}
 async function downloadReport() {
   if (!S.current) return;
-  let dl = null; try { dl = await window.claude.use('downloads'); } catch (e) { /* ausente */ }
-  if (!dl) return toast('Download indisponível neste ambiente.');
-  const tokens = $('#tokens').textContent, ctx = S.current;
-  const slug = ctx.location.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'relatorio';
-  const d = new Date(ctx.generatedTs * 1000);
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}</style></head><body><main class="rp">${buildReport(ctx)}</main></body></html>`;
-  try { await dl.save({ filename: `metocean-${slug}-${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}.html`, data: html }); }
-  catch (e) { if (e && e.code !== 'declined') toast('Não foi possível baixar: ' + (e.message || e)); }
+  await saveFile(reportSlug(S.current) + '.html', reportHtml(S.current), 'text/html;charset=utf-8');
+}
+async function downloadPdf() {
+  if (!S.current) return;
+  const btn = $('#rp-pdf'); btn.disabled = true;
+  try {
+    const bytes = buildPdf(S.current);
+    await saveFile(reportSlug(S.current) + '.pdf', new Blob([bytes], { type: 'application/pdf' }), 'application/pdf');
+  } catch (e) { toast('Não foi possível gerar o PDF: ' + (e.message || e)); }
+  finally { btn.disabled = false; }
+}
+function printReport() {
+  if (!S.current) return;
+  const w = window.open('', '_blank');
+  if (!w) return toast('O navegador bloqueou a janela de impressão. Use "Baixar PDF".');
+  w.document.write(reportHtml(S.current)); w.document.close();
+  w.addEventListener('load', () => { w.focus(); w.print(); });
 }
 async function initDownloads() {
-  try { const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; $('#rp-download').hidden = !dl; } catch (e) { $('#rp-download').hidden = true; }
+  $('#rp-print').hidden = !!window.claude;   // dentro do Claude a impressão não funciona; fora, é o caminho mais rápido para PDF
 }
 
 /* =============================== início =============================== */
@@ -1381,6 +1783,8 @@ async function init() {
   $('#h-tag').addEventListener('change', renderHistory);
   $('#go').addEventListener('click', async () => { $('#go').disabled = true; try { await generate(); } finally { $('#go').disabled = false; } });
   $('#rp-download').addEventListener('click', downloadReport);
+  $('#rp-pdf').addEventListener('click', downloadPdf);
+  $('#rp-print').addEventListener('click', printReport);
 
   renderAll();
   let tab = 'analise'; try { tab = sessionStorage.getItem('mco:tab') || 'analise'; } catch (e) { /* padrão */ }
