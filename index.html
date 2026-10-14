@@ -37,6 +37,18 @@
 }
 </style>
 <style>
+.map{position:relative;height:340px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#dde7ec;touch-action:none;user-select:none;cursor:crosshair}
+.map-tiles{position:absolute;inset:0}
+.map-tiles img{position:absolute;width:256px;height:256px;pointer-events:none;image-rendering:auto}
+.map-pin{position:absolute;width:18px;height:18px;margin:-18px 0 0 -9px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--nogo);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);pointer-events:none}
+.map-cross{position:absolute;left:50%;top:50%;width:1px;height:1px;pointer-events:none}
+.map-ctl{position:absolute;top:8px;left:8px;display:flex;flex-direction:column;gap:4px}
+.map-ctl button{width:32px;height:32px;padding:0;font:600 18px var(--font-body);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer}
+.map-attr{position:absolute;right:4px;bottom:2px;font:10px var(--font-body);background:rgba(255,255,255,.75);color:#222;padding:1px 5px;border-radius:3px}
+.map-attr a{color:#0a5c7d}
+.map-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;background:var(--bg);color:var(--mut);font-size:14px}
+@media (prefers-color-scheme:dark){.map{background:#1c2a31}}
+
 *{box-sizing:border-box}
 details.card>summary{cursor:pointer;font:600 14px var(--font-body);color:var(--accent);list-style:revert}
 details.card[open]>summary{margin-bottom:12px}
@@ -124,6 +136,15 @@ details>summary{cursor:pointer}
   <div class="card">
     <h2>Análise rápida</h2>
     <p class="note">Coordenadas, limites, e pronto: a previsão de vento e onda é buscada na Open-Meteo e o relatório sai na hora.</p>
+    <div id="map" class="map" role="application" aria-label="Mapa para escolher o ponto: clique no local da operação">
+      <div class="map-tiles"></div>
+      <div class="map-pin" hidden></div>
+      <div class="map-cross"></div>
+      <div class="map-ctl"><button type="button" data-zoom="1" aria-label="Aproximar">+</button><button type="button" data-zoom="-1" aria-label="Afastar">−</button><button type="button" id="map-geo" aria-label="Usar minha posição" title="Usar minha posição">◎</button></div>
+      <div class="map-attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
+      <div class="map-msg" hidden></div>
+    </div>
+    <p class="note" style="margin-top:6px">Clique (ou toque) no mapa no ponto da operação; arraste para mover e use +/− ou a roda do mouse para o zoom. Ou digite as coordenadas abaixo.</p>
     <label>Coordenadas do ponto<input id="q-coords" class="f" placeholder="ex.: -22.9519, -43.1859  ou  22°57′S 43°11′W" autocomplete="off"></label>
     <div id="q-coordsmsg" class="msg"></div>
     <div class="grid" style="margin-top:8px">
@@ -1778,6 +1799,72 @@ async function generate() {
   const days = Math.max(1, Math.min(10, parseInt($('#a-days').value, 10) || 5));
   await runAnalysis(loc, prof, days, anTags.get(), msg);
 }
+
+/* =============================== mapa (tiles OSM, sem bibliotecas) =============================== */
+const MapView = (() => {
+  const TILE = 256, el_ = () => $('#map');
+  let z = 6, cx = 0, cy = 0;      // centro em coordenadas de tile (fracionárias) no zoom z
+  let pin = null, failed = 0, loaded = 0, onPick = null, drag = null, moved = false;
+  const n = () => 2 ** z;
+  const ll2t = (lat, lon, zz = z) => { const r = lat * Math.PI / 180; return [(lon + 180) / 360 * 2 ** zz, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** zz]; };
+  const t2ll = (x, y, zz = z) => { const N = 2 ** zz, lon = x / N * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / N))) * 180 / Math.PI; return [lat, lon]; };
+  function render() {
+    const m = el_(); if (!m) return;
+    const W = m.clientWidth, H = m.clientHeight, host = m.querySelector('.map-tiles');
+    const x0 = cx - W / 2 / TILE, y0 = cy - H / 2 / TILE;
+    const keep = new Set();
+    for (let tx = Math.floor(x0); tx < x0 + W / TILE; tx++) for (let ty = Math.floor(y0); ty < y0 + H / TILE; ty++) {
+      if (ty < 0 || ty >= n()) continue;
+      const wx = ((tx % n()) + n()) % n(), key = `${z}/${wx}/${ty}`;
+      keep.add(key);
+      let img = host.querySelector(`img[data-k="${key}"]`);
+      if (!img) {
+        img = el('img', { 'data-k': key, alt: '', src: `https://tile.openstreetmap.org/${z}/${wx}/${ty}.png`, draggable: 'false' });
+        img.onerror = () => { failed++; if (failed >= 4 && !loaded) msg('Mapa indisponível neste ambiente (sem acesso aos mapas do OpenStreetMap). Digite as coordenadas abaixo ou abra a versão web.'); };
+        img.onload = () => { loaded++; };
+        host.append(img);
+      }
+      img.style.left = `${Math.round((tx - x0) * TILE)}px`; img.style.top = `${Math.round((ty - y0) * TILE)}px`;
+    }
+    host.querySelectorAll('img').forEach(i => { if (!keep.has(i.dataset.k)) i.remove(); });
+    const p = m.querySelector('.map-pin');
+    if (pin) { const [px, py] = ll2t(pin.lat, pin.lon); p.style.left = `${(px - x0) * TILE}px`; p.style.top = `${(py - y0) * TILE}px`; p.hidden = false; } else p.hidden = true;
+  }
+  function msg(t) { const b = el_().querySelector('.map-msg'); b.textContent = t || ''; b.hidden = !t; }
+  function setView(lat, lon, zz) { if (zz !== undefined) z = Math.max(2, Math.min(17, zz)); [cx, cy] = ll2t(lat, lon); render(); }
+  function zoomBy(d, px, py) {
+    const m = el_(), W = m.clientWidth, H = m.clientHeight, nz = Math.max(2, Math.min(17, z + d)); if (nz === z) return;
+    const ax = px === undefined ? W / 2 : px, ay = py === undefined ? H / 2 : py;
+    const tx = cx + (ax - W / 2) / TILE, ty = cy + (ay - H / 2) / TILE;           // ponto sob o cursor
+    const f = 2 ** (nz - z); z = nz; cx = tx * f - (ax - W / 2) / TILE; cy = ty * f - (ay - H / 2) / TILE;
+    el_().querySelector('.map-tiles').replaceChildren(); render();
+  }
+  function pick(px, py) {
+    const m = el_(), W = m.clientWidth, H = m.clientHeight;
+    const [lat, lon] = t2ll(cx + (px - W / 2) / TILE, cy + (py - H / 2) / TILE);
+    pin = { lat, lon }; render(); if (onPick) onPick(lat, lon);
+  }
+  function init(cb) {
+    const m = el_(); if (!m) return; onPick = cb;
+    const pos = e => { const r = m.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    m.addEventListener('pointerdown', e => { if (e.target.closest('button,a')) return; drag = { x: e.clientX, y: e.clientY, cx, cy }; moved = false; m.setPointerCapture(e.pointerId); });
+    m.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 4) moved = true; cx = drag.cx - dx / TILE; cy = drag.cy - dy / TILE; render(); });
+    m.addEventListener('pointerup', e => { if (!drag) return; drag = null; if (!moved) { const [px, py] = pos(e); pick(px, py); } });
+    m.addEventListener('pointercancel', () => { drag = null; });
+    m.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = pos(e); zoomBy(e.deltaY < 0 ? 1 : -1, px, py); }, { passive: false });
+    m.addEventListener('dblclick', e => { const [px, py] = pos(e); zoomBy(1, px, py); });
+    m.querySelectorAll('[data-zoom]').forEach(b => b.addEventListener('click', () => zoomBy(+b.dataset.zoom)));
+    $('#map-geo').addEventListener('click', () => {
+      if (!navigator.geolocation) return toast('Geolocalização indisponível.');
+      navigator.geolocation.getCurrentPosition(p => { pin = { lat: p.coords.latitude, lon: p.coords.longitude }; setView(pin.lat, pin.lon, 10); if (onPick) onPick(pin.lat, pin.lon); }, () => toast('Não foi possível obter sua posição.'), { timeout: 8000 });
+    });
+    new ResizeObserver(() => render()).observe(m);
+    setView(-23.0, -42.0, 6);
+  }
+  function setPin(lat, lon, recenter) { pin = { lat, lon }; if (recenter) setView(lat, lon, Math.max(z, 8)); else render(); }
+  return { init, setPin, setView };
+})();
+
 /* ---- análise rápida: coordenadas + limites → busca + relatório ---- */
 const QKEY = 'mco:quick';
 function quickLoad() {
@@ -1986,6 +2073,9 @@ async function init() {
   $('#q-go').addEventListener('click', quickRun);
   $('#q-coords').addEventListener('keydown', e => { if (e.key === 'Enter') quickRun(); });
   quickLoad();
+  MapView.init((lat, lon) => { $('#q-coords').value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`; setMsg('#q-coordsmsg', `Ponto marcado: ${lat.toFixed(5)}, ${lon.toFixed(5)}.`, 'ok'); quickSave(); });
+  $('#q-coords').addEventListener('input', () => { const c = parseCoords($('#q-coords').value); if (c) { MapView.setPin(c.lat, c.lon, true); setMsg('#q-coordsmsg', ''); } });
+  { const c = parseCoords($('#q-coords').value); if (c) MapView.setPin(c.lat, c.lon, true); }
   // link com parâmetros: ?lat=-22.1&lon=-41.1&hs=1.5&vento=20&dias=5&gerar=1
   try {
     const q = new URLSearchParams(location.search);
@@ -1993,6 +2083,7 @@ async function init() {
       $('#q-coords').value = `${q.get('lat')}, ${q.get('lon')}`;
       for (const [k, id] of [['hs', '#q-hs'], ['vento', '#q-wind'], ['rajada', '#q-gust'], ['tp', '#q-tp'], ['janela', '#q-win'], ['dias', '#q-days']]) if (q.get(k) !== null) $(id).value = q.get(k);
       if (q.get('diurno') === '1') $('#q-day').checked = true;
+      { const c = parseCoords($('#q-coords').value); if (c) MapView.setPin(c.lat, c.lon, true); }
       if (q.get('gerar') === '1') setTimeout(quickRun, 300);
     }
   } catch (e) { /* sem parâmetros */ }
