@@ -47,6 +47,7 @@
 .map-attr{position:absolute;right:4px;bottom:2px;font:10px var(--font-body);background:rgba(255,255,255,.75);color:#222;padding:1px 5px;border-radius:3px}
 .map-attr a{color:#0a5c7d}
 .map-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;background:var(--bg);color:var(--mut);font-size:14px}
+.map.off{height:auto;min-height:0;cursor:default}.map.off .map-msg{position:static}
 @media (prefers-color-scheme:dark){.map{background:#1c2a31}}
 
 *{box-sizing:border-box}
@@ -144,7 +145,7 @@ details>summary{cursor:pointer}
       <div class="map-attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
       <div class="map-msg" hidden></div>
     </div>
-    <p class="note" style="margin-top:6px">Clique (ou toque) no mapa no ponto da operação; arraste para mover e use +/− ou a roda do mouse para o zoom. Ou digite as coordenadas abaixo.</p>
+    <p class="note" id="map-help" style="margin-top:6px">Clique (ou toque) no mapa no ponto da operação; arraste para mover e use +/− ou a roda do mouse para o zoom. Ou digite as coordenadas abaixo.</p>
     <label>Coordenadas do ponto<input id="q-coords" class="f" placeholder="ex.: -22.9519, -43.1859  ou  22°57′S 43°11′W" autocomplete="off"></label>
     <div id="q-coordsmsg" class="msg"></div>
     <div class="grid" style="margin-top:8px">
@@ -1820,7 +1821,7 @@ const MapView = (() => {
       let img = host.querySelector(`img[data-k="${key}"]`);
       if (!img) {
         img = el('img', { 'data-k': key, alt: '', src: `https://tile.openstreetmap.org/${z}/${wx}/${ty}.png`, draggable: 'false' });
-        img.onerror = () => { failed++; if (failed >= 4 && !loaded) msg('Mapa indisponível neste ambiente (sem acesso aos mapas do OpenStreetMap). Digite as coordenadas abaixo ou abra a versão web.'); };
+        img.onerror = () => { failed++; if (failed >= 4 && !loaded) msg('O mapa não carregou (sem acesso ao OpenStreetMap). Confira a internet ou digite as coordenadas abaixo.'); };
         img.onload = () => { loaded++; };
         host.append(img);
       }
@@ -1830,7 +1831,12 @@ const MapView = (() => {
     const p = m.querySelector('.map-pin');
     if (pin) { const [px, py] = ll2t(pin.lat, pin.lon); p.style.left = `${(px - x0) * TILE}px`; p.style.top = `${(py - y0) * TILE}px`; p.hidden = false; } else p.hidden = true;
   }
-  function msg(t) { const b = el_().querySelector('.map-msg'); b.textContent = t || ''; b.hidden = !t; }
+  const WEB_URL = 'https://vilelaernani-max.github.io/METEOCEAN/';
+  function msg(t) {
+    const m = el_(), b = m.querySelector('.map-msg'); b.replaceChildren(); b.hidden = !t; if (!t) return;
+    b.append(el('div', {}, el('p', { style: 'margin:0 0 10px' }, t), el('a', { class: 'btn', href: WEB_URL, target: '_blank', rel: 'noopener' }, 'Abrir a versão web com mapa')));
+    m.classList.add('off'); const h = $('#map-help'); if (h) h.hidden = true; m.querySelector('.map-ctl').hidden = true; m.querySelector('.map-attr').hidden = true; m.querySelector('.map-tiles').replaceChildren();
+  }
   function setView(lat, lon, zz) { if (zz !== undefined) z = Math.max(2, Math.min(17, zz)); [cx, cy] = ll2t(lat, lon); render(); }
   function zoomBy(d, px, py) {
     const m = el_(), W = m.clientWidth, H = m.clientHeight, nz = Math.max(2, Math.min(17, z + d)); if (nz === z) return;
@@ -1858,6 +1864,7 @@ const MapView = (() => {
       if (!navigator.geolocation) return toast('Geolocalização indisponível.');
       navigator.geolocation.getCurrentPosition(p => { pin = { lat: p.coords.latitude, lon: p.coords.longitude }; setView(pin.lat, pin.lon, 10); if (onPick) onPick(pin.lat, pin.lon); }, () => toast('Não foi possível obter sua posição.'), { timeout: 8000 });
     });
+    if (window.claude) { msg('Dentro do Claude o mapa não carrega (os blocos do OpenStreetMap são bloqueados). Digite as coordenadas abaixo ou use a versão web, que tem o mapa.'); return; }
     new ResizeObserver(() => render()).observe(m);
     setView(-23.0, -42.0, 6);
   }
