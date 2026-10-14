@@ -47,7 +47,11 @@
 .map-attr{position:absolute;right:4px;bottom:2px;font:10px var(--font-body);background:rgba(255,255,255,.75);color:#222;padding:1px 5px;border-radius:3px}
 .map-attr a{color:#0a5c7d}
 .map-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;background:var(--bg);color:var(--mut);font-size:14px}
-.map.off{height:auto;min-height:0;cursor:default}.map.off .map-msg{position:static}
+.map.off{height:auto;min-height:0;cursor:default}
+.fs{border:1px solid var(--line);border-radius:8px;padding:6px 12px 8px;margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px 18px}
+.fs legend{font:600 11.5px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--mut);padding:0 4px}
+.rp .hdr{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:10px 0;font-size:13.5px}
+.rp .hdr span b{font-weight:600}.map.off .map-msg{position:static}
 @media (prefers-color-scheme:dark){.map{background:#1c2a31}}
 
 *{box-sizing:border-box}
@@ -149,6 +153,29 @@ details>summary{cursor:pointer}
     <label>Coordenadas do ponto<input id="q-coords" class="f" placeholder="ex.: -22.9519, -43.1859  ou  22°57′S 43°11′W" autocomplete="off"></label>
     <div id="q-coordsmsg" class="msg"></div>
     <div class="grid" style="margin-top:8px">
+      <label>Nome do ponto (opcional)<input id="q-name" class="f" maxlength="80" placeholder="ex.: Locação P-71" autocomplete="off"></label>
+      <label>Projeto (opcional)<input id="q-proj" class="f" maxlength="80" placeholder="ex.: Survey Bacia de Campos" autocomplete="off"></label>
+    </div>
+    <div class="row" style="margin-top:6px"><button id="q-saveloc" type="button" class="lnk">Salvar este ponto na aba Locais</button><span id="q-savemsg" class="msg"></span></div>
+    <fieldset class="fs"><legend>O que analisar</legend>
+      <label class="check"><input id="q-an-wind" type="checkbox" checked> Vento</label>
+      <label class="check"><input id="q-an-wave" type="checkbox" checked> Ondas</label>
+      <label class="check"><input id="q-an-tide" type="checkbox" checked> Maré</label>
+    </fieldset>
+    <fieldset class="fs"><legend>Relatório</legend>
+      <label class="check"><input type="radio" name="q-mode" value="resumido"> Resumido (janelas + gráficos do que foi pedido)</label>
+      <label class="check"><input type="radio" name="q-mode" value="completo" checked> Completo</label>
+    </fieldset>
+    <details id="q-hdr" style="margin-top:8px"><summary class="lnk" style="cursor:pointer;color:var(--accent);font-weight:600">Cabeçalho do relatório (cliente, embarcação, responsável)</summary>
+      <div class="grid" style="margin-top:8px">
+        <label>Cliente<input id="h-client" class="f" maxlength="80" autocomplete="off"></label>
+        <label>Embarcação / unidade<input id="h-vessel" class="f" maxlength="80" autocomplete="off"></label>
+        <label>Responsável<input id="h-resp" class="f" maxlength="80" autocomplete="off"></label>
+        <label>Nº do documento / revisão<input id="h-doc" class="f" maxlength="40" autocomplete="off"></label>
+      </div>
+      <label style="margin-top:8px">Observações<input id="h-obs" class="f" maxlength="200" autocomplete="off"></label>
+    </details>
+    <div class="grid" style="margin-top:8px">
       <label>Hs máxima (m)<input id="q-hs" class="f" type="number" step="0.1" min="0" value="1.5"></label>
       <label>Vento máximo (nós)<input id="q-wind" class="f" type="number" step="1" min="0" value="20"></label>
       <label>Rajada máxima (nós)<input id="q-gust" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
@@ -233,6 +260,7 @@ details>summary{cursor:pointer}
       <label>Longitude <input id="l-lon" class="f" type="number" step="any" min="-180" max="180"></label>
       <label>Fuso (horas de UTC) <input id="l-tz" class="f" type="number" step="0.5" min="-12" max="14" value="-3"></label>
       <label>Área(s) da Marinha <input id="l-areas" class="f" maxlength="100" placeholder="ex.: GOLF, COSTEIRA" autocomplete="off"></label>
+      <label>Projeto (opcional) <input id="l-proj" class="f" maxlength="80" placeholder="ex.: Survey Bacia de Campos" autocomplete="off"></label>
     </div>
     <div style="margin-top:10px"><label>Tags<div id="l-tags"></div></label></div>
     <div class="row" style="margin-top:12px">
@@ -573,25 +601,26 @@ function describePaste(j) {
 }
 
 function buildSeries(windJ, waveJ, row, startTs, endTs) {
-  const wh = windJ.hourly, mh = waveJ.hourly;
-  const sp = hourlyPick(wh, 'wind_speed_10m', row.wind.trim()), gu = hourlyPick(wh, 'wind_gusts_10m', row.wind.trim()), wd = hourlyPick(wh, 'wind_direction_10m', row.wind.trim());
-  if (!sp) throw new Error(`modelo de vento "${row.wind.trim() || 'melhor modelo'}" não veio na resposta colada`);
-  const hs = hourlyPick(mh, 'wave_height', row.wave.trim()), tp = hourlyPick(mh, 'wave_period', row.wave.trim()), wv = hourlyPick(mh, 'wave_direction', row.wave.trim());
+  if (!windJ && !waveJ) throw new Error('sem dados de vento nem de onda');
+  const wh = windJ ? windJ.hourly : { time: [] }, mh = waveJ ? waveJ.hourly : { time: [] };
+  const sp = windJ ? hourlyPick(wh, 'wind_speed_10m', row.wind.trim()) : null, gu = windJ ? hourlyPick(wh, 'wind_gusts_10m', row.wind.trim()) : null, wd = windJ ? hourlyPick(wh, 'wind_direction_10m', row.wind.trim()) : null;
+  if (windJ && !sp) throw new Error(`modelo de vento "${row.wind.trim() || 'melhor modelo'}" não veio na resposta colada`);
+  const hs = waveJ ? hourlyPick(mh, 'wave_height', row.wave.trim()) : null, tp = waveJ ? hourlyPick(mh, 'wave_period', row.wave.trim()) : null, wv = waveJ ? hourlyPick(mh, 'wave_direction', row.wave.trim()) : null;
   const tideKey = Object.keys(mh).find(k => k === 'sea_level_height_msl' || k === `sea_level_height_msl_${row.wave.trim() || 'best_match'}` || k === `sea_level_height_msl_marine_${row.wave.trim() || 'best_match'}`) || Object.keys(mh).find(k => k.startsWith('sea_level_height_msl'));
   const tide = tideKey ? mh[tideKey] : null;
-  if (!hs) throw new Error(`modelo de onda "${row.wave.trim() || 'melhor modelo'}" não veio na resposta colada`);
+  if (waveJ && !hs) throw new Error(`modelo de onda "${row.wave.trim() || 'melhor modelo'}" não veio na resposta colada`);
   const by = new Map();
-  wh.time.forEach((t, i) => { const ts = toTs(t); by.set(ts, { ts, hs: null, tp: null, wave_dir: null, wind_kn: numOrNull(sp[i]), gust_kn: gu ? numOrNull(gu[i]) : null, wind_dir: wd ? numOrNull(wd[i]) : null }); });
+  wh.time.forEach((t, i) => { const ts = toTs(t); by.set(ts, { ts, hs: null, tp: null, wave_dir: null, wind_kn: sp ? numOrNull(sp[i]) : null, gust_kn: gu ? numOrNull(gu[i]) : null, wind_dir: wd ? numOrNull(wd[i]) : null }); });
   mh.time.forEach((t, i) => {
     const ts = toTs(t);
     const r = by.get(ts) || { ts, hs: null, tp: null, wave_dir: null, wind_kn: null, gust_kn: null, wind_dir: null };
-    r.hs = numOrNull(hs[i]); r.tp = tp ? numOrNull(tp[i]) : null; r.wave_dir = wv ? numOrNull(wv[i]) : null; r.tide = tide ? numOrNull(tide[i]) : null; by.set(ts, r);
+    r.hs = hs ? numOrNull(hs[i]) : null; r.tp = tp ? numOrNull(tp[i]) : null; r.wave_dir = wv ? numOrNull(wv[i]) : null; r.tide = tide ? numOrNull(tide[i]) : null; by.set(ts, r);
   });
   const series = [...by.values()].filter(r => r.ts > startTs - 3600 && r.ts < endTs + 3600).sort((a, b) => a.ts - b.ts);
   if (!series.length) throw new Error('a resposta colada não tem horas dentro do período (previsão antiga? abra o link de novo)');
-  const note = series.every(r => r.hs === null) ? 'sem dados de onda neste ponto (terra ou costa muito próxima?)' : null;
+  const note = waveJ && series.every(r => r.hs === null) ? 'sem dados de onda neste ponto (terra ou costa muito próxima?)' : null;
   return { series, note, meta: { wind_model: row.wind.trim() || 'best_match', wave_model: row.wave.trim() || 'best_match',
-    grid_wind: [windJ.latitude, windJ.longitude], grid_wave: [waveJ.latitude, waveJ.longitude] } };
+    grid_wind: windJ ? [windJ.latitude, windJ.longitude] : [null, null], grid_wave: waveJ ? [waveJ.latitude, waveJ.longitude] : [null, null] } };
 }
 
 /* =============================== avisos da Marinha =============================== */
@@ -1101,7 +1130,7 @@ function buildReport(ctx) {
   for (const e of errors) alerts.push(`<b>Fonte indisponível:</b> ${esc(e.label)} — ${esc(e.error)}`);
   for (const s of res.sources) {
     if (s.note) alerts.push(`<b>${esc(s.label)}:</b> ${esc(s.note)}`);
-    if (s.n_nodata) alerts.push(`<b>${esc(s.label)}:</b> ${s.n_nodata} h sem dado de algum parâmetro limitado (tratadas como não-GO).`);
+    if (s.n_nodata && (ctx.analyses ? (ctx.analyses.wind || ctx.analyses.wave) : true)) alerts.push(`<b>${esc(s.label)}:</b> ${s.n_nodata} h sem dado de algum parâmetro limitado (tratadas como não-GO).`);
     const g = s.meta && s.meta.grid_wave;
     if (g && g[0] !== undefined && g[0] !== null) {
       const km = haversineKm(ctx.location.lat, ctx.location.lon, g[0], g[1]);
@@ -1139,50 +1168,70 @@ function buildReport(ctx) {
     : `As fontes decidiram igual (GO ou NO-GO) em <b>${Math.round(ag.pct)}%</b> das ${ag.compared} horas comparáveis; divergiram em ${ag.disagree} h. Divergência alta significa previsão incerta: prefira o cenário conservador.`;
   const perSource = res.sources.map(s => `<h3 style="font:600 14px var(--font-body);margin:14px 0 2px">${esc(s.label)}</h3>${windowsTable(s.windows, grid, tz, false)}${s.dropped_short ? `<p class="sub">${s.dropped_short} trecho(s) GO menor(es) que ${lm.min_window_h} h descartado(s).</p>` : ''}`).join('');
 
-  return `
+  const A = ctx.analyses || { wind: true, wave: true, tide: true }, brief = ctx.mode === 'resumido', hasLim = A.wind || A.wave, H = ctx.header || {};
+  const hdrItems = [['Projeto', ctx.location.project || H.project], ['Cliente', H.client], ['Embarcação / unidade', H.vessel], ['Responsável', H.resp], ['Documento', H.doc], ['Observações', H.obs]].filter(([, v]) => v);
+  const hdr = hdrItems.length ? `<div class="hdr">${hdrItems.map(([k, v]) => `<span>${k}: <b>${esc(v)}</b></span>`).join('')}</div>` : '';
+  const scope = [A.wind ? 'vento' : null, A.wave ? 'ondas' : null, A.tide ? 'maré' : null].filter(Boolean).join(', ');
+  const foot = `<p class="foot">Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.</p>`;
+  const head = `
 <h1>Relatório MetOcean — ${esc(ctx.location.name)}</h1>
-<p class="sub">Análise de janelas operacionais</p>
+<p class="sub">${brief ? 'Resumo operacional' : 'Análise de janelas operacionais'} · ${scope}</p>
+${hdr}
 <div class="meta">
  <span>Ponto: <b>${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°</b></span>
- <span>Operação: <b>${esc(ctx.profileName)}</b></span>
+ ${hasLim ? `<span>Operação: <b>${esc(ctx.profileName)}</b></span>` : ''}
  <span>Período: <b>${startL} → ${endL}</b> (${tzlabel(tz)})</span>
  <span>Tags: ${tags}</span>
  <span>Gerado: <b>${fmtUtcFull(ctx.generatedTs)}</b></span>
-</div>
-${kpis(res, tz)}
+</div>`;
+  const chart = (title, body) => `<div><h2>${title}</h2>${body}</div>`;
+  if (brief) {
+    const charts = [];
+    if (A.wind) charts.push(chart('Vento a 10 m', lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')));
+    if (A.wave) charts.push(chart('Altura significativa (Hs)', lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')));
+    const t = A.tide ? tideStats(res, tz, ctx.generatedTs) : null;
+    return `${head}
+${hasLim ? kpis(res, tz) : ''}
 ${alertHtml}
-${verdict}
-<h2>Janelas — cenário conservador</h2>
+${hasLim ? verdict : ''}
+${hasLim ? `<h2>Janelas — cenário conservador</h2>${windowsTable(cw, grid, tz, true)}<h2>Linha do tempo por fonte</h2>${legend}${timelineSvg(res, tz, rows)}` : ''}
+${charts.length ? `<div class="charts">${charts.join('')}</div>` : ''}
+${A.tide ? `<h2>Maré</h2>${t ? `<p>Agora: maré <b>${t.state || '–'}</b> · amplitude <b>${{ crescendo: 'crescendo (rumo à sizígia)', diminuindo: 'diminuindo (rumo à quadratura)', 'estável': 'estável' }[t.trend]}</b>${t.nextSyz ? ` · próxima sizígia ${fmt(t.nextSyz.ts, tz)}` : ''}. Próximas: ${t.next.map(e => `${e.kind === 'HW' ? 'PM' : 'BM'} ${fmt(e.ts, tz)} (${fm(e.h)})`).join('; ')}.</p>${tideChartSvg(res, tz, t)}` : '<p class="sub">Sem previsão de nível do mar para este ponto.</p>'}` : ''}
+${hasLim ? `<h2>Limites aplicados</h2>${limitsTable(lm)}` : ''}
+${foot}`;
+  }
+  return `${head}
+${hasLim ? kpis(res, tz) : ''}
+${alertHtml}
+${hasLim ? verdict : ''}
+${hasLim ? `<h2>Janelas — cenário conservador</h2>
 ${windowsTable(cw, grid, tz, true)}
 <h2>Resumo por dia (cenário conservador)</h2>
 ${dailySummary(res, tz)}
 <h2>Linha do tempo por fonte</h2>
 ${legend}
-${timelineSvg(res, tz, rows)}
-<h2>Vento predominante</h2>
-${windSummaryHtml(res, tz)}
+${timelineSvg(res, tz, rows)}` : ''}
+${A.wind ? `<h2>Vento predominante</h2>
+${windSummaryHtml(res, tz)}` : ''}
 <div class="charts">
-<div><h2>Altura significativa (Hs)</h2>${lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')}</div>
-<div><h2>Período de pico (Tp)</h2>${lineChartSvg(res, tz, 'tp', 'Tp', 's', lm.tp_min, 'Tp por fonte com o limite operacional')}</div>
-<div><h2>Vento a 10 m</h2>${lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')}</div>
-<div><h2>Rajada</h2>${lineChartSvg(res, tz, 'gust', 'Rajada', 'kn', lm.gust_max, 'Rajada por fonte com o limite operacional')}</div>
-<div><h2>Direção do vento</h2>${dirChartSvg(res, tz, 'wdir', 'Direção do vento por fonte')}</div>
-<div><h2>Direção das ondas</h2>${dirChartSvg(res, tz, 'wvdir', 'Direção das ondas por fonte')}</div>
+${A.wave ? chart('Altura significativa (Hs)', lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')) + chart('Período de pico (Tp)', lineChartSvg(res, tz, 'tp', 'Tp', 's', lm.tp_min, 'Tp por fonte com o limite operacional')) : ''}
+${A.wind ? chart('Vento a 10 m', lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')) + chart('Rajada', lineChartSvg(res, tz, 'gust', 'Rajada', 'kn', lm.gust_max, 'Rajada por fonte com o limite operacional')) + chart('Direção do vento', dirChartSvg(res, tz, 'wdir', 'Direção do vento por fonte')) : ''}
+${A.wave ? chart('Direção das ondas', dirChartSvg(res, tz, 'wvdir', 'Direção das ondas por fonte')) : ''}
 </div>
-<h2>Maré</h2>
-${tideSectionHtml(ctx)}
-<h2>Regime de ondas no período previsto</h2>
-${waveClimateHtml(ctx)}
-<h2>Comparação entre fontes</h2>
+${A.tide ? `<h2>Maré</h2>
+${tideSectionHtml(ctx)}` : ''}
+${A.wave ? `<h2>Regime de ondas no período previsto</h2>
+${waveClimateHtml(ctx)}` : ''}
+${hasLim ? `<h2>Comparação entre fontes</h2>
 <p>${agTxt}</p>
 ${srcTable}
 <details><summary>Janelas de cada fonte</summary>${perSource}</details>
-<details><summary>Cenário otimista (qualquer fonte dentro dos limites)</summary>${windowsTable(res.optimistic.windows, grid, tz, true)}</details>
+<details><summary>Cenário otimista (qualquer fonte dentro dos limites)</summary>${windowsTable(res.optimistic.windows, grid, tz, true)}</details>` : ''}
 <h2>Avisos de Mau Tempo da Marinha</h2>
 ${navySection(ctx, tz)}
-<h2>Limites aplicados</h2>
-${limitsTable(lm)}
-<p class="foot">Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em ${tzlabel(tz)}; dados originais em UTC. Previsões de vento e onda: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.</p>`;
+${hasLim ? `<h2>Limites aplicados</h2>
+${limitsTable(lm)}` : ''}
+${foot}`;
 }
 
 /* ===PDF:start=== */
@@ -1466,7 +1515,7 @@ function pdfWaveSection(pdf, ctx) {
   pdf.para('Excedência e janelas operacionais', 9.5, { bold: true, gap: 1 }); pdf.para(text[4], 8.5);
   pdf.table([{ h: 'Curva de excedência', w: 0.3 }, ...w.exc.curve.map(([h]) => ({ h: `Hs > ${f1(h)} m`, w: 0.1, align: 'right' }))], [['% do tempo', ...w.exc.curve.map(([, p]) => f1(p) + '%')]]);
 }
-function pdfTideSection(pdf, ctx) {
+function pdfTideSection(pdf, ctx, brief) {
   const res = ctx.result, tz = ctx.location.tz_offset, t = tideStats(res, tz, ctx.generatedTs);
   pdf.ensure(120); pdf.h2('Maré');
   if (!t) { pdf.para('Sem previsão de nível do mar para este ponto nas fontes carregadas.', 9, { color: PDF_COL.mut }); return; }
@@ -1475,7 +1524,7 @@ function pdfTideSection(pdf, ctx) {
   pdf.para(`Estado em ${fmt(ctx.generatedTs, tz)}: maré ${t.state || '–'}${t.prev ? `, desde a ${t.prev.kind === 'HW' ? 'preamar' : 'baixa-mar'} de ${fmt(t.prev.ts, tz, false)} (${fm(t.prev.h)})` : ''}. Amplitude ${trendTxt}: de ${r(o.rangeMin)} a ${r(o.rangeMax)} no período (média ${r(o.rangeMean)}). Preamar mais alta ${fm(o.max)}, baixa-mar mais baixa ${fm(o.min)}, referidas ao nível médio do mar.`, 8.5);
   pdf.para('Próximas marés: ' + t.next.map(e => `${e.kind === 'HW' ? 'preamar' : 'baixa-mar'} ${fmt(e.ts, tz)} (${fm(e.h)})`).join('; ') + '. Estofo (água parada): ±30 min em torno de cada preamar e baixa-mar.', 8.5);
   pdf.para(`Lua: ${t.phases.filter(p => p.ts > ctx.generatedTs - 86400).slice(0, 4).map(p => `${p.name} ${fmt(p.ts, tz)}`).join(' · ')}.${t.nextSyz ? ` Próxima sizígia (marés maiores, 1–2 dias após a ${t.nextSyz.name.toLowerCase()}): ${fmt(t.nextSyz.ts, tz)}.` : ''}${t.nextQuad ? ` Próxima quadratura (marés menores): ${fmt(t.nextQuad.ts, tz)}.` : ''}`, 8.5);
-  pdf.table([{ h: 'Dia', w: 0.14 }, { h: 'Preamares', w: 0.36 }, { h: 'Baixa-mares', w: 0.36 }, { h: 'Ampl. máx (m)', w: 0.14, align: 'right' }],
+  if (!brief) pdf.table([{ h: 'Dia', w: 0.14 }, { h: 'Preamares', w: 0.36 }, { h: 'Baixa-mares', w: 0.36 }, { h: 'Ampl. máx (m)', w: 0.14, align: 'right' }],
     t.dayList.map(d => [dayLabel(d.d), d.hw.map(e => `${fmt(e.ts, tz, false)} (${fm(e.h)})`).join('  ') || '–', d.lw.map(e => `${fmt(e.ts, tz, false)} (${fm(e.h)})`).join('  ') || '–', d.range === null ? '–' : d.range.toFixed(2).replace('.', ',')]));
   // curva
   const grid = res.grid, n = grid.length, h = t.series, vals = h.filter(v => v !== null);
@@ -1502,13 +1551,22 @@ function buildPdf(ctx) {
   pdf.text(PDF_W - PDF_M, 30, 'MetOcean OP', 9, { color: '#dcebf1', align: 'right' });
   pdf.text(PDF_W - PDF_M, 46, `gerado ${fmtUtcFull(ctx.generatedTs)}`, 8.5, { color: '#dcebf1', align: 'right' });
   pdf.y = 76;
+  const A = ctx.analyses || { wind: true, wave: true, tide: true }, brief = ctx.mode === 'resumido', hasLim = A.wind || A.wave, Hd = ctx.header || {};
   const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
-  pdf.para(`Operação: ${ctx.profileName}    ·    Período: ${startL} → ${endL} (${tzlabel(tz)})${ctx.tags.length ? '    ·    Tags: ' + ctx.tags.join(', ') : ''}`, 9, { color: PDF_COL.mut, gap: 6 });
-  pdfKpis(pdf, res, tz);
+  const scope = [A.wind ? 'vento' : null, A.wave ? 'ondas' : null, A.tide ? 'maré' : null].filter(Boolean).join(', ');
+  pdf.para(`${brief ? 'Resumo operacional' : 'Análise de janelas operacionais'} (${scope})${hasLim ? '    ·    Operação: ' + ctx.profileName : ''}    ·    Período: ${startL} → ${endL} (${tzlabel(tz)})${ctx.tags.length ? '    ·    Tags: ' + ctx.tags.join(', ') : ''}`, 9, { color: PDF_COL.mut, gap: 6 });
+  const hdrItems = [['Projeto', ctx.location.project || Hd.project], ['Cliente', Hd.client], ['Embarcação / unidade', Hd.vessel], ['Responsável', Hd.resp], ['Documento', Hd.doc], ['Observações', Hd.obs]].filter(([, v]) => v);
+  if (hdrItems.length) {
+    const colW = (PDF_W - 2 * PDF_M) / 2, rowsN = Math.ceil(hdrItems.length / 2), hh = rowsN * 13 + 10;
+    pdf.ensure(hh + 6); pdf.rect(PDF_M, pdf.y, PDF_W - 2 * PDF_M, hh, { stroke: PDF_COL.line });
+    hdrItems.forEach(([k, v], i) => { const x = PDF_M + 8 + (i % 2) * colW, y = pdf.y + 13 + Math.floor(i / 2) * 13; pdf.text(x, y, k + ': ', 8, { color: PDF_COL.mut }); pdf.text(x + pdf.width(k + ': ', 8), y, String(v).slice(0, 70), 8, { bold: true }); });
+    pdf.y += hh + 8;
+  }
+  if (hasLim) pdfKpis(pdf, res, tz);
   // alertas
   const alerts = [];
   for (const e of ctx.errors) alerts.push(`Fonte indisponível: ${e.label} — ${e.error}`);
-  for (const s of res.sources) { if (s.note) alerts.push(`${s.label}: ${s.note}`); if (s.n_nodata) alerts.push(`${s.label}: ${s.n_nodata} h sem dado de algum parâmetro limitado (tratadas como não-GO).`); }
+  for (const s of res.sources) { if (s.note) alerts.push(`${s.label}: ${s.note}`); if (s.n_nodata && hasLim) alerts.push(`${s.label}: ${s.n_nodata} h sem dado de algum parâmetro limitado (tratadas como não-GO).`); }
   const ni = ctx.navyInfo || {};
   if ((ni.status || '').startsWith('formato_nao_reconhecido')) alerts.push('Avisos da Marinha: o texto importado não foi reconhecido. Confira o site oficial.');
   else if (!ni.fetched_at) alerts.push('Avisos da Marinha: nenhum aviso importado nesta ferramenta; confira o site oficial.');
@@ -1522,6 +1580,7 @@ function buildPdf(ctx) {
     pdf.y += h + 4;
   }
   // veredito
+  if (hasLim) {
   const verdict = cw.length ? [`${cw.length} janela(s) operacional(is) no cenário conservador`, `Primeira: ${fmt(grid[cw[0].i0], tz)} · mais longa: ${cw.reduce((a, b) => b.hours > a.hours ? b : a).hours} h. Cenário conservador = todas as fontes dentro dos limites.`]
     : [`Nenhuma janela de ${lm.min_window_h} h seguidas no cenário conservador`, `Nenhum período atende simultaneamente a todas as fontes.${res.optimistic.windows.length ? ` Há ${res.optimistic.windows.length} janela(s) considerando a fonte mais favorável.` : ''}`];
   const vl = pdf.wrap(verdict[1], PDF_W - 2 * PDF_M - 24, 9), vh = 26 + vl.length * 12;
@@ -1531,32 +1590,39 @@ function buildPdf(ctx) {
   pdf.text(PDF_M + 14, pdf.y + 16, verdict[0], 11, { bold: true });
   vl.forEach((ln, i) => pdf.text(PDF_M + 14, pdf.y + 30 + i * 12, ln, 9));
   pdf.y += vh + 6;
+  }
   // janelas
-  pdf.h2('Janelas — cenário conservador');
+  const wcols0 = null; void wcols0;
+  if (hasLim) pdf.h2('Janelas — cenário conservador');
   const wcols = [{ h: 'Início', w: 0.2 }, { h: 'Fim', w: 0.2 }, { h: 'Duração', w: 0.12, align: 'right' }, { h: 'Hs máx (m)', w: 0.12, align: 'right' }, { h: 'Vento máx (kn)', w: 0.14, align: 'right' }, { h: 'Rajada máx (kn)', w: 0.14, align: 'right' }, { h: 'Fontes', w: 0.08, align: 'right' }];
   const wrow = w => [fmt(grid[w.i0], tz), fmt(grid[w.i1 - 1] + HOUR, tz), `${w.hours} h`, num(w.max_hs), num(w.max_wind, 0), num(w.max_gust, 0), w.min_sources ?? ''];
-  pdf.table(wcols, cw.map(wrow));
-  pdf.ensure(100); pdf.h2('Resumo por dia (cenário conservador)');
-  pdfDays(pdf, res, tz);
-  pdf.ensure(res.sources.length * 13 + 90); pdf.h2('Linha do tempo por fonte');
-  pdfTimeline(pdf, res, tz, [['Conservador', res.conservative.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])]);
-  pdfWindSection(pdf, res);
-  pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
-  pdfLineChart(pdf, res, tz, 'tp', 'Período de pico (Tp)', 's', lm.tp_min);
-  pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
-  pdfLineChart(pdf, res, tz, 'gust', 'Rajada', 'kn', lm.gust_max);
-  pdfDirChart(pdf, res, tz, 'wdir', 'Direção do vento (de onde vem)');
-  pdfDirChart(pdf, res, tz, 'wvdir', 'Direção das ondas (de onde vêm)');
-  pdfTideSection(pdf, ctx);
-  pdfWaveSection(pdf, ctx);
+  if (hasLim) pdf.table(wcols, cw.map(wrow));
+  if (hasLim && !brief) { pdf.ensure(100); pdf.h2('Resumo por dia (cenário conservador)'); pdfDays(pdf, res, tz); }
+  if (hasLim) { pdf.ensure(res.sources.length * 13 + 90); pdf.h2('Linha do tempo por fonte');
+    pdfTimeline(pdf, res, tz, [['Conservador', res.conservative.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])]); }
+  if (brief) {
+    if (A.wind) pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
+    if (A.wave) pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
+    if (A.tide) pdfTideSection(pdf, ctx, true);
+  } else {
+    if (A.wind) pdfWindSection(pdf, res);
+    if (A.wave) { pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max); pdfLineChart(pdf, res, tz, 'tp', 'Período de pico (Tp)', 's', lm.tp_min); }
+    if (A.wind) { pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max); pdfLineChart(pdf, res, tz, 'gust', 'Rajada', 'kn', lm.gust_max); pdfDirChart(pdf, res, tz, 'wdir', 'Direção do vento (de onde vem)'); }
+    if (A.wave) pdfDirChart(pdf, res, tz, 'wvdir', 'Direção das ondas (de onde vêm)');
+    if (A.tide) pdfTideSection(pdf, ctx);
+    if (A.wave) pdfWaveSection(pdf, ctx);
+  }
   // comparação
+  if (hasLim && !brief) {
   pdf.h2('Comparação entre fontes');
   const ag = res.agreement;
   pdf.para(ag.pct === null ? 'Concordância não calculável (menos de duas fontes com dados).' : `As fontes decidiram igual (GO ou NO-GO) em ${Math.round(ag.pct)}% das ${ag.compared} horas comparáveis; divergiram em ${ag.disagree} h. Divergência alta significa previsão incerta: prefira o cenário conservador.`, 9);
   pdf.table([{ h: 'Fonte', w: 0.3 }, { h: 'Modelos (vento / onda)', w: 0.3 }, { h: 'h GO', w: 0.1, align: 'right' }, { h: 'h NO-GO', w: 0.1, align: 'right' }, { h: 'h sem dado', w: 0.1, align: 'right' }, { h: 'Janelas', w: 0.1, align: 'right' }],
     res.sources.map(s => [s.label, s.meta && s.meta.wind_model ? `${s.meta.wind_model} / ${s.meta.wave_model}` : '–', s.n_go, s.n_nogo, s.n_nodata, s.windows.length]));
   if (res.optimistic.windows.length) { pdf.h2('Cenário otimista (qualquer fonte dentro dos limites)'); pdf.table(wcols, res.optimistic.windows.map(wrow)); }
+  }
   // marinha
+  if (!brief) {
   pdf.h2('Avisos de Mau Tempo da Marinha (METAREA V)');
   if (!ctx.navyWarnings.length) pdf.para('Nenhum aviso de mau tempo registrado com vigência dentro do período.', 9, { color: PDF_COL.mut });
   for (const w of ctx.navyWarnings) {
@@ -1564,12 +1630,15 @@ function buildPdf(ctx) {
     pdf.para((w.text || '').slice(0, 1500), 8, { color: PDF_COL.mut, gap: 6 });
   }
   pdf.para(`Fonte: Marinha do Brasil / CHM · última importação: ${ni.fetched_at ? fmtUtcFull(ni.fetched_at) : 'nunca'}`, 8, { color: PDF_COL.mut });
+  }
   // limites
+  if (hasLim) {
   pdf.h2('Limites aplicados');
   const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
   pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
+  }
   pdf.y += 6;
-  pdf.para(`Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.`, 7.5, { color: PDF_COL.mut });
+  if (!brief || pdf.y < PDF_H - 120) pdf.para(`Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.`, 7.5, { color: PDF_COL.mut });
   const d = new Date(ctx.generatedTs * 1000);
   const stamp = `${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}00Z`;
   return pdf.build({ title: `MetOcean — ${ctx.location.name}`, date: stamp, footer: `MetOcean OP · ${ctx.location.name} · gerado ${fmtUtcFull(ctx.generatedTs)} · apoio à decisão` });
@@ -1669,7 +1738,7 @@ function renderLocs() {
   if (S.selLoc && S.locs.some(l => l.id === S.selLoc)) sel.value = S.selLoc;
   $('#l-list').replaceChildren(...(S.locs.length ? S.locs.map(l => el('li', { class: l.id === S.selLoc ? 'sel' : '' },
     el('div', { class: 't' }, l.name),
-    el('div', { class: 'm mono' }, `${l.lat.toFixed(4)}°, ${l.lon.toFixed(4)}° · ${tzlabel(l.tz_offset)}${l.areas ? ' · ' + l.areas : ''}`),
+    el('div', { class: 'm mono' }, `${l.lat.toFixed(4)}°, ${l.lon.toFixed(4)}° · ${tzlabel(l.tz_offset)}${l.areas ? ' · ' + l.areas : ''}${l.project ? ' · ' + l.project : ''}`),
     el('div', { class: 'tagrow' }, ...(l.tags || []).map(t => el('span', { class: 'tag' }, t))),
     el('div', { style: 'margin-top:4px' }, el('button', { class: 'lnk', type: 'button', onclick: () => selectLoc(l.id) }, 'Editar')))) :
     [el('li', { class: 'empty' }, 'Nenhum local salvo. Cole as coordenadas acima, dê um nome e salve.')]));
@@ -1679,13 +1748,13 @@ function renderLocs() {
 function selectLoc(id) {
   const l = S.locs.find(x => x.id === id); if (!l) return;
   S.selLoc = id;
-  $('#l-name').value = l.name; $('#l-lat').value = l.lat; $('#l-lon').value = l.lon; $('#l-tz').value = l.tz_offset; $('#l-areas').value = l.areas || '';
+  $('#l-name').value = l.name; $('#l-lat').value = l.lat; $('#l-lon').value = l.lon; $('#l-tz').value = l.tz_offset; $('#l-areas').value = l.areas || ''; $('#l-proj').value = l.project || '';
   locTags.set(l.tags); anTags.set(l.tags); $('#l-paste').value = ''; setMsg('#l-pastemsg', ''); setMsg('#l-msg', '');
   updateSeeLink(); renderLocs(); updateLinks(); showTab('locais');
 }
 function newLoc() {
   S.selLoc = null;
-  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-paste']) $(id).value = '';
+  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-proj', '#l-paste']) $(id).value = '';
   $('#l-tz').value = -3; locTags.set([]); setMsg('#l-msg', ''); setMsg('#l-pastemsg', ''); updateSeeLink(); renderLocs();
 }
 async function saveLoc() {
@@ -1694,7 +1763,7 @@ async function saveLoc() {
   if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return setMsg('#l-msg', 'Latitude (−90 a 90) e longitude (−180 a 180) são obrigatórias.', 'bad');
   if (!(tz >= -12 && tz <= 14)) return setMsg('#l-msg', 'Fuso deve estar entre −12 e 14.', 'bad');
   const id = S.selLoc || newId();
-  const rec = { name, lat, lon, tz_offset: tz, areas: $('#l-areas').value.trim().slice(0, 100), tags: locTags.get(), created_at: (S.locs.find(l => l.id === id) || {}).created_at || now() };
+  const rec = { name, lat, lon, tz_offset: tz, areas: $('#l-areas').value.trim().slice(0, 100), project: $('#l-proj').value.trim().slice(0, 80), tags: locTags.get(), created_at: (S.locs.find(l => l.id === id) || {}).created_at || now() };
   try { await Store.set('locations', id, rec); S.selLoc = id; await loadAll(); setMsg('#l-msg', 'Local salvo.', 'ok'); anTags.set(rec.tags); }
   catch (e) { setMsg('#l-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
 }
@@ -1997,24 +2066,32 @@ const MapView = (() => {
 const QKEY = 'mco:quick';
 function quickLoad() {
   try { const q = JSON.parse(localStorage.getItem(QKEY) || 'null'); if (!q) return;
-    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['win', '#q-win'], ['days', '#q-days']]) if (q[k] !== undefined) $(id).value = q[k];
+    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['win', '#q-win'], ['days', '#q-days'], ['name', '#q-name'], ['proj', '#q-proj'], ['client', '#h-client'], ['vessel', '#h-vessel'], ['resp', '#h-resp'], ['doc', '#h-doc'], ['obs', '#h-obs']]) if (q[k] !== undefined) $(id).value = q[k];
     $('#q-day').checked = !!q.day;
+    if (q.an) { $('#q-an-wind').checked = !!q.an.wind; $('#q-an-wave').checked = !!q.an.wave; $('#q-an-tide').checked = !!q.an.tide; }
+    if (q.mode) { const r = document.querySelector(`input[name="q-mode"][value="${q.mode}"]`); if (r) r.checked = true; }
   } catch (e) { /* opcional */ }
 }
 function quickSave() {
-  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked })); } catch (e) { /* opcional */ }
+  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
+    an: { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked }, mode: (document.querySelector('input[name="q-mode"]:checked') || {}).value })); } catch (e) { /* opcional */ }
 }
 async function quickRun() {
   const msg = (t, k) => setMsg('#q-msg', t, k);
   const c = parseCoords($('#q-coords').value);
   if (!c) return msg('Coordenadas não reconhecidas. Use -22.9519, -43.1859 ou 22°57′S 43°11′W.', 'bad');
+  const an = { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked };
+  if (!an.wind && !an.wave && !an.tide) return msg('Marque pelo menos uma análise: vento, ondas ou maré.', 'bad');
   let limits;
-  try { limits = normalizeLimits({ hs_max: nOrNull('#q-hs'), tp_min: nOrNull('#q-tp'), wind_max: nOrNull('#q-wind'), gust_max: nOrNull('#q-gust'), min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
+  try { limits = normalizeLimits({ hs_max: an.wave ? nOrNull('#q-hs') : null, tp_min: an.wave ? nOrNull('#q-tp') : null, wind_max: an.wind ? nOrNull('#q-wind') : null, gust_max: an.wind ? nOrNull('#q-gust') : null, min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
   catch (e) { return msg(e.message, 'bad'); }
   const days = Math.max(1, Math.min(10, parseInt($('#q-days').value, 10) || 5));
   quickSave();
   const tz = -new Date().getTimezoneOffset() / 60;
-  const loc = { id: null, name: `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`, lat: c.lat, lon: c.lon, tz_offset: tz, areas: '', tags: [] };
+  const nm = $('#q-name').value.trim(), saved = S.locs.find(l => Math.abs(l.lat - c.lat) < 1e-4 && Math.abs(l.lon - c.lon) < 1e-4);
+  const loc = { id: saved ? saved.id : null, name: nm || (saved ? saved.name : `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`), lat: c.lat, lon: c.lon, tz_offset: saved ? saved.tz_offset : tz, areas: saved ? saved.areas || '' : '', tags: saved ? saved.tags || [] : [], project: $('#q-proj').value.trim() || (saved ? saved.project || '' : '') };
+  const header = { client: $('#h-client').value.trim(), vessel: $('#h-vessel').value.trim(), resp: $('#h-resp').value.trim(), doc: $('#h-doc').value.trim(), obs: $('#h-obs').value.trim(), project: loc.project };
+  const mode = (document.querySelector('input[name="q-mode"]:checked') || {}).value || 'completo';
   const parts = [];
   if (limits.hs_max !== null) parts.push(`Hs ≤ ${limits.hs_max} m`);
   if (limits.wind_max !== null) parts.push(`vento ≤ ${limits.wind_max} kn`);
@@ -2025,29 +2102,32 @@ async function quickRun() {
   try {
     let mcp = null;
     try { mcp = await claude.use('mcp'); } catch (e) { mcp = null; }
-    const u = buildUrls(c.lat, c.lon, days, S.rows);
-    for (const k of ['wind', 'wave']) {
-      msg(`Buscando ${k === 'wind' ? 'vento' : 'ondas'}…`, '');
+    const u = buildUrls(c.lat, c.lon, days, S.rows), need = [];
+    if (an.wind) need.push('wind'); if (an.wave || an.tide) need.push('wave');
+    S.wind = null; S.wave = null; $('#paste-wind').value = ''; $('#paste-wave').value = '';
+    for (const k of need) {
+      msg(`Buscando ${k === 'wind' ? 'vento' : 'ondas e maré'}…`, '');
       const raw = await getRaw(mcp, u[k]);
       $(`#paste-${k}`).value = raw; validatePaste(k);
     }
-    if (!S.wind || !S.wave) return msg('A resposta veio sem dados horários. Confira as coordenadas (ponto em terra?).', 'bad');
-    await runAnalysis(loc, prof, days, [], msg);
+    if ((an.wind && !S.wind) || ((an.wave || an.tide) && !S.wave)) return msg('A resposta veio sem dados horários. Confira as coordenadas (ponto em terra?).', 'bad');
+    await runAnalysis(loc, prof, days, loc.tags, msg, { analyses: an, mode, header });
   } catch (e) {
     msg(`Não consegui buscar a previsão (${(e && e.message) || (e && e.code) || 'erro'}). Verifique a internet ou use o modo completo abaixo.`, 'bad');
   } finally { btn.disabled = false; }
 }
-async function runAnalysis(loc, prof, days, tags, msg) {
+async function runAnalysis(loc, prof, days, tags, msg, opts = {}) {
   const startTs = Math.floor(now() / HOUR) * HOUR, endTs = startTs + days * 86400;
   const ok = [], errors = [];
   for (const row of S.rows) {
-    try { const r = buildSeries(S.wind, S.wave, row, startTs, endTs); ok.push({ id: row.label, label: row.label || 'Fonte', fetched_at: now(), ...r }); }
+    try { const r = buildSeries(opts.analyses && !opts.analyses.wind ? null : S.wind, opts.analyses && !(opts.analyses.wave || opts.analyses.tide) ? null : S.wave, row, startTs, endTs); ok.push({ id: row.label, label: row.label || 'Fonte', fetched_at: now(), ...r }); }
     catch (e) { errors.push({ label: row.label || 'Fonte', error: e.message }); }
   }
   if (!ok.length) return msg('Nenhuma fonte pôde ser montada: ' + errors.map(e => `${e.label}: ${e.error}`).join('; '), 'bad');
   let result;
   try { result = analyze(ok, prof.limits, loc.lat, loc.lon, startTs, endTs); } catch (e) { return msg('Erro na análise: ' + e.message, 'bad'); }
-  const ctx = { result, errors, location: { name: loc.name, lat: loc.lat, lon: loc.lon, tz_offset: loc.tz_offset, areas: loc.areas || '' }, profileName: prof.name, tags,
+  const ctx = { result, errors, location: { name: loc.name, lat: loc.lat, lon: loc.lon, tz_offset: loc.tz_offset, areas: loc.areas || '', project: loc.project || '' }, profileName: prof.name, tags,
+    analyses: opts.analyses || { wind: true, wave: true, tide: true }, mode: opts.mode || 'completo', header: opts.header || {},
     navyWarnings: warningsFor(S.navy.warnings || [], startTs, endTs, S.navy.fetched_at || 0), navyInfo: { fetched_at: S.navy.fetched_at, status: S.navy.status },
     navyStale: !S.navy.fetched_at || (now() - S.navy.fetched_at) > 7 * 86400, generatedTs: now() };
   showReport(ctx);
@@ -2201,8 +2281,15 @@ async function init() {
   $('#q-go').addEventListener('click', quickRun);
   $('#q-coords').addEventListener('keydown', e => { if (e.key === 'Enter') quickRun(); });
   quickLoad();
-  MapView.init((lat, lon) => { $('#q-coords').value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`; setMsg('#q-coordsmsg', `Ponto marcado: ${lat.toFixed(5)}, ${lon.toFixed(5)}.`, 'ok'); quickSave(); });
-  $('#q-coords').addEventListener('input', () => { const c = parseCoords($('#q-coords').value); if (c) { MapView.setPin(c.lat, c.lon, true); setMsg('#q-coordsmsg', ''); } });
+  const toLocais = (lat, lon) => { if (!S.selLoc) { $('#l-lat').value = +lat.toFixed(5); $('#l-lon').value = +lon.toFixed(5); updateSeeLink(); } };
+  MapView.init((lat, lon) => { $('#q-coords').value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`; setMsg('#q-coordsmsg', `Ponto marcado: ${lat.toFixed(5)}, ${lon.toFixed(5)}. Também preenchido na aba Locais.`, 'ok'); toLocais(lat, lon); quickSave(); });
+  $('#q-saveloc').addEventListener('click', async () => {
+    const c = parseCoords($('#q-coords').value); if (!c) return setMsg('#q-savemsg', 'Marque ou digite as coordenadas primeiro.', 'bad');
+    const name = $('#q-name').value.trim() || `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`;
+    S.selLoc = null; $('#l-name').value = name; $('#l-lat').value = +c.lat.toFixed(5); $('#l-lon').value = +c.lon.toFixed(5); $('#l-proj').value = $('#q-proj').value.trim(); $('#l-areas').value = ''; locTags.set([]);
+    await saveLoc(); setMsg('#q-savemsg', $('#l-msg').textContent, $('#l-msg').className.includes('bad') ? 'bad' : 'ok');
+  });
+  $('#q-coords').addEventListener('input', () => { const c = parseCoords($('#q-coords').value); if (c) { MapView.setPin(c.lat, c.lon, true); toLocais(c.lat, c.lon); setMsg('#q-coordsmsg', ''); } });
   { const c = parseCoords($('#q-coords').value); if (c) MapView.setPin(c.lat, c.lon, true); }
   // link com parâmetros: ?lat=-22.1&lon=-41.1&hs=1.5&vento=20&dias=5&gerar=1
   try {
