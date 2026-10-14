@@ -51,7 +51,8 @@
 .fs{border:1px solid var(--line);border-radius:8px;padding:6px 12px 8px;margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px 18px}
 .fs legend{font:600 11.5px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--mut);padding:0 4px}
 .rp .hdr{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 18px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:10px 0;font-size:13.5px}
-.rp .hdr span b{font-weight:600}.map.off .map-msg{position:static}
+.rp .hdr span b{font-weight:600}
+.rp .hdr.main{background:var(--accent-soft);border-color:transparent;font-size:14.5px}.map.off .map-msg{position:static}
 @media (prefers-color-scheme:dark){.map{background:#1c2a31}}
 
 *{box-sizing:border-box}
@@ -263,6 +264,17 @@ details>summary{cursor:pointer}
       <label>Projeto (opcional) <input id="l-proj" class="f" maxlength="80" placeholder="ex.: Survey Bacia de Campos" autocomplete="off"></label>
     </div>
     <div style="margin-top:10px"><label>Tags<div id="l-tags"></div></label></div>
+    <fieldset class="fs" style="display:block"><legend>Limites operacionais do local (opcional)</legend>
+      <p class="note" style="margin:0 0 6px">Se preenchidos, a análise rápida usa estes limites sempre que o ponto for este local.</p>
+      <div class="grid">
+        <label>Hs máxima (m)<input id="l-hs" class="f" type="number" step="0.1" min="0" placeholder="não usar"></label>
+        <label>Vento máximo (nós)<input id="l-wind" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
+        <label>Rajada máxima (nós)<input id="l-gust" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
+        <label>Tp mínimo (s)<input id="l-tp" class="f" type="number" step="0.5" min="0" placeholder="não usar"></label>
+        <label>Janela mínima (h)<input id="l-win" class="f" type="number" min="1" max="72" placeholder="4"></label>
+      </div>
+      <label class="check" style="margin-top:6px"><input id="l-day" type="checkbox"> Somente período diurno</label>
+    </fieldset>
     <div class="row" style="margin-top:12px">
       <button id="l-save" class="primary" type="button">Salvar local</button>
       <button id="l-new" type="button">Novo</button>
@@ -1169,19 +1181,19 @@ function buildReport(ctx) {
   const perSource = res.sources.map(s => `<h3 style="font:600 14px var(--font-body);margin:14px 0 2px">${esc(s.label)}</h3>${windowsTable(s.windows, grid, tz, false)}${s.dropped_short ? `<p class="sub">${s.dropped_short} trecho(s) GO menor(es) que ${lm.min_window_h} h descartado(s).</p>` : ''}`).join('');
 
   const A = ctx.analyses || { wind: true, wave: true, tide: true }, brief = ctx.mode === 'resumido', hasLim = A.wind || A.wave, H = ctx.header || {};
-  const hdrItems = [['Projeto', ctx.location.project || H.project], ['Cliente', H.client], ['Embarcação / unidade', H.vessel], ['Responsável', H.resp], ['Documento', H.doc], ['Observações', H.obs]].filter(([, v]) => v);
+  const hdrItems = [['Cliente', H.client], ['Embarcação / unidade', H.vessel], ['Responsável', H.resp], ['Documento', H.doc], ['Observações', H.obs]].filter(([, v]) => v);
   const hdr = hdrItems.length ? `<div class="hdr">${hdrItems.map(([k, v]) => `<span>${k}: <b>${esc(v)}</b></span>`).join('')}</div>` : '';
   const scope = [A.wind ? 'vento' : null, A.wave ? 'ondas' : null, A.tide ? 'maré' : null].filter(Boolean).join(', ');
   const foot = `<p class="foot">Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.</p>`;
+  const proj = ctx.location.project || H.project;
   const head = `
-<h1>Relatório MetOcean — ${esc(ctx.location.name)}</h1>
+<h1>Relatório MetOcean${proj ? ' — ' + esc(proj) : ''}</h1>
 <p class="sub">${brief ? 'Resumo operacional' : 'Análise de janelas operacionais'} · ${scope}</p>
+<div class="hdr main"><span>Local: <b>${esc(ctx.location.name)}</b> (${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°)</span><span>Período: <b>${startL} → ${endL}</b> (${tzlabel(tz)})</span>${proj ? `<span>Projeto: <b>${esc(proj)}</b></span>` : ''}</div>
 ${hdr}
 <div class="meta">
- <span>Ponto: <b>${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°</b></span>
- ${hasLim ? `<span>Operação: <b>${esc(ctx.profileName)}</b></span>` : ''}
- <span>Período: <b>${startL} → ${endL}</b> (${tzlabel(tz)})</span>
- <span>Tags: ${tags}</span>
+ ${hasLim ? `<span>Limites: <b>${esc(ctx.profileName)}</b></span>` : ''}
+ ${ctx.tags.length ? `<span>Tags: ${tags}</span>` : ''}
  <span>Gerado: <b>${fmtUtcFull(ctx.generatedTs)}</b></span>
 </div>`;
   const chart = (title, body) => `<div><h2>${title}</h2>${body}</div>`;
@@ -1547,7 +1559,8 @@ function buildPdf(ctx) {
   pdf.rect(0, 0, PDF_W, 62, { fill: PDF_COL.accent });
   pdf.text(PDF_M, 30, 'RELATÓRIO METOCEAN', 17, { bold: true, color: '#ffffff' });
   const coords = `${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°`;
-  pdf.text(PDF_M, 48, ctx.location.name === coords ? coords : `${ctx.location.name}  ·  ${coords}`, 10, { color: '#dcebf1' });
+  const projP = ctx.location.project || (ctx.header || {}).project;
+  pdf.text(PDF_M, 48, `${projP ? projP + '  ·  ' : ''}${ctx.location.name === coords ? coords : ctx.location.name + '  ·  ' + coords}`.slice(0, 95), 10, { color: '#dcebf1' });
   pdf.text(PDF_W - PDF_M, 30, 'MetOcean OP', 9, { color: '#dcebf1', align: 'right' });
   pdf.text(PDF_W - PDF_M, 46, `gerado ${fmtUtcFull(ctx.generatedTs)}`, 8.5, { color: '#dcebf1', align: 'right' });
   pdf.y = 76;
@@ -1555,7 +1568,7 @@ function buildPdf(ctx) {
   const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
   const scope = [A.wind ? 'vento' : null, A.wave ? 'ondas' : null, A.tide ? 'maré' : null].filter(Boolean).join(', ');
   pdf.para(`${brief ? 'Resumo operacional' : 'Análise de janelas operacionais'} (${scope})${hasLim ? '    ·    Operação: ' + ctx.profileName : ''}    ·    Período: ${startL} → ${endL} (${tzlabel(tz)})${ctx.tags.length ? '    ·    Tags: ' + ctx.tags.join(', ') : ''}`, 9, { color: PDF_COL.mut, gap: 6 });
-  const hdrItems = [['Projeto', ctx.location.project || Hd.project], ['Cliente', Hd.client], ['Embarcação / unidade', Hd.vessel], ['Responsável', Hd.resp], ['Documento', Hd.doc], ['Observações', Hd.obs]].filter(([, v]) => v);
+  const hdrItems = [['Projeto', projP], ['Local', ctx.location.name], ['Cliente', Hd.client], ['Embarcação / unidade', Hd.vessel], ['Responsável', Hd.resp], ['Documento', Hd.doc], ['Observações', Hd.obs]].filter(([, v]) => v);
   if (hdrItems.length) {
     const colW = (PDF_W - 2 * PDF_M) / 2, rowsN = Math.ceil(hdrItems.length / 2), hh = rowsN * 13 + 10;
     pdf.ensure(hh + 6); pdf.rect(PDF_M, pdf.y, PDF_W - 2 * PDF_M, hh, { stroke: PDF_COL.line });
@@ -1740,7 +1753,8 @@ function renderLocs() {
     el('div', { class: 't' }, l.name),
     el('div', { class: 'm mono' }, `${l.lat.toFixed(4)}°, ${l.lon.toFixed(4)}° · ${tzlabel(l.tz_offset)}${l.areas ? ' · ' + l.areas : ''}${l.project ? ' · ' + l.project : ''}`),
     el('div', { class: 'tagrow' }, ...(l.tags || []).map(t => el('span', { class: 'tag' }, t))),
-    el('div', { style: 'margin-top:4px' }, el('button', { class: 'lnk', type: 'button', onclick: () => selectLoc(l.id) }, 'Editar')))) :
+    l.limits ? el('div', { class: 'm' }, 'Limites: ' + limitsLabel(l.limits)) : null,
+    el('div', { class: 'row', style: 'margin-top:4px;gap:14px' }, el('button', { class: 'lnk', type: 'button', onclick: () => selectLoc(l.id) }, 'Editar'), el('button', { class: 'lnk', type: 'button', onclick: () => runFromLoc(l.id) }, 'Gerar previsão deste local')))) :
     [el('li', { class: 'empty' }, 'Nenhum local salvo. Cole as coordenadas acima, dê um nome e salve.')]));
   $('#l-del').hidden = !S.selLoc;
   hintAnalysis();
@@ -1749,12 +1763,13 @@ function selectLoc(id) {
   const l = S.locs.find(x => x.id === id); if (!l) return;
   S.selLoc = id;
   $('#l-name').value = l.name; $('#l-lat').value = l.lat; $('#l-lon').value = l.lon; $('#l-tz').value = l.tz_offset; $('#l-areas').value = l.areas || ''; $('#l-proj').value = l.project || '';
+  const L = l.limits || {}; $('#l-hs').value = L.hs_max ?? ''; $('#l-wind').value = L.wind_max ?? ''; $('#l-gust').value = L.gust_max ?? ''; $('#l-tp').value = L.tp_min ?? ''; $('#l-win').value = L.min_window_h ?? ''; $('#l-day').checked = !!L.daylight_only;
   locTags.set(l.tags); anTags.set(l.tags); $('#l-paste').value = ''; setMsg('#l-pastemsg', ''); setMsg('#l-msg', '');
   updateSeeLink(); renderLocs(); updateLinks(); showTab('locais');
 }
 function newLoc() {
   S.selLoc = null;
-  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-proj', '#l-paste']) $(id).value = '';
+  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-proj', '#l-paste', '#l-hs', '#l-wind', '#l-gust', '#l-tp', '#l-win']) $(id).value = ''; $('#l-day').checked = false;
   $('#l-tz').value = -3; locTags.set([]); setMsg('#l-msg', ''); setMsg('#l-pastemsg', ''); updateSeeLink(); renderLocs();
 }
 async function saveLoc() {
@@ -1763,7 +1778,9 @@ async function saveLoc() {
   if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return setMsg('#l-msg', 'Latitude (−90 a 90) e longitude (−180 a 180) são obrigatórias.', 'bad');
   if (!(tz >= -12 && tz <= 14)) return setMsg('#l-msg', 'Fuso deve estar entre −12 e 14.', 'bad');
   const id = S.selLoc || newId();
-  const rec = { name, lat, lon, tz_offset: tz, areas: $('#l-areas').value.trim().slice(0, 100), project: $('#l-proj').value.trim().slice(0, 80), tags: locTags.get(), created_at: (S.locs.find(l => l.id === id) || {}).created_at || now() };
+  const lim = { hs_max: nOrNull('#l-hs'), wind_max: nOrNull('#l-wind'), gust_max: nOrNull('#l-gust'), tp_min: nOrNull('#l-tp'), min_window_h: nOrNull('#l-win'), daylight_only: $('#l-day').checked };
+  const hasLim = Object.values(lim).some(v => v !== null && v !== false);
+  const rec = { name, lat, lon, tz_offset: tz, areas: $('#l-areas').value.trim().slice(0, 100), project: $('#l-proj').value.trim().slice(0, 80), limits: hasLim ? lim : null, tags: locTags.get(), created_at: (S.locs.find(l => l.id === id) || {}).created_at || now() };
   try { await Store.set('locations', id, rec); S.selLoc = id; await loadAll(); setMsg('#l-msg', 'Local salvo.', 'ok'); anTags.set(rec.tags); }
   catch (e) { setMsg('#l-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
 }
@@ -2076,6 +2093,30 @@ function quickSave() {
   try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
     an: { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked }, mode: (document.querySelector('input[name="q-mode"]:checked') || {}).value })); } catch (e) { /* opcional */ }
 }
+function limitsLabel(L) {
+  const parts = [];
+  if (L.hs_max !== null && L.hs_max !== undefined) parts.push(`Hs ≤ ${L.hs_max} m`);
+  if (L.wind_max !== null && L.wind_max !== undefined) parts.push(`vento ≤ ${L.wind_max} kn`);
+  if (L.gust_max !== null && L.gust_max !== undefined) parts.push(`rajada ≤ ${L.gust_max} kn`);
+  if (L.tp_min !== null && L.tp_min !== undefined) parts.push(`Tp ≥ ${L.tp_min} s`);
+  if (L.min_window_h) parts.push(`janela ≥ ${L.min_window_h} h`);
+  if (L.daylight_only) parts.push('só diurno');
+  return parts.join(', ') || 'sem limites';
+}
+/* ponto salvo → preenche nome, projeto e limites da análise rápida */
+function applyLocToQuick(l) {
+  $('#q-name').value = l.name; $('#q-proj').value = l.project || '';
+  if (l.limits) {
+    const L = l.limits; $('#q-hs').value = L.hs_max ?? ''; $('#q-wind').value = L.wind_max ?? ''; $('#q-gust').value = L.gust_max ?? ''; $('#q-tp').value = L.tp_min ?? ''; if (L.min_window_h) $('#q-win').value = L.min_window_h; $('#q-day').checked = !!L.daylight_only;
+    setMsg('#q-coordsmsg', `Local salvo "${l.name}": limites do local aplicados (${limitsLabel(L)}).`, 'ok');
+  } else setMsg('#q-coordsmsg', `Local salvo "${l.name}".`, 'ok');
+}
+function matchLoc(lat, lon) { return S.locs.find(l => Math.abs(l.lat - lat) < 1e-4 && Math.abs(l.lon - lon) < 1e-4) || null; }
+function runFromLoc(id) {
+  const l = S.locs.find(x => x.id === id); if (!l) return;
+  $('#q-coords').value = `${l.lat.toFixed(5)}, ${l.lon.toFixed(5)}`; MapView.setPin(l.lat, l.lon, true); applyLocToQuick(l);
+  showTab('analise'); quickRun();
+}
 async function quickRun() {
   const msg = (t, k) => setMsg('#q-msg', t, k);
   const c = parseCoords($('#q-coords').value);
@@ -2088,7 +2129,7 @@ async function quickRun() {
   const days = Math.max(1, Math.min(10, parseInt($('#q-days').value, 10) || 5));
   quickSave();
   const tz = -new Date().getTimezoneOffset() / 60;
-  const nm = $('#q-name').value.trim(), saved = S.locs.find(l => Math.abs(l.lat - c.lat) < 1e-4 && Math.abs(l.lon - c.lon) < 1e-4);
+  const nm = $('#q-name').value.trim(), saved = matchLoc(c.lat, c.lon);
   const loc = { id: saved ? saved.id : null, name: nm || (saved ? saved.name : `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`), lat: c.lat, lon: c.lon, tz_offset: saved ? saved.tz_offset : tz, areas: saved ? saved.areas || '' : '', tags: saved ? saved.tags || [] : [], project: $('#q-proj').value.trim() || (saved ? saved.project || '' : '') };
   const header = { client: $('#h-client').value.trim(), vessel: $('#h-vessel').value.trim(), resp: $('#h-resp').value.trim(), doc: $('#h-doc').value.trim(), obs: $('#h-obs').value.trim(), project: loc.project };
   const mode = (document.querySelector('input[name="q-mode"]:checked') || {}).value || 'completo';
@@ -2282,14 +2323,21 @@ async function init() {
   $('#q-coords').addEventListener('keydown', e => { if (e.key === 'Enter') quickRun(); });
   quickLoad();
   const toLocais = (lat, lon) => { if (!S.selLoc) { $('#l-lat').value = +lat.toFixed(5); $('#l-lon').value = +lon.toFixed(5); updateSeeLink(); } };
-  MapView.init((lat, lon) => { $('#q-coords').value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`; setMsg('#q-coordsmsg', `Ponto marcado: ${lat.toFixed(5)}, ${lon.toFixed(5)}. Também preenchido na aba Locais.`, 'ok'); toLocais(lat, lon); quickSave(); });
+  const afterPick = (lat, lon) => {
+    const m = matchLoc(lat, lon);
+    if (m) { applyLocToQuick(m); return; }
+    toLocais(lat, lon);
+    const n = $('#q-coordsmsg'); n.className = 'msg ok';
+    n.replaceChildren(`Ponto marcado: ${lat.toFixed(5)}, ${lon.toFixed(5)}. Coordenadas já estão na aba Locais: `, el('button', { type: 'button', class: 'lnk', onclick: () => { S.selLoc = null; $('#l-name').value = $('#q-name').value.trim(); $('#l-proj').value = $('#q-proj').value.trim(); showTab('locais'); $('#l-name').focus(); } }, 'completar projeto e limites e salvar'), '.');
+  };
+  MapView.init((lat, lon) => { $('#q-coords').value = `${lat.toFixed(5)}, ${lon.toFixed(5)}`; afterPick(lat, lon); quickSave(); });
   $('#q-saveloc').addEventListener('click', async () => {
     const c = parseCoords($('#q-coords').value); if (!c) return setMsg('#q-savemsg', 'Marque ou digite as coordenadas primeiro.', 'bad');
     const name = $('#q-name').value.trim() || `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`;
     S.selLoc = null; $('#l-name').value = name; $('#l-lat').value = +c.lat.toFixed(5); $('#l-lon').value = +c.lon.toFixed(5); $('#l-proj').value = $('#q-proj').value.trim(); $('#l-areas').value = ''; locTags.set([]);
     await saveLoc(); setMsg('#q-savemsg', $('#l-msg').textContent, $('#l-msg').className.includes('bad') ? 'bad' : 'ok');
   });
-  $('#q-coords').addEventListener('input', () => { const c = parseCoords($('#q-coords').value); if (c) { MapView.setPin(c.lat, c.lon, true); toLocais(c.lat, c.lon); setMsg('#q-coordsmsg', ''); } });
+  $('#q-coords').addEventListener('input', () => { const c = parseCoords($('#q-coords').value); if (c) { MapView.setPin(c.lat, c.lon, true); afterPick(c.lat, c.lon); } });
   { const c = parseCoords($('#q-coords').value); if (c) MapView.setPin(c.lat, c.lon, true); }
   // link com parâmetros: ?lat=-22.1&lon=-41.1&hs=1.5&vento=20&dias=5&gerar=1
   try {
