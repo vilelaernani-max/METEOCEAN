@@ -483,17 +483,17 @@ function analyze(sourceResults, limits, lat, lon, startTs, endTs) {
 
   const sources = sourceResults.map(sr => {
     const idx = new Map(sr.series.map(r => [r.ts, r]));
-    const st = [], cols = { hs: [], tp: [], wind: [], gust: [], wdir: [], wvdir: [] };
+    const st = [], cols = { hs: [], tp: [], wind: [], gust: [], wdir: [], wvdir: [], tide: [] };
     for (const ts of grid) {
       const row = idx.get(ts);
       if (!row) { st.push('nodata'); for (const k in cols) cols[k].push(null); continue; }
       st.push(evaluateHour({ ...row, ts }, L, day)[0]);
-      cols.hs.push(row.hs); cols.tp.push(row.tp); cols.wind.push(row.wind_kn); cols.gust.push(row.gust_kn); cols.wdir.push(row.wind_dir ?? null); cols.wvdir.push(row.wave_dir ?? null);
+      cols.hs.push(row.hs); cols.tp.push(row.tp); cols.wind.push(row.wind_kn); cols.gust.push(row.gust_kn); cols.wdir.push(row.wind_dir ?? null); cols.wvdir.push(row.wave_dir ?? null); cols.tide.push(row.tide ?? null);
     }
     const extra = (i0, i1) => ({ max_hs: maxv(cols.hs.slice(i0, i1)), max_wind: maxv(cols.wind.slice(i0, i1)), max_gust: maxv(cols.gust.slice(i0, i1)) });
     const [windows, dropped] = windowsOf(st, minH, extra);
     return { id: sr.id, label: sr.label, note: sr.note || null, meta: sr.meta || {}, fetched_at: sr.fetched_at || null,
-      status: st, hs: cols.hs, tp: cols.tp, wind: cols.wind, gust: cols.gust, wdir: cols.wdir, wvdir: cols.wvdir, windows, dropped_short: dropped,
+      status: st, hs: cols.hs, tp: cols.tp, wind: cols.wind, gust: cols.gust, wdir: cols.wdir, wvdir: cols.wvdir, tide: cols.tide, windows, dropped_short: dropped,
       n_go: st.filter(x => x === 'go').length, n_nogo: st.filter(x => x === 'nogo').length, n_nodata: st.filter(x => x === 'nodata').length };
   });
 
@@ -525,7 +525,7 @@ const DEFAULT_SOURCES = [
   { label: 'ECMWF IFS / WAM', wind: 'ecmwf_ifs025', wave: 'ecmwf_wam025' },
 ];
 const WIND_VARS = 'wind_speed_10m,wind_gusts_10m,wind_direction_10m';
-const WAVE_VARS = 'wave_height,wave_period,wave_direction';
+const WAVE_VARS = 'wave_height,wave_period,wave_direction,sea_level_height_msl';
 
 function modelParam(rows, key) {
   const names = rows.map(r => (r[key] || '').trim());
@@ -577,13 +577,15 @@ function buildSeries(windJ, waveJ, row, startTs, endTs) {
   const sp = hourlyPick(wh, 'wind_speed_10m', row.wind.trim()), gu = hourlyPick(wh, 'wind_gusts_10m', row.wind.trim()), wd = hourlyPick(wh, 'wind_direction_10m', row.wind.trim());
   if (!sp) throw new Error(`modelo de vento "${row.wind.trim() || 'melhor modelo'}" não veio na resposta colada`);
   const hs = hourlyPick(mh, 'wave_height', row.wave.trim()), tp = hourlyPick(mh, 'wave_period', row.wave.trim()), wv = hourlyPick(mh, 'wave_direction', row.wave.trim());
+  const tideKey = Object.keys(mh).find(k => k === 'sea_level_height_msl' || k === `sea_level_height_msl_${row.wave.trim() || 'best_match'}` || k === `sea_level_height_msl_marine_${row.wave.trim() || 'best_match'}`) || Object.keys(mh).find(k => k.startsWith('sea_level_height_msl'));
+  const tide = tideKey ? mh[tideKey] : null;
   if (!hs) throw new Error(`modelo de onda "${row.wave.trim() || 'melhor modelo'}" não veio na resposta colada`);
   const by = new Map();
   wh.time.forEach((t, i) => { const ts = toTs(t); by.set(ts, { ts, hs: null, tp: null, wave_dir: null, wind_kn: numOrNull(sp[i]), gust_kn: gu ? numOrNull(gu[i]) : null, wind_dir: wd ? numOrNull(wd[i]) : null }); });
   mh.time.forEach((t, i) => {
     const ts = toTs(t);
     const r = by.get(ts) || { ts, hs: null, tp: null, wave_dir: null, wind_kn: null, gust_kn: null, wind_dir: null };
-    r.hs = numOrNull(hs[i]); r.tp = tp ? numOrNull(tp[i]) : null; r.wave_dir = wv ? numOrNull(wv[i]) : null; by.set(ts, r);
+    r.hs = numOrNull(hs[i]); r.tp = tp ? numOrNull(tp[i]) : null; r.wave_dir = wv ? numOrNull(wv[i]) : null; r.tide = tide ? numOrNull(tide[i]) : null; by.set(ts, r);
   });
   const series = [...by.values()].filter(r => r.ts > startTs - 3600 && r.ts < endTs + 3600).sort((a, b) => a.ts - b.ts);
   if (!series.length) throw new Error('a resposta colada não tem horas dentro do período (previsão antiga? abra o link de novo)');
@@ -1000,6 +1002,97 @@ function waveClimateHtml(ctx) {
 <h3 style="font:600 14px var(--font-body);margin:14px 0 2px">Excedência e janelas operacionais</h3>${exc}
 <details><summary>Texto pronto para o relatório (copiar)</summary><p><button type="button" class="lnk" data-copy="wave">Copiar texto</button></p><pre id="wave-text">${esc(text)}</pre></details>`;
 }
+/* ---- maré: nível do mar previsto (Open-Meteo, maré + sobre-elevação, referido ao NMM) ---- */
+function moonPhases(fromTs, count = 6) {
+  // Meeus, Astronomical Algorithms cap. 49 (termos principais). Erro típico < 1 h.
+  const out = [], T0 = (fromTs / 86400 + 2440587.5 - 2451545) / 36525, kBase = Math.floor((T0 * 1236.85)) - 1;
+  for (let k = kBase; out.length < count && k < kBase + 20; k += 0.25) {
+    const kk = Math.round(k * 4) / 4, T = kk / 1236.85, rad = Math.PI / 180;
+    let jde = 2451550.09766 + 29.530588861 * kk + 0.00015437 * T * T;
+    const E = 1 - 0.002516 * T, M = (2.5534 + 29.1053567 * kk) * rad, Mp = (201.5643 + 385.81693528 * kk) * rad, F = (160.7108 + 390.67050284 * kk) * rad, O = (124.7746 - 1.56375588 * kk) * rad;
+    const ph = Math.round((kk % 1) * 4 + 4) % 4; // 0 nova, 1 crescente, 2 cheia, 3 minguante
+    if (ph === 0 || ph === 2) {
+      const sgn = ph === 0 ? 1 : -1;
+      jde += (ph === 0 ? -0.40720 : -0.40614) * Math.sin(Mp) + (ph === 0 ? 0.17241 : 0.17302) * E * Math.sin(M) + 0.01608 * Math.sin(2 * Mp) + 0.01039 * Math.sin(2 * F) + 0.00739 * E * Math.sin(Mp - M) - 0.00514 * E * Math.sin(Mp + M) + 0.00208 * E * E * Math.sin(2 * M) - 0.00111 * Math.sin(Mp - 2 * F) - 0.00057 * Math.sin(Mp + 2 * F) + 0.00056 * E * Math.sin(2 * Mp + M) - 0.00042 * Math.sin(3 * Mp) + 0.00042 * E * Math.sin(M + 2 * F) + 0.00038 * E * Math.sin(M - 2 * F) - 0.00024 * E * Math.sin(2 * Mp - M) - 0.00017 * Math.sin(O);
+      void sgn;
+    } else {
+      jde += -0.62801 * Math.sin(Mp) + 0.17172 * E * Math.sin(M) - 0.01183 * E * Math.sin(Mp + M) + 0.00862 * Math.sin(2 * Mp) + 0.00804 * Math.sin(2 * F) + 0.00454 * E * Math.sin(Mp - M) + 0.00204 * E * E * Math.sin(2 * M) - 0.00180 * Math.sin(Mp - 2 * F) - 0.00070 * Math.sin(Mp + 2 * F) - 0.00040 * Math.sin(3 * Mp) - 0.00034 * E * Math.sin(2 * Mp - M) + 0.00032 * E * Math.sin(M + 2 * F) + 0.00032 * E * Math.sin(M - 2 * F) - 0.00028 * E * E * Math.sin(Mp + 2 * M) + 0.00027 * E * Math.sin(2 * Mp + M) - 0.00017 * Math.sin(O);
+      const W = 0.00306 - 0.00038 * E * Math.cos(M) + 0.00026 * Math.cos(Mp) - 0.00002 * Math.cos(Mp - M) + 0.00002 * Math.cos(Mp + M) + 0.00002 * Math.cos(2 * F);
+      jde += ph === 1 ? W : -W;
+    }
+    const ts = Math.round((jde - 2440587.5) * 86400);
+    if (ts >= fromTs) out.push({ phase: ph, name: ['Lua nova', 'Quarto crescente', 'Lua cheia', 'Quarto minguante'][ph], ts });
+  }
+  return out;
+}
+function tideStats(res, tz, nowTs) {
+  const src = res.sources.find(s => s.tide && s.tide.some(v => v !== null && v !== undefined));
+  if (!src) return null;
+  const h = src.tide, grid = res.grid, n = grid.length;
+  const ext = [];
+  for (let i = 1; i < n - 1; i++) {
+    const a = h[i - 1], b = h[i], c = h[i + 1];
+    if (a === null || b === null || c === null) continue;
+    const isMax = b >= a && b > c, isMin = b <= a && b < c;
+    if (!isMax && !isMin) continue;
+    const den = a - 2 * b + c, off = den ? 0.5 * (a - c) / den : 0, hv = den ? b - (a - c) * (a - c) / (8 * den) : b;
+    ext.push({ kind: isMax ? 'HW' : 'LW', ts: grid[i] + off * HOUR, h: hv });
+  }
+  if (ext.length < 2) return null;
+  for (let i = 1; i < ext.length; i++) ext[i].range = Math.abs(ext[i].h - ext[i - 1].h);
+  // por dia (hora local do ponto)
+  const days = new Map();
+  for (const e of ext) { const d = localD(e.ts, tz), k = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`; if (!days.has(k)) days.set(k, { d, hw: [], lw: [], ranges: [] }); const o = days.get(k); (e.kind === 'HW' ? o.hw : o.lw).push(e); if (e.range !== undefined) o.ranges.push(e.range); }
+  const dayList = [...days.values()].map(o => ({ ...o, range: o.ranges.length ? Math.max(...o.ranges) : null, meanRange: mean(o.ranges) }));
+  // tendência: regressão das amplitudes (médias diárias) ao longo dos dias
+  const xs = dayList.map((_, i) => i), ys = dayList.map(o => o.meanRange);
+  const ok = xs.filter(i => ys[i] !== null), mx = mean(ok), my = mean(ok.map(i => ys[i]));
+  const slope = ok.length > 1 ? ok.reduce((a, i) => a + (i - mx) * (ys[i] - my), 0) / ok.reduce((a, i) => a + (i - mx) ** 2, 0) : 0;
+  const rel = my ? slope / my : 0;
+  const trend = rel > 0.03 ? 'crescendo' : rel < -0.03 ? 'diminuindo' : 'estável';
+  // estado atual e próximas marés
+  const next = ext.filter(e => e.ts > nowTs).slice(0, 4), prev = ext.filter(e => e.ts <= nowTs).slice(-1)[0];
+  const state = next.length ? (next[0].kind === 'HW' ? 'enchente' : 'vazante') : null;
+  const overall = { max: Math.max(...ext.filter(e => e.kind === 'HW').map(e => e.h)), min: Math.min(...ext.filter(e => e.kind === 'LW').map(e => e.h)), rangeMax: Math.max(...ext.slice(1).map(e => e.range)), rangeMin: Math.min(...ext.slice(1).map(e => e.range)), rangeMean: mean(ext.slice(1).map(e => e.range)) };
+  const phases = moonPhases(nowTs - 86400, 6), nextSyz = phases.find(p => (p.phase === 0 || p.phase === 2) && p.ts > nowTs), nextQuad = phases.find(p => (p.phase === 1 || p.phase === 3) && p.ts > nowTs), lastPhase = [...phases].reverse().find(p => p.ts <= nowTs) || null;
+  return { src: src.label, series: h, ext, dayList, trend, rel, next, prev, state, overall, phases, nextSyz, nextQuad, lastPhase, nValid: h.filter(v => v !== null).length };
+}
+const fm = v => (v === null || v === undefined) ? '–' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2).replace('.', ',') + ' m';
+function tideChartSvg(res, tz, t) {
+  const grid = res.grid, n = grid.length, h = t.series, vals = h.filter(v => v !== null);
+  const W = 980, H = 220, left = 50, right = 12, top = 16, bot = 26, pw = W - left - right, ph = H - top - bot;
+  const lo = Math.floor(Math.min(...vals) * 2) / 2 - 0.5, hi = Math.ceil(Math.max(...vals) * 2) / 2 + 0.5;
+  const X = ts => left + ((ts - grid[0]) / (grid[n - 1] - grid[0])) * pw, Y = v => top + ph - (v - lo) / (hi - lo) * ph;
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Nível do mar previsto com preamares e baixa-mares">`];
+  for (let v = lo; v <= hi + 1e-9; v += 0.5) { o.push(`<line class="grid" x1="${left}" y1="${Y(v).toFixed(1)}" x2="${W - right}" y2="${Y(v).toFixed(1)}"/>`); o.push(`<text class="mut" x="${left - 6}" y="${(Y(v) + 4).toFixed(1)}" font-size="11" text-anchor="end">${fm(v).replace(' m', '')}</text>`); }
+  o.push(`<text class="mut" x="4" y="10" font-size="11">m (NMM)</text>`);
+  if (lo < 0 && hi > 0) o.push(`<line x1="${left}" y1="${Y(0).toFixed(1)}" x2="${W - right}" y2="${Y(0).toFixed(1)}" style="stroke:var(--mut);stroke-width:1"/>`);
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(grid[i]); o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + ph}"/>`); if ((n - i) / n * pw > 40) o.push(`<text class="mut" x="${(x + 3).toFixed(1)}" y="${H - 8}" font-size="11">${dayLabel(d)}</text>`); }
+  const pts = []; h.forEach((v, i) => { if (v !== null) pts.push(`${X(grid[i]).toFixed(1)},${Y(v).toFixed(1)}`); });
+  o.push(`<polygon points="${X(grid[0]).toFixed(1)},${Y(lo).toFixed(1)} ${pts.join(' ')} ${X(grid[n - 1]).toFixed(1)},${Y(lo).toFixed(1)}" style="fill:var(--c1);opacity:.12"/>`);
+  o.push(`<polyline class="ln l1" points="${pts.join(' ')}"/>`);
+  for (const e of t.ext) { const x = X(e.ts), y = Y(e.h); o.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" style="fill:${e.kind === 'HW' ? 'var(--go)' : 'var(--nogo)'}"/>`); o.push(`<text x="${x.toFixed(1)}" y="${(e.kind === 'HW' ? y - 7 : y + 14).toFixed(1)}" font-size="9.5" text-anchor="middle">${fmt(e.ts, tz, false)}</text>`); }
+  const xn = X(Math.max(grid[0], Math.min(grid[n - 1], now()))); o.push(`<line x1="${xn.toFixed(1)}" y1="${top}" x2="${xn.toFixed(1)}" y2="${top + ph}" style="stroke:var(--warn);stroke-width:1.5;stroke-dasharray:4 3"/>`);
+  o.push('</svg>');
+  return `<div class="legend"><span><i class="sw" style="background:var(--go)"></i>preamar</span><span><i class="sw" style="background:var(--nogo)"></i>baixa-mar</span><span><i class="sw" style="background:var(--warn)"></i>agora</span></div>${o.join('')}`;
+}
+function tideSectionHtml(ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, t = tideStats(res, tz, ctx.generatedTs);
+  if (!t) return '<p class="sub">Sem previsão de nível do mar para este ponto nas fontes carregadas (a variável sea_level_height_msl não veio da Open-Meteo, ou a previsão foi colada antes desta versão).</p>';
+  const o = t.overall;
+  const trendTxt = { crescendo: 'crescendo dia a dia (rumo à sizígia)', diminuindo: 'diminuindo dia a dia (rumo à quadratura)', 'estável': 'praticamente estável' }[t.trend];
+  const nextList = t.next.map(e => `<li><b>${e.kind === 'HW' ? 'Preamar' : 'Baixa-mar'}</b> ${fmt(e.ts, tz)} · ${fm(e.h)}${e.range !== undefined ? ` · amplitude ${fm(e.range).replace(/^[+−]/, '')}` : ''}</li>`).join('');
+  const moon = t.phases.filter(p => p.ts > ctx.generatedTs - 86400).slice(0, 4).map(p => `${p.name} ${fmt(p.ts, tz)}`).join(' · ');
+  const rows = t.dayList.map(d => `<tr><td>${dayLabel(d.d)}</td><td>${d.hw.map(e => `${fmt(e.ts, tz, false)} (${fm(e.h)})`).join('<br>') || '–'}</td><td>${d.lw.map(e => `${fmt(e.ts, tz, false)} (${fm(e.h)})`).join('<br>') || '–'}</td><td class="n">${d.range === null ? '–' : d.range.toFixed(2).replace('.', ',')}</td></tr>`).join('');
+  return `<p>Estado agora (${fmt(ctx.generatedTs, tz)}): maré <b>${t.state || '–'}</b>${t.prev ? `, desde a ${t.prev.kind === 'HW' ? 'preamar' : 'baixa-mar'} de ${fmt(t.prev.ts, tz, false)} (${fm(t.prev.h)})` : ''}. Amplitude das marés <b>${trendTxt}</b>: de ${fm(o.rangeMin).replace(/^[+−]/, '')} a ${fm(o.rangeMax).replace(/^[+−]/, '')} no período (média ${fm(o.rangeMean).replace(/^[+−]/, '')}). Preamar mais alta ${fm(o.max)}, baixa-mar mais baixa ${fm(o.min)}, referidas ao nível médio do mar.</p>
+<div class="wind2"><div><h3 style="font:600 14px var(--font-body);margin:8px 0 2px">Próximas marés</h3><ul style="margin:4px 0 8px;padding-left:18px">${nextList}</ul>
+<p>Estofo (água parada) ocorre, em média, perto de cada preamar e baixa-mar: ±30 min em torno dos horários acima. Sem dados de corrente, esse é o melhor indicativo.</p>
+<p>Lua: ${moon}. ${t.nextSyz ? `Próxima <b>sizígia</b> (marés maiores, 1–2 dias após a ${t.nextSyz.name.toLowerCase()}): <b>${fmt(t.nextSyz.ts, tz)}</b>.` : ''} ${t.nextQuad ? `Próxima <b>quadratura</b> (marés menores): ${fmt(t.nextQuad.ts, tz)}.` : ''}</p></div>
+<div><div class="tw"><table><tr><th>Dia</th><th>Preamares</th><th>Baixa-mares</th><th class="n">Ampl. máx (m)</th></tr>${rows}</table></div></div></div>
+<h3 style="font:600 14px var(--font-body);margin:14px 0 2px">Curva de maré prevista</h3>
+${tideChartSvg(res, tz, t)}
+<p class="sub">Fonte: Open-Meteo, variável sea_level_height_msl (${esc(t.src)}): maré astronômica + sobre-elevação meteorológica, em metros relativos ao nível médio do mar (não ao nível de redução das cartas náuticas). Resolução horária; horários de preamar/baixa-mar interpolados (±20 min). Para navegação, confira a Tábua de Marés da DHN.</p>`;
+}
 function buildReport(ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, errors = ctx.errors, cons = res.conservative, cw = cons.windows;
   const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
@@ -1076,6 +1169,8 @@ ${windSummaryHtml(res, tz)}
 <div><h2>Direção do vento</h2>${dirChartSvg(res, tz, 'wdir', 'Direção do vento por fonte')}</div>
 <div><h2>Direção das ondas</h2>${dirChartSvg(res, tz, 'wvdir', 'Direção das ondas por fonte')}</div>
 </div>
+<h2>Maré</h2>
+${tideSectionHtml(ctx)}
 <h2>Regime de ondas no período previsto</h2>
 ${waveClimateHtml(ctx)}
 <h2>Comparação entre fontes</h2>
@@ -1371,6 +1466,31 @@ function pdfWaveSection(pdf, ctx) {
   pdf.para('Excedência e janelas operacionais', 9.5, { bold: true, gap: 1 }); pdf.para(text[4], 8.5);
   pdf.table([{ h: 'Curva de excedência', w: 0.3 }, ...w.exc.curve.map(([h]) => ({ h: `Hs > ${f1(h)} m`, w: 0.1, align: 'right' }))], [['% do tempo', ...w.exc.curve.map(([, p]) => f1(p) + '%')]]);
 }
+function pdfTideSection(pdf, ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, t = tideStats(res, tz, ctx.generatedTs);
+  pdf.ensure(120); pdf.h2('Maré');
+  if (!t) { pdf.para('Sem previsão de nível do mar para este ponto nas fontes carregadas.', 9, { color: PDF_COL.mut }); return; }
+  const o = t.overall, r = v => fm(v).replace(/^[+−]/, '');
+  const trendTxt = { crescendo: 'crescendo dia a dia (rumo à sizígia)', diminuindo: 'diminuindo dia a dia (rumo à quadratura)', 'estável': 'praticamente estável' }[t.trend];
+  pdf.para(`Estado em ${fmt(ctx.generatedTs, tz)}: maré ${t.state || '–'}${t.prev ? `, desde a ${t.prev.kind === 'HW' ? 'preamar' : 'baixa-mar'} de ${fmt(t.prev.ts, tz, false)} (${fm(t.prev.h)})` : ''}. Amplitude ${trendTxt}: de ${r(o.rangeMin)} a ${r(o.rangeMax)} no período (média ${r(o.rangeMean)}). Preamar mais alta ${fm(o.max)}, baixa-mar mais baixa ${fm(o.min)}, referidas ao nível médio do mar.`, 8.5);
+  pdf.para('Próximas marés: ' + t.next.map(e => `${e.kind === 'HW' ? 'preamar' : 'baixa-mar'} ${fmt(e.ts, tz)} (${fm(e.h)})`).join('; ') + '. Estofo (água parada): ±30 min em torno de cada preamar e baixa-mar.', 8.5);
+  pdf.para(`Lua: ${t.phases.filter(p => p.ts > ctx.generatedTs - 86400).slice(0, 4).map(p => `${p.name} ${fmt(p.ts, tz)}`).join(' · ')}.${t.nextSyz ? ` Próxima sizígia (marés maiores, 1–2 dias após a ${t.nextSyz.name.toLowerCase()}): ${fmt(t.nextSyz.ts, tz)}.` : ''}${t.nextQuad ? ` Próxima quadratura (marés menores): ${fmt(t.nextQuad.ts, tz)}.` : ''}`, 8.5);
+  pdf.table([{ h: 'Dia', w: 0.14 }, { h: 'Preamares', w: 0.36 }, { h: 'Baixa-mares', w: 0.36 }, { h: 'Ampl. máx (m)', w: 0.14, align: 'right' }],
+    t.dayList.map(d => [dayLabel(d.d), d.hw.map(e => `${fmt(e.ts, tz, false)} (${fm(e.h)})`).join('  ') || '–', d.lw.map(e => `${fmt(e.ts, tz, false)} (${fm(e.h)})`).join('  ') || '–', d.range === null ? '–' : d.range.toFixed(2).replace('.', ',')]));
+  // curva
+  const grid = res.grid, n = grid.length, h = t.series, vals = h.filter(v => v !== null);
+  const H = 120, left = PDF_M + 34, right = PDF_W - PDF_M, pw = right - left, ph = H - 22;
+  pdf.ensure(H + 30);
+  const top = pdf.y + 6, lo = Math.floor(Math.min(...vals) * 2) / 2 - 0.5, hi = Math.ceil(Math.max(...vals) * 2) / 2 + 0.5;
+  const X = ts => left + ((ts - grid[0]) / (grid[n - 1] - grid[0])) * pw, Y = v => top + ph - (v - lo) / (hi - lo) * ph;
+  for (let v = lo; v <= hi + 1e-9; v += 0.5) { pdf.line(left, Y(v), right, Y(v)); pdf.text(left - 4, Y(v) + 2.5, fm(v).replace(' m', ''), 6.5, { color: PDF_COL.mut, align: 'right' }); }
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(grid[i]); pdf.line(x, top, x, top + ph); if ((n - i) / n * pw > 30) pdf.text(x + 2, top + ph + 10, dayLabel(d), 7, { color: PDF_COL.mut }); }
+  const pts = []; h.forEach((v, i) => { if (v !== null) pts.push([X(grid[i]), Y(v)]); });
+  pdf.poly(pts, { color: PDF_COL.c[0], lw: 1.1 });
+  for (const e of t.ext) { pdf.dot(X(e.ts), Y(e.h), 1.8, e.kind === 'HW' ? PDF_COL.go : PDF_COL.nogo); pdf.text(X(e.ts), e.kind === 'HW' ? Y(e.h) - 4 : Y(e.h) + 9, fmt(e.ts, tz, false), 5.5, { align: 'center', color: PDF_COL.mut }); }
+  pdf.y = top + H + 2;
+  pdf.para('Fonte: Open-Meteo (sea_level_height_msl): maré astronômica + sobre-elevação meteorológica, em metros relativos ao nível médio do mar, não ao nível de redução das cartas. Horários interpolados (±20 min). Para navegação, confira a Tábua de Marés da DHN.', 7, { color: PDF_COL.mut });
+}
 function buildPdf(ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, cw = res.conservative.windows;
   const pdf = new Pdf();
@@ -1427,6 +1547,7 @@ function buildPdf(ctx) {
   pdfLineChart(pdf, res, tz, 'gust', 'Rajada', 'kn', lm.gust_max);
   pdfDirChart(pdf, res, tz, 'wdir', 'Direção do vento (de onde vem)');
   pdfDirChart(pdf, res, tz, 'wvdir', 'Direção das ondas (de onde vêm)');
+  pdfTideSection(pdf, ctx);
   pdfWaveSection(pdf, ctx);
   // comparação
   pdf.h2('Comparação entre fontes');
