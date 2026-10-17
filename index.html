@@ -322,6 +322,16 @@ details>summary{cursor:pointer}
     <label>Filtrar por tag <select id="h-tag" class="f"><option value="">todas</option></select></label>
     <ul id="h-list" class="list" style="margin-top:10px"></ul>
   </div>
+  <div class="card">
+    <h2>Backup dos dados</h2>
+    <p class="note">Locais, perfis de limites, fontes e relatórios ficam salvos só neste navegador. Exporte um arquivo para guardar ou para levar a outro aparelho (celular ↔ computador). Ao importar, itens com o mesmo identificador são sobrescritos.</p>
+    <div class="row">
+      <button id="b-export" type="button" class="primary">Exportar backup</button>
+      <button id="b-import" type="button">Importar backup</button>
+      <input id="b-file" type="file" accept="application/json,.json" hidden>
+    </div>
+    <div id="b-msg" class="msg" aria-live="polite"></div>
+  </div>
 </section>
 
 <!-- AVISOS -->
@@ -2345,6 +2355,34 @@ function reportHtml(ctx) {
   const tokens = $('#tokens').textContent;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}@media print{body{background:#fff;padding:0}}</style></head><body><div class="rp">${buildReport(ctx)}</div></body></html>`;
 }
+/* ---- backup (exportar / importar) ---- */
+const BACKUP_COLLECTIONS = ['locations', 'profiles', 'analyses', 'results'];
+async function exportBackup() {
+  try {
+    const data = { app: 'metocean-op', version: 1, exported_at: now(), rows: S.rows, collections: {}, navy: S.navy };
+    for (const c of BACKUP_COLLECTIONS) data.collections[c] = await Store.list(c);
+    const d = new Date();
+    const ok = await saveFile(`metocean-backup-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}.json`, JSON.stringify(data), 'application/json;charset=utf-8');
+    if (ok) setMsg('#b-msg', 'Backup gerado. Guarde o arquivo em local seguro.', 'ok');
+  } catch (e) { setMsg('#b-msg', 'Não foi possível exportar: ' + (e.message || e), 'bad'); }
+}
+async function importBackup(file) {
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || data.app !== 'metocean-op' || typeof data.collections !== 'object') throw new Error('arquivo não é um backup do MetOcean OP');
+    let n = 0;
+    for (const c of BACKUP_COLLECTIONS) for (const rec of (data.collections[c] || [])) {
+      if (!rec || !rec.id) continue;
+      await Store.set(c, String(rec.id), rec); n++;
+    }
+    if (data.navy && Array.isArray(data.navy.warnings)) await Store.set('navy', 'latest', data.navy);
+    if (Array.isArray(data.rows) && data.rows.length) { S.rows = data.rows; saveRows(); }
+    await loadAll();
+    setMsg('#b-msg', `Backup importado: ${n} registro(s). Itens com o mesmo identificador foram sobrescritos.`, 'ok');
+  } catch (e) { setMsg('#b-msg', 'Não foi possível importar: ' + (e.message || e), 'bad'); }
+  finally { $('#b-file').value = ''; }
+}
 async function downloadReport() {
   if (!S.current) return;
   await saveFile(reportSlug(S.current) + '.html', reportHtml(S.current), 'text/html;charset=utf-8');
@@ -2449,6 +2487,9 @@ async function init() {
   $('#h-tag').addEventListener('change', renderHistory);
   $('#go').addEventListener('click', async () => { $('#go').disabled = true; try { await generate(); } finally { $('#go').disabled = false; } });
   $('#rp-download').addEventListener('click', downloadReport);
+  $('#b-export').addEventListener('click', exportBackup);
+  $('#b-import').addEventListener('click', () => $('#b-file').click());
+  $('#b-file').addEventListener('change', e => importBackup(e.target.files[0]));
   $('#rp-pdf').addEventListener('click', downloadPdf);
   $('#report').addEventListener('click', async e => {
     const b = e.target.closest('button[data-copy]'); if (!b) return;
