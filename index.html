@@ -338,7 +338,7 @@ details>summary{cursor:pointer}
 <section class="panel" id="p-avisos" role="tabpanel" aria-labelledby="t-avisos" hidden>
   <div class="card">
     <h2>Avisos de Mau Tempo (METAREA V)</h2>
-    <p class="note">Use “Buscar da Marinha” para tentar importar sozinho. Se o site da Marinha não permitir (comum), abra a página oficial, selecione e copie o texto dos avisos e cole abaixo. Avisos já importados ficam salvos e entram nos relatórios pelo período de vigência.</p>
+    <p class="note">No GitHub Pages os avisos são coletados automaticamente a cada 6 horas e importados ao abrir a página. Use “Buscar da Marinha” para atualizar na hora. Se o site da Marinha não permitir (comum), abra a página oficial, selecione e copie o texto dos avisos e cole abaixo. Avisos já importados ficam salvos e entram nos relatórios pelo período de vigência.</p>
     <div class="row"><button id="n-fetch" class="primary" type="button">Buscar da Marinha</button><a class="btn" target="_blank" rel="noopener" href="https://www.marinha.mil.br/chm/dados-do-smm-avisos-de-mau-tempo/avisos-de-mau-tempo">Abrir avisos da Marinha</a></div>
     <label style="margin-top:10px">Texto copiado da página<textarea id="n-text" class="f" spellcheck="false" style="min-height:140px"></textarea></label>
     <div class="row" style="margin-top:8px"><button id="n-import" class="primary" type="button">Importar avisos</button></div>
@@ -2068,8 +2068,25 @@ function renderNavy() {
     el('details', {}, el('summary', {}, 'Texto original'), el('pre', { style: 'white-space:pre-wrap;font:12px var(--font-mono)' }, w.text)))) : [el('li', { class: 'empty' }, 'Nenhum aviso salvo.')]));
 }
 
+/* avisos.json: coletado a cada 6 h pela GitHub Action e servido na mesma origem (só existe no GitHub Pages) */
+async function loadNavyJson() {
+  try {
+    const r = await fetch('avisos.json', { cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j && typeof j.text === 'string' && j.text.length > 50) ? j : null;
+  } catch (e) { return null; }
+}
+async function autoNavy() {
+  const j = await loadNavyJson();
+  if (!j || !(j.fetched_at > (S.navy.fetched_at || 0))) return;
+  $('#n-text').value = j.text;
+  await importNavy(j.fetched_at);
+}
 async function fetchNavy() {
-  setMsg('#n-msg', 'Buscando no site da Marinha…', '');
+  setMsg('#n-msg', 'Buscando os avisos…', '');
+  const pre = await loadNavyJson();
+  if (pre) { $('#n-text').value = pre.text; await importNavy(pre.fetched_at); return; }
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
   try {
     const r = await fetch('https://www.marinha.mil.br/chm/dados-do-smm-avisos-de-mau-tempo/avisos-de-mau-tempo', { signal: ctl.signal });
@@ -2082,14 +2099,14 @@ async function fetchNavy() {
     setMsg('#n-msg', 'O navegador não deixou buscar direto do site da Marinha. Abra a página, copie o texto e cole na caixa abaixo.', 'warn');
   } finally { clearTimeout(t); }
 }
-async function importNavy() {
+async function importNavy(fetchedAt) {
   const text = $('#n-text').value;
   if (text.trim().length < 20) return setMsg('#n-msg', 'Cole o texto copiado da página de avisos.', 'bad');
   const [found, status] = parseNavy(text);
   const known = new Map((S.navy.warnings || []).map(w => [w.hash, w]));
   let added = 0; for (const w of found) { if (!known.has(w.hash)) added++; known.set(w.hash, w); }
   const merged = [...known.values()].sort((a, b) => (b.issued_ts || 0) - (a.issued_ts || 0)).slice(0, 60);
-  const rec = { warnings: merged, fetched_at: now(), status };
+  const rec = { warnings: merged, fetched_at: typeof fetchedAt === 'number' ? fetchedAt : now(), status };
   try { await Store.set('navy', 'latest', rec); S.navy = rec; $('#n-text').value = ''; renderNavy();
     setMsg('#n-msg', status === 'formato_nao_reconhecido' ? 'Formato não reconhecido. Copie o texto direto da página oficial.' : `${status} · ${added} novo(s).`, status === 'formato_nao_reconhecido' ? 'bad' : 'ok'); }
   catch (e) { setMsg('#n-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
@@ -2507,6 +2524,7 @@ async function init() {
   initDownloads();
   await loadAll();
   if (S.locs.length && !S.selLoc) { S.selLoc = S.locs[0].id; anTags.set(S.locs[0].tags); renderLocs(); updateLinks(); }
+  autoNavy();
 }
 init();
 })();
