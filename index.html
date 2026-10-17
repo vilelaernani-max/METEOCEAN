@@ -751,6 +751,8 @@ const REPORT_CSS = `
 .rp pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;font:12.5px/1.4 var(--font-mono)}
 .rp .foot{color:var(--mut);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .rp .mine{color:var(--warn);font-weight:600}
+.rp .age{color:var(--mut);font-size:13px;margin:8px 0}
+.rp .age.alert.stale{background:var(--nogo);border-color:var(--nogo);color:#fff;font-weight:600}
 .rp .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
 .rp .kpi{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:8px;padding:10px 12px}
 .rp .kpi.go{border-top-color:var(--go)}.rp .kpi.nogo{border-top-color:var(--nogo)}.rp .kpi.warn{border-top-color:var(--warn)}
@@ -1208,6 +1210,19 @@ ${stickPlotSvg(res, tz, c, lm.cur_max)}
 <div><h3 style="font:600 14px var(--font-body);margin:10px 0 2px">Rosa de correntes (para onde vai)</h3>${c.tot ? roseSvg(c, CUR_CLASSES, ['var(--c4)', 'var(--c1)', 'var(--c2)', 'var(--nogo)'], 'Rosa de correntes: frequência por direção de destino e classe de velocidade') : '<p class="sub">Sem direção.</p>'}</div></div>
 <p class="sub">Fonte: Open-Meteo, modelo MeteoFrance SMOC (${esc(c.src)}), ~8 km, horário: corrente total de superfície (circulação + deriva de Stokes + maré). Velocidade convertida para nós. Em águas costeiras e rasas a precisão é limitada; não use para navegação. Para corrente em profundidade (ROV, mergulho) use ADCP local.</p>`;
 }
+/* idade da previsão: texto recalculado ao abrir (também no HTML baixado) */
+function ageFill(root) {
+  root.querySelectorAll('.age[data-ts]').forEach(function (n) {
+    var m = Math.max(0, Math.round((Date.now() / 1000 - Number(n.getAttribute('data-ts'))) / 60));
+    var t = m < 90 ? m + ' min' : (m < 2880 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' dias');
+    n.className = 'age alert' + (m >= 720 ? ' stale' : '');
+    if (m < 180) { n.className = 'age'; n.textContent = 'Previsão gerada há ' + t + '. Gere de novo perto da operação.'; }
+    else if (m < 720) n.textContent = 'Previsão gerada há ' + t + ': pode ter mudado. Gere de novo antes de decidir.';
+    else n.textContent = 'PREVISÃO ANTIGA (gerada há ' + t + '). Não use para decidir: gere uma nova análise.';
+  });
+}
+function ageBanner(ts) { return `<div class="age" data-ts="${ts}">Previsão gerada em ${fmtUtcFull(ts)}. Gere de novo perto da operação.</div>`; }
+
 function buildReport(ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, lm = res.limits, errors = ctx.errors, cons = res.conservative, cw = cons.windows;
   const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
@@ -1278,6 +1293,7 @@ ${hdr}
     const t = A.tide ? tideStats(res, tz, ctx.generatedTs) : null;
     return `${head}
 ${hasLim ? kpis(res, tz) : ''}
+${ageBanner(ctx.generatedTs)}
 ${alertHtml}
 ${hasLim ? verdict : ''}
 ${hasLim ? `<h2>Janelas — cenário conservador</h2>${windowsTable(cw, grid, tz, true)}<h2>Linha do tempo por fonte</h2>${legend}${timelineSvg(res, tz, rows)}` : ''}
@@ -1289,6 +1305,7 @@ ${foot}`;
   }
   return `${head}
 ${hasLim ? kpis(res, tz) : ''}
+${ageBanner(ctx.generatedTs)}
 ${alertHtml}
 ${hasLim ? verdict : ''}
 ${hasLim ? `<h2>Janelas — cenário conservador</h2>
@@ -2298,6 +2315,7 @@ async function runAnalysis(loc, prof, days, tags, msg, opts = {}) {
 function showReport(ctx) {
   S.current = ctx;
   $('#report').innerHTML = buildReport(ctx);
+  ageFill($('#report'));
   $('#report-wrap').classList.add('on');
   $('#report-wrap').scrollIntoView({ block: 'start' });
 }
@@ -2370,7 +2388,7 @@ async function saveFile(filename, data, mime) {
 }
 function reportHtml(ctx) {
   const tokens = $('#tokens').textContent;
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}@media print{body{background:#fff;padding:0}}</style></head><body><div class="rp">${buildReport(ctx)}</div></body></html>`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}@media print{body{background:#fff;padding:0}}</style></head><body><div class="rp">${buildReport(ctx)}</div><script>(${ageFill.toString()})(document)<\/script></body></html>`;
 }
 /* ---- backup (exportar / importar) ---- */
 const BACKUP_COLLECTIONS = ['locations', 'profiles', 'analyses', 'results'];
