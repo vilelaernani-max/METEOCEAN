@@ -184,6 +184,7 @@ details>summary{cursor:pointer}
       <label>Tp mínimo (s)<input id="q-tp" class="f" type="number" step="0.5" min="0" placeholder="não usar"></label>
       <label>Corrente máxima (nós)<input id="q-cur" class="f" type="number" step="0.1" min="0" placeholder="não usar"></label>
       <label>Janela mínima (h seguidas)<input id="q-win" class="f" type="number" min="1" max="72" value="4"></label>
+      <div class="dirpair" data-p="q"></div>
       <label>Dias à frente<input id="q-days" class="f" type="number" min="1" max="10" value="5"></label>
     </div>
     <label class="check" style="margin-top:8px"><input id="q-day" type="checkbox"> Somente período diurno</label>
@@ -275,6 +276,7 @@ details>summary{cursor:pointer}
         <label>Tp mínimo (s)<input id="l-tp" class="f" type="number" step="0.5" min="0" placeholder="não usar"></label>
         <label>Corrente máxima (nós)<input id="l-cur" class="f" type="number" step="0.1" min="0" placeholder="não usar"></label>
         <label>Janela mínima (h)<input id="l-win" class="f" type="number" min="1" max="72" placeholder="4"></label>
+        <div class="dirpair" data-p="l"></div>
       </div>
       <label class="check" style="margin-top:6px"><input id="l-day" type="checkbox"> Somente período diurno</label>
     </fieldset>
@@ -301,6 +303,7 @@ details>summary{cursor:pointer}
       <label>Vento máximo (nós) <input id="p-wind" class="f" type="number" step="1" min="0"></label>
       <label>Rajada máxima (nós) <input id="p-gust" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
       <label>Janela mínima (h seguidas) <input id="p-win" class="f" type="number" min="1" max="72" value="4"></label>
+      <div class="dirpair" data-p="p"></div>
     </div>
     <label style="margin-top:10px"><input id="p-day" type="checkbox">Somente período diurno</label>
     <p class="note">Campo vazio = limite não usado. Perfis de exemplo trazem valores genéricos: ajuste aos limites reais de cada operação.</p>
@@ -443,8 +446,19 @@ const DEFAULT_PROFILES = [
   { name: 'Lançamento de equipamento (exemplo)', limits: { hs_max: 2.0, tp_min: null, wind_max: 25, gust_max: 30, daylight_only: false, min_window_h: 3 } },
 ];
 
+/* direção do vento bloqueada: 16 pontos cardeais, cada um cobre ±11,25° em volta do centro (N = 348,75° a 11,25°) */
+const PONTOS16 = ['N', 'NNE', 'NE', 'ENE', 'L', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+const pontoDe = deg => PONTOS16[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+/* true = direção dentro da faixa bloqueada (do início do setor "de" ao fim do setor "até", sentido horário, fim exclusivo); null = sem dado */
+function dirBlocked(dir, fromIdx, toIdx) {
+  if (dir === null || dir === undefined || !Number.isFinite(Number(dir))) return null;
+  const d = ((Number(dir) % 360) + 360) % 360;
+  const start = (((fromIdx * 22.5 - 11.25) % 360) + 360) % 360, end = (((toIdx * 22.5 + 11.25) % 360) + 360) % 360;
+  return start < end ? (d >= start && d < end) : (d >= start || d < end);
+}
+
 function normalizeLimits(raw) {
-  const out = { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: null, cur_max: null, daylight_only: false, min_window_h: 4 };
+  const out = { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: null, cur_max: null, dir_from: null, dir_to: null, daylight_only: false, min_window_h: 4 };
   raw = raw || {};
   for (const k of ['hs_max', 'tp_min', 'wind_max', 'gust_max', 'cur_max']) {
     if (k in raw) {
@@ -457,6 +471,16 @@ function normalizeLimits(raw) {
       }
     }
   }
+  for (const k of ['dir_from', 'dir_to']) if (k in raw) {
+    const v = raw[k];
+    if (v === null || v === undefined || v === '') out[k] = null;
+    else {
+      const f = Number(v);
+      if (!Number.isInteger(f) || f < 0 || f > 15) throw new Error(`Valor inválido em ${k}`);
+      out[k] = f;
+    }
+  }
+  if ((out.dir_from === null) !== (out.dir_to === null)) throw new Error('Direção do vento bloqueada: informe os dois pontos (de e até) ou nenhum.');
   if ('daylight_only' in raw) out.daylight_only = !!raw.daylight_only;
   if ('min_window_h' in raw) {
     const m = Math.trunc(Number(raw.min_window_h));
@@ -507,6 +531,11 @@ function evaluateHour(row, L, day) {
   check(row.wind_kn, L.wind_max, 'vento', 'kn', 'max');
   check(row.gust_kn, L.gust_max, 'rajada', 'kn', 'max');
   check(row.cur_kn, L.cur_max, 'corrente', 'kn', 'max');
+  if (L.dir_from !== null && L.dir_from !== undefined && L.dir_to !== null && L.dir_to !== undefined) {
+    const b = dirBlocked(row.wind_dir, L.dir_from, L.dir_to);
+    if (b === null) missing.push('direção do vento');
+    else if (b) reasons.push(`direção ${pontoDe(row.wind_dir)} (${Math.round(row.wind_dir)}°) na faixa bloqueada ${PONTOS16[L.dir_from]}–${PONTOS16[L.dir_to]}`);
+  }
   if (L.daylight_only && day && !isDaylight(row.ts, day)) reasons.push('fora do período diurno');
   if (reasons.length) return ['nogo', reasons];
   if (missing.length) return ['nodata', missing.map(m => `sem dado de ${m}`)];
@@ -960,9 +989,10 @@ function windowsTable(wins, grid, tz, showSources) {
   const rows = wins.map(w => `<tr><td>${fmt(grid[w.i0], tz)}</td><td>${fmt(grid[w.i1 - 1] + HOUR, tz)}</td><td class="n">${w.hours} h</td><td class="n">${num(w.max_hs)}</td><td class="n">${num(w.max_wind, 0)}</td><td class="n">${num(w.max_gust, 0)}</td><td class="n">${num(w.max_cur)}</td>${showSources ? `<td class="n">${w.min_sources}</td>` : ''}</tr>`).join('');
   return `<div class="tw"><table>${head}${rows}</table></div>`;
 }
+const dirTxt = L => (L.dir_from === null || L.dir_from === undefined || L.dir_to === null || L.dir_to === undefined) ? 'não usado' : `${PONTOS16[L.dir_from]} a ${PONTOS16[L.dir_to]}`;
 function limitsTable(L) {
   const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
-  const rows = [['Hs máxima', v(L.hs_max, 'm')], ['Tp mínima', v(L.tp_min, 's')], ['Vento máximo (10 m)', v(L.wind_max, 'kn')], ['Rajada máxima', v(L.gust_max, 'kn')], ['Corrente máxima', v(L.cur_max, 'kn')],
+  const rows = [['Hs máxima', v(L.hs_max, 'm')], ['Tp mínima', v(L.tp_min, 's')], ['Vento máximo (10 m)', v(L.wind_max, 'kn')], ['Rajada máxima', v(L.gust_max, 'kn')], ['Corrente máxima', v(L.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(L)],
     ['Somente diurno', L.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${L.min_window_h} h seguidas`]];
   return `<table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')}</table>`;
 }
@@ -1766,7 +1796,7 @@ function buildPdf(ctx) {
   if (hasLim) {
   pdf.h2('Limites aplicados');
   const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
-  pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Corrente máxima', v(lm.cur_max, 'kn')], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
+  pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Corrente máxima', v(lm.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(lm)], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
   }
   pdf.y += 6;
   if (!brief || pdf.y < PDF_H - 120) pdf.para(`Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.`, 7.5, { color: PDF_COL.mut });
@@ -1881,13 +1911,13 @@ function selectLoc(id) {
   const l = S.locs.find(x => x.id === id); if (!l) return;
   S.selLoc = id;
   $('#l-name').value = l.name; $('#l-lat').value = l.lat; $('#l-lon').value = l.lon; $('#l-tz').value = l.tz_offset; $('#l-areas').value = l.areas || ''; $('#l-proj').value = l.project || '';
-  const L = l.limits || {}; $('#l-hs').value = L.hs_max ?? ''; $('#l-wind').value = L.wind_max ?? ''; $('#l-gust').value = L.gust_max ?? ''; $('#l-tp').value = L.tp_min ?? ''; $('#l-cur').value = L.cur_max ?? ''; $('#l-win').value = L.min_window_h ?? ''; $('#l-day').checked = !!L.daylight_only;
+  const L = l.limits || {}; $('#l-hs').value = L.hs_max ?? ''; $('#l-wind').value = L.wind_max ?? ''; $('#l-gust').value = L.gust_max ?? ''; $('#l-tp').value = L.tp_min ?? ''; $('#l-cur').value = L.cur_max ?? ''; $('#l-win').value = L.min_window_h ?? ''; $('#l-day').checked = !!L.daylight_only; setIdx('#l-dfrom', L.dir_from); setIdx('#l-dto', L.dir_to);
   locTags.set(l.tags); anTags.set(l.tags); $('#l-paste').value = ''; setMsg('#l-pastemsg', ''); setMsg('#l-msg', '');
   updateSeeLink(); renderLocs(); updateLinks(); showTab('locais');
 }
 function newLoc() {
   S.selLoc = null;
-  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-proj', '#l-paste', '#l-hs', '#l-wind', '#l-gust', '#l-tp', '#l-cur', '#l-win']) $(id).value = ''; $('#l-day').checked = false;
+  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-proj', '#l-paste', '#l-hs', '#l-wind', '#l-gust', '#l-tp', '#l-cur', '#l-win', '#l-dfrom', '#l-dto']) $(id).value = ''; $('#l-day').checked = false;
   $('#l-tz').value = -3; locTags.set([]); setMsg('#l-msg', ''); setMsg('#l-pastemsg', ''); updateSeeLink(); renderLocs();
 }
 async function saveLoc() {
@@ -1896,7 +1926,8 @@ async function saveLoc() {
   if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return setMsg('#l-msg', 'Latitude (−90 a 90) e longitude (−180 a 180) são obrigatórias.', 'bad');
   if (!(tz >= -12 && tz <= 14)) return setMsg('#l-msg', 'Fuso deve estar entre −12 e 14.', 'bad');
   const id = S.selLoc || newId();
-  const lim = { hs_max: nOrNull('#l-hs'), wind_max: nOrNull('#l-wind'), gust_max: nOrNull('#l-gust'), tp_min: nOrNull('#l-tp'), cur_max: nOrNull('#l-cur'), min_window_h: nOrNull('#l-win'), daylight_only: $('#l-day').checked };
+  const lim = { hs_max: nOrNull('#l-hs'), wind_max: nOrNull('#l-wind'), gust_max: nOrNull('#l-gust'), tp_min: nOrNull('#l-tp'), cur_max: nOrNull('#l-cur'), min_window_h: nOrNull('#l-win'), daylight_only: $('#l-day').checked, dir_from: selIdx('#l-dfrom'), dir_to: selIdx('#l-dto') };
+  if ((lim.dir_from === null) !== (lim.dir_to === null)) return setMsg('#l-msg', 'Direção do vento bloqueada: informe os dois pontos (de e até) ou nenhum.', 'bad');
   const hasLim = Object.values(lim).some(v => v !== null && v !== false);
   const rec = { name, lat, lon, tz_offset: tz, areas: $('#l-areas').value.trim().slice(0, 100), project: $('#l-proj').value.trim().slice(0, 80), limits: hasLim ? lim : null, tags: locTags.get(), created_at: (S.locs.find(l => l.id === id) || {}).created_at || now() };
   try { await Store.set('locations', id, rec); S.selLoc = id; await loadAll(); setMsg('#l-msg', 'Local salvo.', 'ok'); anTags.set(rec.tags); }
@@ -1909,6 +1940,18 @@ async function delLoc() {
 
 /* ---- perfis ---- */
 const nOrNull = sel => { const v = $(sel).value.trim(); return v === '' ? null : Number(v); };
+const selIdx = sel => { const v = $(sel).value; return v === '' ? null : Number(v); };
+const setIdx = (sel, v) => { $(sel).value = (v === null || v === undefined) ? '' : String(v); };
+function initDirFields() {
+  document.querySelectorAll('.dirpair').forEach(box => {
+    const p = box.dataset.p, opts = () => [el('option', { value: '' }, '—'), ...PONTOS16.map((n, i) => el('option', { value: String(i) }, n))];
+    box.replaceChildren(el('label', {}, 'Direção do vento bloqueada (opcional)',
+      el('div', { class: 'row', style: 'flex-wrap:nowrap;gap:6px;margin-top:3px' },
+        el('select', { id: `${p}-dfrom`, class: 'f', 'aria-label': 'Direção do vento bloqueada, de', style: 'margin:0' }, ...opts()),
+        el('span', { class: 'm' }, 'até'),
+        el('select', { id: `${p}-dto`, class: 'f', 'aria-label': 'Direção do vento bloqueada, até', style: 'margin:0' }, ...opts()))));
+  });
+}
 function renderProfs() {
   const opts = S.profs.map(p => el('option', { value: p.id }, p.name));
   $('#p-sel').replaceChildren(...(opts.length ? opts : [el('option', { value: '' }, 'Nenhum perfil salvo')]));
@@ -1922,19 +1965,19 @@ function fillProf(id, quiet) {
   const p = S.profs.find(x => x.id === id); if (!p) return;
   S.selProf = id; const l = p.limits;
   $('#p-name').value = p.name; $('#p-hs').value = l.hs_max ?? ''; $('#p-tp').value = l.tp_min ?? '';
-  $('#p-wind').value = l.wind_max ?? ''; $('#p-gust').value = l.gust_max ?? ''; $('#p-win').value = l.min_window_h; $('#p-day').checked = !!l.daylight_only;
+  $('#p-wind').value = l.wind_max ?? ''; $('#p-gust').value = l.gust_max ?? ''; $('#p-win').value = l.min_window_h; $('#p-day').checked = !!l.daylight_only; setIdx('#p-dfrom', l.dir_from); setIdx('#p-dto', l.dir_to);
   $('#p-sel').value = id; $('#a-prof').value = id;
   if (!quiet) setMsg('#p-msg', '');
 }
 function newProf() {
-  S.selProf = null; $('#p-name').value = ''; $('#p-hs').value = 1.5; $('#p-tp').value = ''; $('#p-wind').value = 20; $('#p-gust').value = ''; $('#p-win').value = 4; $('#p-day').checked = false;
+  S.selProf = null; $('#p-name').value = ''; $('#p-hs').value = 1.5; $('#p-tp').value = ''; $('#p-wind').value = 20; $('#p-gust').value = ''; $('#p-win').value = 4; $('#p-day').checked = false; setIdx('#p-dfrom', null); setIdx('#p-dto', null);
   $('#p-del').hidden = true; setMsg('#p-msg', '');
 }
 async function saveProf() {
   const name = $('#p-name').value.trim();
   if (!name) return setMsg('#p-msg', 'Dê um nome ao perfil.', 'bad');
   let limits;
-  try { limits = normalizeLimits({ hs_max: nOrNull('#p-hs'), tp_min: nOrNull('#p-tp'), wind_max: nOrNull('#p-wind'), gust_max: nOrNull('#p-gust'), min_window_h: $('#p-win').value, daylight_only: $('#p-day').checked }); }
+  try { limits = normalizeLimits({ hs_max: nOrNull('#p-hs'), tp_min: nOrNull('#p-tp'), wind_max: nOrNull('#p-wind'), gust_max: nOrNull('#p-gust'), min_window_h: $('#p-win').value, daylight_only: $('#p-day').checked, dir_from: selIdx('#p-dfrom'), dir_to: selIdx('#p-dto') }); }
   catch (e) { return setMsg('#p-msg', e.message, 'bad'); }
   const id = S.selProf || newId();
   try { await Store.set('profiles', id, { name, limits, created_at: (S.profs.find(p => p.id === id) || {}).created_at || now() }); S.selProf = id; await loadAll(); setMsg('#p-msg', 'Perfil salvo.', 'ok'); }
@@ -2218,14 +2261,14 @@ const MapView = (() => {
 const QKEY = 'mco:quick';
 function quickLoad() {
   try { const q = JSON.parse(localStorage.getItem(QKEY) || 'null'); if (!q) return;
-    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['cur', '#q-cur'], ['win', '#q-win'], ['days', '#q-days'], ['name', '#q-name'], ['proj', '#q-proj'], ['client', '#h-client'], ['vessel', '#h-vessel'], ['resp', '#h-resp'], ['doc', '#h-doc'], ['obs', '#h-obs']]) if (q[k] !== undefined) $(id).value = q[k];
+    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['cur', '#q-cur'], ['dfrom', '#q-dfrom'], ['dto', '#q-dto'], ['win', '#q-win'], ['days', '#q-days'], ['name', '#q-name'], ['proj', '#q-proj'], ['client', '#h-client'], ['vessel', '#h-vessel'], ['resp', '#h-resp'], ['doc', '#h-doc'], ['obs', '#h-obs']]) if (q[k] !== undefined) $(id).value = q[k];
     $('#q-day').checked = !!q.day;
     if (q.an) { $('#q-an-wind').checked = !!q.an.wind; $('#q-an-wave').checked = !!q.an.wave; $('#q-an-tide').checked = !!q.an.tide; $('#q-an-cur').checked = q.an.cur !== false; }
     if (q.mode) { const r = document.querySelector(`input[name="q-mode"][value="${q.mode}"]`); if (r) r.checked = true; }
   } catch (e) { /* opcional */ }
 }
 function quickSave() {
-  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, cur: $('#q-cur').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
+  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, cur: $('#q-cur').value, dfrom: $('#q-dfrom').value, dto: $('#q-dto').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
     an: { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked, cur: $('#q-an-cur').checked }, mode: (document.querySelector('input[name="q-mode"]:checked') || {}).value })); } catch (e) { /* opcional */ }
 }
 function limitsLabel(L) {
@@ -2235,6 +2278,7 @@ function limitsLabel(L) {
   if (L.gust_max !== null && L.gust_max !== undefined) parts.push(`rajada ≤ ${L.gust_max} kn`);
   if (L.tp_min !== null && L.tp_min !== undefined) parts.push(`Tp ≥ ${L.tp_min} s`);
   if (L.cur_max !== null && L.cur_max !== undefined) parts.push(`corrente ≤ ${L.cur_max} kn`);
+  if (L.dir_from !== null && L.dir_from !== undefined && L.dir_to !== null && L.dir_to !== undefined) parts.push(`sem vento de ${PONTOS16[L.dir_from]} a ${PONTOS16[L.dir_to]}`);
   if (L.min_window_h) parts.push(`janela ≥ ${L.min_window_h} h`);
   if (L.daylight_only) parts.push('só diurno');
   return parts.join(', ') || 'sem limites';
@@ -2243,7 +2287,7 @@ function limitsLabel(L) {
 function applyLocToQuick(l) {
   $('#q-name').value = l.name; $('#q-proj').value = l.project || '';
   if (l.limits) {
-    const L = l.limits; $('#q-hs').value = L.hs_max ?? ''; $('#q-wind').value = L.wind_max ?? ''; $('#q-gust').value = L.gust_max ?? ''; $('#q-tp').value = L.tp_min ?? ''; $('#q-cur').value = L.cur_max ?? ''; if (L.min_window_h) $('#q-win').value = L.min_window_h; $('#q-day').checked = !!L.daylight_only;
+    const L = l.limits; $('#q-hs').value = L.hs_max ?? ''; $('#q-wind').value = L.wind_max ?? ''; $('#q-gust').value = L.gust_max ?? ''; $('#q-tp').value = L.tp_min ?? ''; $('#q-cur').value = L.cur_max ?? ''; setIdx('#q-dfrom', L.dir_from); setIdx('#q-dto', L.dir_to); if (L.min_window_h) $('#q-win').value = L.min_window_h; $('#q-day').checked = !!L.daylight_only;
     setMsg('#q-coordsmsg', `Local salvo "${l.name}": limites do local aplicados (${limitsLabel(L)}).`, 'ok');
   } else setMsg('#q-coordsmsg', `Local salvo "${l.name}".`, 'ok');
 }
@@ -2260,7 +2304,7 @@ async function quickRun() {
   const an = { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked, cur: $('#q-an-cur').checked };
   if (!an.wind && !an.wave && !an.tide && !an.cur) return msg('Marque pelo menos uma análise: vento, ondas, maré ou corrente.', 'bad');
   let limits;
-  try { limits = normalizeLimits({ hs_max: an.wave ? nOrNull('#q-hs') : null, tp_min: an.wave ? nOrNull('#q-tp') : null, wind_max: an.wind ? nOrNull('#q-wind') : null, gust_max: an.wind ? nOrNull('#q-gust') : null, cur_max: an.cur ? nOrNull('#q-cur') : null, min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
+  try { limits = normalizeLimits({ hs_max: an.wave ? nOrNull('#q-hs') : null, tp_min: an.wave ? nOrNull('#q-tp') : null, wind_max: an.wind ? nOrNull('#q-wind') : null, gust_max: an.wind ? nOrNull('#q-gust') : null, cur_max: an.cur ? nOrNull('#q-cur') : null, dir_from: an.wind ? selIdx('#q-dfrom') : null, dir_to: an.wind ? selIdx('#q-dto') : null, min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
   catch (e) { return msg(e.message, 'bad'); }
   const days = Math.max(1, Math.min(10, parseInt($('#q-days').value, 10) || 5));
   quickSave();
@@ -2445,6 +2489,7 @@ async function initDownloads() {
 /* =============================== início =============================== */
 async function init() {
   injectReportCss();
+  initDirFields();
   document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
   locTags = TagInput($('#l-tags')); anTags = TagInput($('#a-tags'));
   S.rows = loadRows(); renderSources();
