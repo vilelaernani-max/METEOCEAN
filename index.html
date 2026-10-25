@@ -792,6 +792,9 @@ const REPORT_CSS = `
 .rmap text{font:600 10px var(--font-mono);fill:#13232b;paint-order:stroke;stroke:#fff;stroke-width:2px;stroke-linejoin:round;text-anchor:middle}
 .rmap .arr{fill:#13232b;stroke:#fff;stroke-width:1.3;stroke-linejoin:round}
 .rmap .att{position:absolute;right:4px;bottom:2px;font:10px var(--font-body);background:rgba(255,255,255,.8);color:#222;padding:1px 5px;border-radius:3px}
+.rmap .cell.sel{stroke:#13232b;stroke-width:2;fill-opacity:.8}
+.rminfo{font-size:13.5px;margin:8px 0 0;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-height:3.2em}
+.rmap svg g{cursor:pointer}
 .rmctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
 .rmctl input[type=range]{flex:1 1 200px;min-width:0;width:auto;padding:0}
 .rmleg{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;margin:6px 0}
@@ -2320,13 +2323,17 @@ function drawRegionMap(box, data, grid, tz, hsMax, loc, fetchedAt) {
   const slider = el('input', { type: 'range', min: '0', max: String(grid.length - 1), value: '0', id: 'rm-hour', 'aria-label': 'Horário da previsão' });
   const lab = el('span', { class: 'mono', style: 'min-width:150px' });
   const prev = el('button', { type: 'button', 'aria-label': 'Hora anterior' }, '◀'), next = el('button', { type: 'button', 'aria-label': 'Próxima hora' }, '▶');
+  let sel = Math.floor(data.length / 2);
+  const info = el('div', { id: 'rm-info', class: 'rminfo', 'aria-live': 'polite' });
   function paint(i) {
     lab.textContent = `${fmt(grid[i], tz)} (${tzlabel(tz)})`;
     const parts = [];
     for (const d of data) {
       const [x, y] = px(d), hs = d.hs[i], kn = d.kn[i], dir = d.dir[i], cls = hsClass(hs, hsMax);
       const tip = `Hs ${hs === null ? 'sem dado' : hs.toFixed(1) + ' m'} · vento ${kn === null ? 'sem dado' : Math.round(kn) + ' kn'}${dir === null ? '' : ' de ' + pontoDe(dir) + ' (' + Math.round(dir) + '°)'}`;
-      let g = `<g><title>${esc(tip)}</title><rect class="cell c-${cls}" x="${(x - cw / 2 + 1).toFixed(1)}" y="${(y - ch / 2 + 1).toFixed(1)}" width="${(cw - 2).toFixed(1)}" height="${(ch - 2).toFixed(1)}" rx="3"/>`;
+      const k = data.indexOf(d);
+      if (k === sel) info.innerHTML = `<b>Célula selecionada</b> (${d.lat.toFixed(2)}°, ${d.lon.toFixed(2)}°)<br>Onda: <b>${hs === null ? 'sem dado (terra)' : hs.toFixed(1) + ' m'}</b> · Vento: <b>${kn === null ? 'sem dado' : Math.round(kn) + ' kn'}</b>${dir === null ? '' : ' vindo de <b>' + pontoDe(dir) + '</b> (' + Math.round(dir) + '°), indo para ' + pontoDe(dir + 180)}`;
+      let g = `<g data-k="${k}"><title>${esc(tip)}</title><rect class="cell c-${cls}${k === sel ? ' sel' : ''}" x="${(x - cw / 2 + 1).toFixed(1)}" y="${(y - ch / 2 + 1).toFixed(1)}" width="${(cw - 2).toFixed(1)}" height="${(ch - 2).toFixed(1)}" rx="3"/>`;
       if (hs !== null) g += `<text x="${x.toFixed(1)}" y="${(y - ch / 2 + 11).toFixed(1)}">${hs.toFixed(1)}</text>`;
       if (dir !== null && kn !== null) {
         const sc = (Math.min(cw, ch) / 46) * (0.55 + Math.min(kn, 40) / 40 * 0.55);
@@ -2339,14 +2346,17 @@ function drawRegionMap(box, data, grid, tz, hsMax, loc, fetchedAt) {
     svg.innerHTML = parts.join('');
   }
   const go = i => { i = Math.max(0, Math.min(grid.length - 1, i)); slider.value = String(i); paint(i); };
+  const pick = e => { const g = e.target.closest && e.target.closest('g[data-k]'); if (!g) return; const k = +g.dataset.k; if (k !== sel) { sel = k; paint(+slider.value); } };
+  svg.addEventListener('pointerdown', pick);
+  svg.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') pick(e); });
   slider.addEventListener('input', () => paint(+slider.value));
   prev.addEventListener('click', () => go(+slider.value - 1)); next.addEventListener('click', () => go(+slider.value + 1));
   const L = hsMax
     ? [['ok', `Hs abaixo de 70% do limite (${hsMax} m)`], ['mid', `70% a 100% do limite`], ['bad', `acima do limite`], ['none', 'sem dado (terra)']]
     : [['ok', 'até 1 m'], ['lo', '1 a 2 m'], ['mid', '2 a 3 m'], ['bad', 'acima de 3 m'], ['none', 'sem dado (terra)']];
   const legend = el('div', { class: 'rmleg' }, ...L.map(([c, t]) => el('span', {}, el('i', { class: 'c-' + c }), t)));
-  box.replaceChildren(map, el('div', { class: 'rmctl' }, prev, slider, next, lab), legend,
-    el('p', { class: 'sub', style: 'font-size:12.5px' }, `Modelo: melhor modelo automático da Open-Meteo. Mapa buscado às ${fmtUtc(fetchedAt)}.${hsMax ? '' : ' Sem limite de Hs no perfil: escala fixa em metros.'} A seta aponta para onde o vento vai; o número é a Hs em metros; passe o dedo ou o mouse sobre a célula para ver o vento. O círculo marca o ponto da operação.`));
+  box.replaceChildren(map, info, el('div', { class: 'rmctl' }, prev, slider, next, lab), legend,
+    el('p', { class: 'sub', style: 'font-size:12.5px' }, `Modelo: melhor modelo automático da Open-Meteo. Mapa buscado às ${fmtUtc(fetchedAt)}.${hsMax ? '' : ' Sem limite de Hs no perfil: escala fixa em metros.'} A seta aponta para onde o vento vai; o número é a Hs em metros; toque ou passe o mouse numa célula para ver os dados dela no quadro acima do horário. O círculo marca o ponto da operação.`));
   go(0);
 }
 
