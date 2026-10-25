@@ -5,7 +5,7 @@ const shots = process.argv[2];
 let fails = 0;
 const ok = (n, c, x = '') => { if (!c) { fails++; console.log('FALHOU', n, x); } };
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4+/wNAAVVArEcIxn+AAAAAElFTkSuQmCC', 'base64');
-let modo = 'ok', chamadasGrade = 0;
+let modo = 'ok', chamadasGrade = 0, ultimasLats = [];
 
 function resp(u) {
   const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(130)].map((_, i) => t0 + i * 3600);
@@ -15,7 +15,7 @@ function resp(u) {
       : { time, wind_speed_10m: time.map(() => 10), wind_gusts_10m: time.map(() => 14), wind_direction_10m: time.map(() => 120) };
     return { latitude: -22.9, longitude: -43.1, hourly: h, hourly_units: {} };
   }
-  chamadasGrade++;
+  chamadasGrade++; ultimasLats = lats.map(Number);
   return lats.map((_, i) => {
     const terra = i === 0 || i === 7; // dois pontos sobre terra
     const h = u.includes('marine') ? { time, wave_height: time.map((_, k) => terra ? null : 0.5 + (i % 7) * 0.3 + (k % 3) * 0.1) }
@@ -70,6 +70,37 @@ function resp(u) {
   ok('mouse passando seleciona a célula', k20 === 20, String(k20));
   await (await p.$$('.rmap svg g'))[30].dispatchEvent('pointermove', { pointerType: 'touch' });
   ok('movimento de toque não troca a seleção', (await p.$$eval('.rmap svg g', gs => gs.findIndex(g => g.querySelector('rect.sel')))) === 20);
+  // ---- tamanho da região ----
+  const passoKm = () => Math.abs(ultimasLats[0] - ultimasLats[7]) * 111.32;   // passo norte-sul entre pontos vizinhos
+  ok('padrão 300 km: passo ~50 km', Math.abs(passoKm() - 50) < 0.5, String(passoKm()));
+  ok('seletor tem 100, 200 e 300 km com 300 marcado', JSON.stringify(await p.$$eval('#rm-size option', o => o.map(x => x.value + (x.selected ? '*' : '')))) === '["100","200","300*"]');
+  ok('texto informa 300 km', /Região de 300 km/.test(await p.textContent('.rmwrap')));
+  await (await p.$$('.rmap svg g'))[10].dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await p.fill('#rm-hour', '12'); await p.dispatchEvent('#rm-hour', 'input');
+  const antesBusca = chamadasGrade;
+  await p.selectOption('#rm-size', '100'); await p.waitForFunction(n => /Região de 100 km/.test(document.querySelector('.rmwrap').textContent), null, { timeout: 10000 });
+  ok('mudar o tamanho faz nova busca (2 requisições)', chamadasGrade === antesBusca + 2, `${antesBusca} -> ${chamadasGrade}`);
+  ok('com 100 km o passo cai para ~17 km e a grade segue com 49 pontos', Math.abs(passoKm() - 100 / 6) < 0.3 && ultimasLats.length === 49, String(passoKm()));
+  ok('célula e horário mantidos', (await p.$$eval('.rmap svg g', gs => gs.findIndex(g => g.querySelector('rect.sel')))) === 10 && (await p.inputValue('#rm-hour')) === '12');
+  await p.selectOption('#rm-size', '200'); await p.waitForFunction(() => /Região de 200 km/.test(document.querySelector('.rmwrap').textContent), null, { timeout: 10000 });
+  ok('200 km: passo ~33 km', Math.abs(passoKm() - 200 / 6) < 0.3, String(passoKm()));
+  // ---- reproduzir ----
+  const total = +(await p.getAttribute('#rm-hour', 'max'));
+  await p.fill('#rm-hour', '0'); await p.dispatchEvent('#rm-hour', 'input');
+  ok('não começa sozinho', (await p.textContent('#rm-play')) === 'Reproduzir');
+  await p.click('#rm-play'); ok('vira Pausar', (await p.textContent('#rm-play')) === 'Pausar');
+  await p.waitForTimeout(1300);
+  const andou = +(await p.inputValue('#rm-hour')); ok('avança 1 h a cada 0,5 s (2 a 3 horas em 1,3 s)', andou >= 2 && andou <= 3, String(andou));
+  ok('as cores/horário mudam junto', /\d{2}:\d{2}/.test(await p.textContent('.rmctl .mono')));
+  await p.click('#rm-play'); const parou = +(await p.inputValue('#rm-hour')); await p.waitForTimeout(900);
+  ok('pausar para a animação', +(await p.inputValue('#rm-hour')) === parou && (await p.textContent('#rm-play')) === 'Reproduzir');
+  await p.fill('#rm-hour', String(total - 2)); await p.dispatchEvent('#rm-hour', 'input');
+  await p.click('#rm-play'); await p.waitForFunction(() => document.querySelector('#rm-play').textContent === 'Reproduzir', null, { timeout: 5000 });
+  ok('chegar ao fim para sozinho', +(await p.inputValue('#rm-hour')) === total);
+  await p.click('#rm-play'); await p.waitForTimeout(700);
+  ok('no fim, reproduzir recomeça do início', +(await p.inputValue('#rm-hour')) < total && (await p.textContent('#rm-play')) === 'Pausar');
+  await p.selectOption('#rm-size', '300'); await p.waitForFunction(() => /Região de 300 km/.test(document.querySelector('.rmwrap').textContent), null, { timeout: 10000 });
+  ok('nova busca para a animação', (await p.textContent('#rm-play')) === 'Reproduzir');
   ok('mapa não vai no HTML baixado', await (async () => { const [d] = await Promise.all([p.waitForEvent('download'), p.click('#rp-download')]); return !/rmwrap|Mapa da região/.test(require('fs').readFileSync(await d.path(), 'utf8')); })());
   if (shots) await p.locator('.rmwrap').screenshot({ path: path.join(shots, 'mapa-desktop-claro.png') });
   ok('sem erros de página (desktop)', errs.length === 0, JSON.stringify(errs)); await ctx.close();

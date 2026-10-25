@@ -46,3 +46,15 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - T1 a T6 concluídas em 2026-10-25. Testes: `tests/dir_blocked.js`, `tests/grid.js`, `tests/dir_forms.js`, `tests/map.js` (Node + Playwright).
 - Ajuste fora do plano: a rosa dos ventos/ondas (`.wind2`) fazia a página rolar para o lado no celular; corrigido com `min-width:0` e `minmax(0,1fr)`.
 - Decisões de construção: o mapa se encaixa no maior zoom inteiro que cabe na tela (altura máxima 720 px); seta com tamanho proporcional à célula e à velocidade do vento.
+
+---
+
+# Plano 2: direção da onda, data de início e mapa com mais opções (spec 2)
+
+- [x] M1 Direção da onda bloqueada: `wdir_from`/`wdir_to` nos limites, formulários (perfil, análise rápida, local), relatório, PDF, rótulo do local e backup. Testes: `tests/dir_blocked.js`, `tests/dir_forms.js`.
+- [x] M2 Data de início: campo "Início da análise" na análise rápida, `parseStart` (fuso do local, hora cheia em UTC, limite de 16 dias), busca com dias suficientes, alerta acima de 7 dias à frente. Teste: `tests/inicio.js`.
+- [x] M3 Mapa: seletor de 100/200/300 km (nova busca mantendo célula e horário) e botão Reproduzir/Pausar (0,5 s por hora). Teste: `tests/map.js`.
+
+## Registro
+- Concluído em 2026-10-25. Todos os testes e o de paridade passam.
+- Decisões de construção: "Dias à frente" passa a aceitar até 16 (antes 10); o início é arredondado para a hora cheia em UTC (com fuso de meia hora, 08:00 local vira o início da hora UTC anterior); ao chegar ao fim, Reproduzir recomeça do início; o início escolhido não é lembrado entre visitas (evita erro de "início no passado").

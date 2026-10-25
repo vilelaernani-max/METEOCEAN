@@ -81,6 +81,32 @@ function openMeteo(dir) {
   const velho = await p.evaluate(() => { try { return JSON.parse(localStorage.getItem('mco:profiles') || '{}'); } catch (e) { return {}; } });
   ok('há perfis salvos no armazenamento', Object.keys(velho).length >= 1);
 
+  // ---- direção da onda nos formulários ----
+  await p.click('#t-analise');
+  await p.selectOption('#q-dfrom', ''); await p.selectOption('#q-dto', '');
+  await p.selectOption('#q-wfrom', '4'); // L
+  await p.click('#q-go'); await p.waitForTimeout(500);
+  ok('análise: só um valor de onda avisa', /onda[\s\S]*dois pontos/i.test(await p.textContent('#q-msg')), await p.textContent('#q-msg'));
+  await p.selectOption('#q-wto', '6'); // SE: onda a 90° (L) bloqueia tudo
+  await p.click('#q-go'); await p.waitForFunction(() => /Nenhuma janela/.test(document.querySelector('#report .verdict')?.textContent || ''), null, { timeout: 15000 });
+  ok('limites mostram a faixa de onda', /Direção da onda bloqueada[\s\S]{0,40}L a SE/.test(await p.textContent('#report')));
+  await p.reload(); await p.waitForTimeout(800);
+  ok('faixa de onda lembrada', (await p.inputValue('#q-wfrom')) === '4' && (await p.inputValue('#q-wto')) === '6');
+  await p.click('#t-limites'); await p.click('#p-new'); await p.fill('#p-name', 'Perfil onda');
+  await p.selectOption('#p-wfrom', '2'); await p.selectOption('#p-wto', '3'); await p.click('#p-save'); await p.waitForTimeout(500);
+  await p.reload(); await p.waitForTimeout(800); await p.click('#t-limites');
+  const po = (await p.$$eval('#p-sel option', os => os.map(o => [o.value, o.textContent]))).find(o => o[1] === 'Perfil onda'); ok('perfil de onda salvo', !!po);
+  await p.selectOption('#p-sel', po[0]); await p.dispatchEvent('#p-sel', 'change');
+  ok('perfil carrega faixa de onda', (await p.inputValue('#p-wfrom')) === '2' && (await p.inputValue('#p-wto')) === '3');
+  await p.selectOption('#p-wto', ''); await p.click('#p-save'); await p.waitForTimeout(300);
+  ok('perfil com um valor de onda avisa', /onda/i.test(await p.textContent('#p-msg')), await p.textContent('#p-msg'));
+  await p.click('#t-locais'); await p.fill('#l-name', 'Local onda'); await p.fill('#l-lat', '-22.8'); await p.fill('#l-lon', '-43.0');
+  await p.selectOption('#l-wfrom', '8'); await p.selectOption('#l-wto', '10'); await p.click('#l-save'); await p.waitForTimeout(500);
+  ok('local mostra limite de onda', /sem onda de S a SO/.test(await p.textContent('#l-list')), await p.textContent('#l-list'));
+  await p.click('#t-historico');
+  const [bd2] = await Promise.all([p.waitForEvent('download'), p.click('#b-export')]);
+  const bk2 = JSON.parse(fs.readFileSync(await bd2.path(), 'utf8'));
+  ok('backup tem faixa de onda no local', bk2.collections.locations.some(x => x.name === 'Local onda' && x.limits.wdir_from === 8 && x.limits.wdir_to === 10));
   ok('sem erros de página', errs.length === 0, JSON.stringify(errs));
   console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes de navegador passaram');
   await b.close(); process.exit(fails ? 1 : 0);

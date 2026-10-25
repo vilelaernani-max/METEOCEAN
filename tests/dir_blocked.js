@@ -63,5 +63,29 @@ const Lv = normalizeLimits({ hs_max: 2, wind_max: 30 });
 eq('sem faixa: go mesmo com direção na faixa', evaluateHour({ ...base, wind_dir: 180 }, Lv, null)[0], 'go');
 eq('sem faixa: go sem dado de direção', evaluateHour({ ...base, wind_dir: null }, Lv, null)[0], 'go');
 
+// ---- direção da onda (wdir_from / wdir_to), de onde a onda vem ----
+const w0 = normalizeLimits({});
+eq('onda: padrão sem faixa', [w0.wdir_from, w0.wdir_to], [null, null]);
+const w1 = normalizeLimits({ wdir_from: I('L'), wdir_to: I('S') });
+eq('onda: aceita faixa', [w1.wdir_from, w1.wdir_to], [I('L'), I('S')]);
+erro = null; try { normalizeLimits({ wdir_from: 3 }); } catch (e) { erro = e.message; }
+eq('onda: só um preenchido dá erro', /onda/i.test(erro || ''), true);
+erro = null; try { normalizeLimits({ wdir_from: 99, wdir_to: 1 }); } catch (e) { erro = e.message; }
+eq('onda: índice inválido dá erro', typeof erro, 'string');
+eq('onda: vento e onda independentes', (() => { const x = normalizeLimits({ dir_from: 1, dir_to: 2 }); return [x.dir_from, x.wdir_from]; })(), [1, null]);
+const LW = normalizeLimits({ hs_max: 3, wind_max: 40, wdir_from: I('L'), wdir_to: I('S') });
+const rw = { ts: 0, hs: 1, tp: 8, wind_kn: 10, gust_kn: 12, wind_dir: 0 };
+let ew = evaluateHour({ ...rw, wave_dir: 135 }, LW, null);
+eq('onda 135 (SE) em L–S bloqueia', ew[0], 'nogo');
+eq('motivo cita onda e faixa', /onda vindo de SE \(135°\).*L–S/.test(ew[1].join(' ')), true, ew[1]);
+eq('onda 270 fora', evaluateHour({ ...rw, wave_dir: 270 }, LW, null)[0], 'go');
+eq('onda sem direção vira nodata', evaluateHour({ ...rw, wave_dir: null }, LW, null)[0], 'nodata');
+eq('direção do vento na faixa não afeta a onda', evaluateHour({ ...rw, wind_dir: 135, wave_dir: 270 }, LW, null)[0], 'go');
+const LWc = normalizeLimits({ hs_max: 3, wind_max: 40, wdir_from: I('NO'), wdir_to: I('NE') });
+eq('onda cruzando o norte', [evaluateHour({ ...rw, wave_dir: 350 }, LWc, null)[0], evaluateHour({ ...rw, wave_dir: 90 }, LWc, null)[0]], ['nogo', 'go']);
+eq('sem faixa de onda: go mesmo sem direção', evaluateHour({ ...rw, wave_dir: null }, normalizeLimits({ hs_max: 3, wind_max: 40 }), null)[0], 'go');
+const LB = normalizeLimits({ hs_max: 3, wind_max: 40, dir_from: I('N'), dir_to: I('N'), wdir_from: I('L'), wdir_to: I('S') });
+eq('vento e onda bloqueados juntos: dois motivos', evaluateHour({ ...rw, wind_dir: 0, wave_dir: 135 }, LB, null)[1].length, 2);
+
 console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes passaram');
 process.exit(fails ? 1 : 0);
