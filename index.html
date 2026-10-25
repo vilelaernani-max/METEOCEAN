@@ -212,7 +212,9 @@ details>summary{cursor:pointer}
       <thead><tr><th>Fonte</th><th>Modelo de vento</th><th>Modelo de onda</th><th></th></tr></thead>
       <tbody id="src-body"></tbody>
     </table></div>
-    <div class="row" style="margin-top:8px"><button id="src-add" type="button">Adicionar fonte</button><button id="src-reset" type="button" class="lnk">Restaurar padrão</button></div>
+    <div class="row" style="margin-top:8px"><button id="src-add" type="button">Adicionar fonte</button><button id="src-reset" type="button" class="lnk">Restaurar padrão</button><button id="src-test" type="button">Testar fontes</button></div>
+    <div id="src-test-msg" class="msg" aria-live="polite"></div>
+    <ul id="src-test-out" class="list" style="margin-top:6px"></ul>
     <p class="note">Modelo em branco usa o melhor modelo automático da Open-Meteo. Nomes de modelo inválidos aparecem como erro na resposta colada.</p>
 
     <h3>Vento</h3>
@@ -2087,6 +2089,37 @@ async function fetchViaBrowser(mcp, url) {
     return extractJson(txt);
   } finally { mcp.callTool(HOSTB, 'tabs_close', { tabId }).catch(() => {}); }
 }
+/* testa, para cada fonte da tabela, se o modelo de vento e o de onda respondem com dados no ponto */
+function seriesCount(j, base, model) {
+  const a = j && j.hourly ? hourlyPick(j.hourly, base, model) : null;
+  if (!a) return { ok: false, why: `o modelo "${model || 'melhor modelo'}" não veio na resposta` };
+  const n = a.filter(v => v !== null && v !== undefined).length;
+  return n ? { ok: true, n, total: a.length } : { ok: false, why: 'resposta sem nenhum valor neste ponto' };
+}
+async function testSources() {
+  const msg = $('#src-test-msg'), out = $('#src-test-out'), btn = $('#src-test');
+  const loc = currentLoc(), qc = typeof parseCoords === 'function' ? parseCoords($('#q-coords').value) : null;
+  const pt = loc ? { lat: loc.lat, lon: loc.lon, nome: loc.name } : qc ? { lat: qc.lat, lon: qc.lon, nome: 'ponto digitado' } : { lat: -22.9519, lon: -43.1859, nome: 'ponto padrão (Rio de Janeiro)' };
+  btn.disabled = true; out.replaceChildren(); msg.className = 'msg'; msg.textContent = `Testando ${S.rows.length} fonte(s) em ${pt.nome}…`;
+  const one = async (kind, row) => {
+    const t0 = performance.now(), u = buildUrls(pt.lat, pt.lon, 1, [row])[kind];
+    try {
+      const j = JSON.parse(await fetchDirect(u)), r = kind === 'wind' ? seriesCount(j, 'wind_speed_10m', row.wind.trim()) : seriesCount(j, 'wave_height', row.wave.trim());
+      return { ...r, ms: Math.round(performance.now() - t0) };
+    } catch (e) { return { ok: false, why: e && e.message ? e.message : 'erro', ms: Math.round(performance.now() - t0) }; }
+  };
+  const results = await Promise.all(S.rows.map(async row => ({ row, wind: await one('wind', row), wave: await one('wave', row) })));
+  let bad = 0;
+  out.replaceChildren(...results.map(({ row, wind, wave }) => {
+    const part = (nome, r, modelo) => el('div', { class: 'm', style: `color:${r.ok ? 'var(--go)' : 'var(--danger)'}` },
+      `${r.ok ? '✓' : '✗'} ${nome} (${modelo || 'melhor modelo'}): ${r.ok ? `${r.n} de ${r.total} horas com dado` : r.why} · ${r.ms} ms`);
+    if (!wind.ok || !wave.ok) bad++;
+    return el('li', {}, el('div', { class: 't' }, row.label || 'Fonte'), part('vento', wind, row.wind.trim()), part('onda', wave, row.wave.trim()));
+  }));
+  msg.className = 'msg ' + (bad ? 'warn' : 'ok');
+  msg.textContent = bad ? `${bad} de ${results.length} fonte(s) com problema. Corrija o nome do modelo ou remova a fonte.` : `As ${results.length} fonte(s) responderam com dados.`;
+  btn.disabled = false;
+}
 async function fetchDirect(url) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 25000);
   try {
@@ -2652,6 +2685,7 @@ async function init() {
   $('#a-loc').addEventListener('change', e => { const l = S.locs.find(x => x.id === e.target.value); if (l) { S.selLoc = l.id; anTags.set(l.tags); } updateLinks(); revalidatePastes(); });
   $('#a-days').addEventListener('input', updateLinks);
   $('#src-add').addEventListener('click', () => { S.rows.push({ label: `Fonte ${S.rows.length + 1}`, wind: '', wave: '' }); saveRows(); renderSources(); updateLinks(); });
+  $('#src-test').addEventListener('click', testSources);
   $('#src-reset').addEventListener('click', () => { S.rows = DEFAULT_SOURCES.map(r => ({ ...r })); saveRows(); renderSources(); updateLinks(); revalidatePastes(); });
   for (const k of ['wind', 'wave']) {
     let t = null;
