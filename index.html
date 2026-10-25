@@ -185,7 +185,9 @@ details>summary{cursor:pointer}
       <label>Corrente máxima (nós)<input id="q-cur" class="f" type="number" step="0.1" min="0" placeholder="não usar"></label>
       <label>Janela mínima (h seguidas)<input id="q-win" class="f" type="number" min="1" max="72" value="4"></label>
       <div class="dirpair" data-p="q"></div>
-      <label>Dias à frente<input id="q-days" class="f" type="number" min="1" max="10" value="5"></label>
+      <div class="dirpair" data-p="q" data-k="w"></div>
+      <label>Dias à frente<input id="q-days" class="f" type="number" min="1" max="16" value="5"></label>
+      <label>Início da análise (opcional)<input id="q-start" class="f" type="datetime-local"></label>
     </div>
     <label class="check" style="margin-top:8px"><input id="q-day" type="checkbox"> Somente período diurno</label>
     <div class="row" style="margin-top:12px;align-items:center"><button id="q-go" type="button" class="primary">Gerar previsão</button><span id="q-msg" class="msg" aria-live="polite"></span></div>
@@ -279,6 +281,7 @@ details>summary{cursor:pointer}
         <label>Corrente máxima (nós)<input id="l-cur" class="f" type="number" step="0.1" min="0" placeholder="não usar"></label>
         <label>Janela mínima (h)<input id="l-win" class="f" type="number" min="1" max="72" placeholder="4"></label>
         <div class="dirpair" data-p="l"></div>
+      <div class="dirpair" data-p="l" data-k="w"></div>
       </div>
       <label class="check" style="margin-top:6px"><input id="l-day" type="checkbox"> Somente período diurno</label>
     </fieldset>
@@ -306,6 +309,7 @@ details>summary{cursor:pointer}
       <label>Rajada máxima (nós) <input id="p-gust" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
       <label>Janela mínima (h seguidas) <input id="p-win" class="f" type="number" min="1" max="72" value="4"></label>
       <div class="dirpair" data-p="p"></div>
+      <div class="dirpair" data-p="p" data-k="w"></div>
     </div>
     <label style="margin-top:10px"><input id="p-day" type="checkbox">Somente período diurno</label>
     <p class="note">Campo vazio = limite não usado. Perfis de exemplo trazem valores genéricos: ajuste aos limites reais de cada operação.</p>
@@ -460,7 +464,7 @@ function dirBlocked(dir, fromIdx, toIdx) {
 }
 
 function normalizeLimits(raw) {
-  const out = { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: null, cur_max: null, dir_from: null, dir_to: null, daylight_only: false, min_window_h: 4 };
+  const out = { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: null, cur_max: null, dir_from: null, dir_to: null, wdir_from: null, wdir_to: null, daylight_only: false, min_window_h: 4 };
   raw = raw || {};
   for (const k of ['hs_max', 'tp_min', 'wind_max', 'gust_max', 'cur_max']) {
     if (k in raw) {
@@ -473,7 +477,7 @@ function normalizeLimits(raw) {
       }
     }
   }
-  for (const k of ['dir_from', 'dir_to']) if (k in raw) {
+  for (const k of ['dir_from', 'dir_to', 'wdir_from', 'wdir_to']) if (k in raw) {
     const v = raw[k];
     if (v === null || v === undefined || v === '') out[k] = null;
     else {
@@ -483,6 +487,7 @@ function normalizeLimits(raw) {
     }
   }
   if ((out.dir_from === null) !== (out.dir_to === null)) throw new Error('Direção do vento bloqueada: informe os dois pontos (de e até) ou nenhum.');
+  if ((out.wdir_from === null) !== (out.wdir_to === null)) throw new Error('Direção da onda bloqueada: informe os dois pontos (de e até) ou nenhum.');
   if ('daylight_only' in raw) out.daylight_only = !!raw.daylight_only;
   if ('min_window_h' in raw) {
     const m = Math.trunc(Number(raw.min_window_h));
@@ -537,6 +542,11 @@ function evaluateHour(row, L, day) {
     const b = dirBlocked(row.wind_dir, L.dir_from, L.dir_to);
     if (b === null) missing.push('direção do vento');
     else if (b) reasons.push(`direção ${pontoDe(row.wind_dir)} (${Math.round(row.wind_dir)}°) na faixa bloqueada ${PONTOS16[L.dir_from]}–${PONTOS16[L.dir_to]}`);
+  }
+  if (L.wdir_from !== null && L.wdir_from !== undefined && L.wdir_to !== null && L.wdir_to !== undefined) {
+    const b = dirBlocked(row.wave_dir, L.wdir_from, L.wdir_to);
+    if (b === null) missing.push('direção da onda');
+    else if (b) reasons.push(`onda vindo de ${pontoDe(row.wave_dir)} (${Math.round(row.wave_dir)}°) na faixa bloqueada ${PONTOS16[L.wdir_from]}–${PONTOS16[L.wdir_to]}`);
   }
   if (L.daylight_only && day && !isDaylight(row.ts, day)) reasons.push('fora do período diurno');
   if (reasons.length) return ['nogo', reasons];
@@ -617,8 +627,8 @@ function modelParam(rows, key) {
   if (names.every(n => !n)) return '';
   return [...new Set(names.map(n => n || 'best_match'))].join(',');
 }
-function buildUrls(lat, lon, days, rows) {
-  const fd = Math.min(16, days + 1);
+function buildUrls(lat, lon, days, rows, offsetDays = 0) {
+  const fd = Math.min(16, days + offsetDays + 1);
   const common = `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=UTC&timeformat=unixtime&forecast_days=${fd}`;
   const mw = modelParam(rows, 'wind'), mv = modelParam(rows, 'wave');
   return {
@@ -796,7 +806,7 @@ const REPORT_CSS = `
 .rminfo{font-size:13.5px;margin:8px 0 0;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-height:3.2em}
 .rmap svg g{cursor:pointer}
 .rmctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
-.rmctl input[type=range]{flex:1 1 200px;min-width:0;width:auto;padding:0}
+.rmctl input[type=range]{order:9;flex:1 1 100%;min-width:0;width:auto;padding:0}
 .rmleg{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;margin:6px 0}
 .rmleg i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-1px;opacity:.8}
 .rmleg i.c-ok{background:var(--go)}.rmleg i.c-lo{background:var(--c4)}.rmleg i.c-mid{background:var(--c2)}.rmleg i.c-bad{background:var(--nogo)}.rmleg i.c-none{border:1px dashed var(--mut)}
@@ -1009,10 +1019,10 @@ function windowsTable(wins, grid, tz, showSources) {
   const rows = wins.map(w => `<tr><td>${fmt(grid[w.i0], tz)}</td><td>${fmt(grid[w.i1 - 1] + HOUR, tz)}</td><td class="n">${w.hours} h</td><td class="n">${num(w.max_hs)}</td><td class="n">${num(w.max_wind, 0)}</td><td class="n">${num(w.max_gust, 0)}</td><td class="n">${num(w.max_cur)}</td>${showSources ? `<td class="n">${w.min_sources}</td>` : ''}</tr>`).join('');
   return `<div class="tw"><table>${head}${rows}</table></div>`;
 }
-const dirTxt = L => (L.dir_from === null || L.dir_from === undefined || L.dir_to === null || L.dir_to === undefined) ? 'não usado' : `${PONTOS16[L.dir_from]} a ${PONTOS16[L.dir_to]}`;
+const dirTxt = (L, w = false) => { const a = L[w ? 'wdir_from' : 'dir_from'], b = L[w ? 'wdir_to' : 'dir_to']; return (a === null || a === undefined || b === null || b === undefined) ? 'não usado' : `${PONTOS16[a]} a ${PONTOS16[b]}`; };
 function limitsTable(L) {
   const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
-  const rows = [['Hs máxima', v(L.hs_max, 'm')], ['Tp mínima', v(L.tp_min, 's')], ['Vento máximo (10 m)', v(L.wind_max, 'kn')], ['Rajada máxima', v(L.gust_max, 'kn')], ['Corrente máxima', v(L.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(L)],
+  const rows = [['Hs máxima', v(L.hs_max, 'm')], ['Tp mínima', v(L.tp_min, 's')], ['Vento máximo (10 m)', v(L.wind_max, 'kn')], ['Rajada máxima', v(L.gust_max, 'kn')], ['Corrente máxima', v(L.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(L)], ['Direção da onda bloqueada', dirTxt(L, true)],
     ['Somente diurno', L.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${L.min_window_h} h seguidas`]];
   return `<table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')}</table>`;
 }
@@ -1278,6 +1288,7 @@ function buildReport(ctx) {
   const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
   const tags = ctx.tags.length ? ctx.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('') : '—';
   const alerts = [];
+  if (ctx.startAheadDays > 7) alerts.push(`<b>Previsão de longo prazo:</b> a análise começa daqui a ${Math.round(ctx.startAheadDays)} dias, e previsões a mais de 7 dias têm confiança bem menor. Use como tendência e gere de novo mais perto da operação.`);
   for (const e of errors) alerts.push(`<b>Fonte indisponível:</b> ${esc(e.label)} — ${esc(e.error)}`);
   for (const s of res.sources) {
     if (s.note) alerts.push(`<b>${esc(s.label)}:</b> ${esc(s.note)}`);
@@ -1744,6 +1755,7 @@ function buildPdf(ctx) {
   if (hasLim) pdfKpis(pdf, res, tz);
   // alertas
   const alerts = [];
+  if (ctx.startAheadDays > 7) alerts.push(`Previsão de longo prazo: a análise começa daqui a ${Math.round(ctx.startAheadDays)} dias, e previsões a mais de 7 dias têm confiança bem menor. Use como tendência e gere de novo mais perto da operação.`);
   for (const e of ctx.errors) alerts.push(`Fonte indisponível: ${e.label} — ${e.error}`);
   for (const s of res.sources) { if (s.note) alerts.push(`${s.label}: ${s.note}`); if (s.n_nodata && hasLim) alerts.push(`${s.label}: ${s.n_nodata} h sem dado de algum parâmetro limitado (tratadas como não-GO).`); }
   const ni = ctx.navyInfo || {};
@@ -1816,7 +1828,7 @@ function buildPdf(ctx) {
   if (hasLim) {
   pdf.h2('Limites aplicados');
   const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
-  pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Corrente máxima', v(lm.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(lm)], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
+  pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Corrente máxima', v(lm.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(lm)], ['Direção da onda bloqueada', dirTxt(lm, true)], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
   }
   pdf.y += 6;
   if (!brief || pdf.y < PDF_H - 120) pdf.para(`Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.`, 7.5, { color: PDF_COL.mut });
@@ -1931,13 +1943,13 @@ function selectLoc(id) {
   const l = S.locs.find(x => x.id === id); if (!l) return;
   S.selLoc = id;
   $('#l-name').value = l.name; $('#l-lat').value = l.lat; $('#l-lon').value = l.lon; $('#l-tz').value = l.tz_offset; $('#l-areas').value = l.areas || ''; $('#l-proj').value = l.project || '';
-  const L = l.limits || {}; $('#l-hs').value = L.hs_max ?? ''; $('#l-wind').value = L.wind_max ?? ''; $('#l-gust').value = L.gust_max ?? ''; $('#l-tp').value = L.tp_min ?? ''; $('#l-cur').value = L.cur_max ?? ''; $('#l-win').value = L.min_window_h ?? ''; $('#l-day').checked = !!L.daylight_only; setIdx('#l-dfrom', L.dir_from); setIdx('#l-dto', L.dir_to);
+  const L = l.limits || {}; $('#l-hs').value = L.hs_max ?? ''; $('#l-wind').value = L.wind_max ?? ''; $('#l-gust').value = L.gust_max ?? ''; $('#l-tp').value = L.tp_min ?? ''; $('#l-cur').value = L.cur_max ?? ''; $('#l-win').value = L.min_window_h ?? ''; $('#l-day').checked = !!L.daylight_only; setIdx('#l-dfrom', L.dir_from); setIdx('#l-dto', L.dir_to); setIdx('#l-wfrom', L.wdir_from); setIdx('#l-wto', L.wdir_to);
   locTags.set(l.tags); anTags.set(l.tags); $('#l-paste').value = ''; setMsg('#l-pastemsg', ''); setMsg('#l-msg', '');
   updateSeeLink(); renderLocs(); updateLinks(); showTab('locais');
 }
 function newLoc() {
   S.selLoc = null;
-  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-proj', '#l-paste', '#l-hs', '#l-wind', '#l-gust', '#l-tp', '#l-cur', '#l-win', '#l-dfrom', '#l-dto']) $(id).value = ''; $('#l-day').checked = false;
+  for (const id of ['#l-name', '#l-lat', '#l-lon', '#l-areas', '#l-proj', '#l-paste', '#l-hs', '#l-wind', '#l-gust', '#l-tp', '#l-cur', '#l-win', '#l-dfrom', '#l-dto', '#l-wfrom', '#l-wto']) $(id).value = ''; $('#l-day').checked = false;
   $('#l-tz').value = -3; locTags.set([]); setMsg('#l-msg', ''); setMsg('#l-pastemsg', ''); updateSeeLink(); renderLocs();
 }
 async function saveLoc() {
@@ -1946,8 +1958,9 @@ async function saveLoc() {
   if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180)) return setMsg('#l-msg', 'Latitude (−90 a 90) e longitude (−180 a 180) são obrigatórias.', 'bad');
   if (!(tz >= -12 && tz <= 14)) return setMsg('#l-msg', 'Fuso deve estar entre −12 e 14.', 'bad');
   const id = S.selLoc || newId();
-  const lim = { hs_max: nOrNull('#l-hs'), wind_max: nOrNull('#l-wind'), gust_max: nOrNull('#l-gust'), tp_min: nOrNull('#l-tp'), cur_max: nOrNull('#l-cur'), min_window_h: nOrNull('#l-win'), daylight_only: $('#l-day').checked, dir_from: selIdx('#l-dfrom'), dir_to: selIdx('#l-dto') };
+  const lim = { hs_max: nOrNull('#l-hs'), wind_max: nOrNull('#l-wind'), gust_max: nOrNull('#l-gust'), tp_min: nOrNull('#l-tp'), cur_max: nOrNull('#l-cur'), min_window_h: nOrNull('#l-win'), daylight_only: $('#l-day').checked, dir_from: selIdx('#l-dfrom'), dir_to: selIdx('#l-dto'), wdir_from: selIdx('#l-wfrom'), wdir_to: selIdx('#l-wto') };
   if ((lim.dir_from === null) !== (lim.dir_to === null)) return setMsg('#l-msg', 'Direção do vento bloqueada: informe os dois pontos (de e até) ou nenhum.', 'bad');
+  if ((lim.wdir_from === null) !== (lim.wdir_to === null)) return setMsg('#l-msg', 'Direção da onda bloqueada: informe os dois pontos (de e até) ou nenhum.', 'bad');
   const hasLim = Object.values(lim).some(v => v !== null && v !== false);
   const rec = { name, lat, lon, tz_offset: tz, areas: $('#l-areas').value.trim().slice(0, 100), project: $('#l-proj').value.trim().slice(0, 80), limits: hasLim ? lim : null, tags: locTags.get(), created_at: (S.locs.find(l => l.id === id) || {}).created_at || now() };
   try { await Store.set('locations', id, rec); S.selLoc = id; await loadAll(); setMsg('#l-msg', 'Local salvo.', 'ok'); anTags.set(rec.tags); }
@@ -1964,12 +1977,12 @@ const selIdx = sel => { const v = $(sel).value; return v === '' ? null : Number(
 const setIdx = (sel, v) => { $(sel).value = (v === null || v === undefined) ? '' : String(v); };
 function initDirFields() {
   document.querySelectorAll('.dirpair').forEach(box => {
-    const p = box.dataset.p, opts = () => [el('option', { value: '' }, '—'), ...PONTOS16.map((n, i) => el('option', { value: String(i) }, n))];
-    box.replaceChildren(el('label', {}, 'Direção do vento bloqueada (opcional)',
+    const p = box.dataset.p, w = box.dataset.k === 'w', k = w ? 'w' : 'd', nome = w ? 'onda' : 'vento', opts = () => [el('option', { value: '' }, '—'), ...PONTOS16.map((n, i) => el('option', { value: String(i) }, n))];
+    box.replaceChildren(el('label', {}, `Direção da${w ? '' : 'o'} ${nome} bloqueada (opcional)`,
       el('div', { class: 'row', style: 'flex-wrap:nowrap;gap:6px;margin-top:3px' },
-        el('select', { id: `${p}-dfrom`, class: 'f', 'aria-label': 'Direção do vento bloqueada, de', style: 'margin:0' }, ...opts()),
+        el('select', { id: `${p}-${k}from`, class: 'f', 'aria-label': `Direção da${w ? '' : 'o'} ${nome} bloqueada, de`, style: 'margin:0' }, ...opts()),
         el('span', { class: 'm' }, 'até'),
-        el('select', { id: `${p}-dto`, class: 'f', 'aria-label': 'Direção do vento bloqueada, até', style: 'margin:0' }, ...opts()))));
+        el('select', { id: `${p}-${k}to`, class: 'f', 'aria-label': `Direção da${w ? '' : 'o'} ${nome} bloqueada, até`, style: 'margin:0' }, ...opts()))));
   });
 }
 function renderProfs() {
@@ -1985,19 +1998,19 @@ function fillProf(id, quiet) {
   const p = S.profs.find(x => x.id === id); if (!p) return;
   S.selProf = id; const l = p.limits;
   $('#p-name').value = p.name; $('#p-hs').value = l.hs_max ?? ''; $('#p-tp').value = l.tp_min ?? '';
-  $('#p-wind').value = l.wind_max ?? ''; $('#p-gust').value = l.gust_max ?? ''; $('#p-win').value = l.min_window_h; $('#p-day').checked = !!l.daylight_only; setIdx('#p-dfrom', l.dir_from); setIdx('#p-dto', l.dir_to);
+  $('#p-wind').value = l.wind_max ?? ''; $('#p-gust').value = l.gust_max ?? ''; $('#p-win').value = l.min_window_h; $('#p-day').checked = !!l.daylight_only; setIdx('#p-dfrom', l.dir_from); setIdx('#p-dto', l.dir_to); setIdx('#p-wfrom', l.wdir_from); setIdx('#p-wto', l.wdir_to);
   $('#p-sel').value = id; $('#a-prof').value = id;
   if (!quiet) setMsg('#p-msg', '');
 }
 function newProf() {
-  S.selProf = null; $('#p-name').value = ''; $('#p-hs').value = 1.5; $('#p-tp').value = ''; $('#p-wind').value = 20; $('#p-gust').value = ''; $('#p-win').value = 4; $('#p-day').checked = false; setIdx('#p-dfrom', null); setIdx('#p-dto', null);
+  S.selProf = null; $('#p-name').value = ''; $('#p-hs').value = 1.5; $('#p-tp').value = ''; $('#p-wind').value = 20; $('#p-gust').value = ''; $('#p-win').value = 4; $('#p-day').checked = false; setIdx('#p-dfrom', null); setIdx('#p-dto', null); setIdx('#p-wfrom', null); setIdx('#p-wto', null);
   $('#p-del').hidden = true; setMsg('#p-msg', '');
 }
 async function saveProf() {
   const name = $('#p-name').value.trim();
   if (!name) return setMsg('#p-msg', 'Dê um nome ao perfil.', 'bad');
   let limits;
-  try { limits = normalizeLimits({ hs_max: nOrNull('#p-hs'), tp_min: nOrNull('#p-tp'), wind_max: nOrNull('#p-wind'), gust_max: nOrNull('#p-gust'), min_window_h: $('#p-win').value, daylight_only: $('#p-day').checked, dir_from: selIdx('#p-dfrom'), dir_to: selIdx('#p-dto') }); }
+  try { limits = normalizeLimits({ hs_max: nOrNull('#p-hs'), tp_min: nOrNull('#p-tp'), wind_max: nOrNull('#p-wind'), gust_max: nOrNull('#p-gust'), min_window_h: $('#p-win').value, daylight_only: $('#p-day').checked, dir_from: selIdx('#p-dfrom'), dir_to: selIdx('#p-dto'), wdir_from: selIdx('#p-wfrom'), wdir_to: selIdx('#p-wto') }); }
   catch (e) { return setMsg('#p-msg', e.message, 'bad'); }
   const id = S.selProf || newId();
   try { await Store.set('profiles', id, { name, limits, created_at: (S.profs.find(p => p.id === id) || {}).created_at || now() }); S.selProf = id; await loadAll(); setMsg('#p-msg', 'Perfil salvo.', 'ok'); }
@@ -2263,8 +2276,8 @@ async function rmJson(url) {
   } finally { clearTimeout(t); }
 }
 /* devolve, para cada ponto da grade, séries alinhadas a tsList: hs (m), kn (nós), dir (graus, de onde vem) */
-async function fetchRegion(lat, lon, tsList) {
-  const pts = gridPoints(lat, lon), la = pts.map(p => p.lat.toFixed(3)).join(','), lo = pts.map(p => p.lon.toFixed(3)).join(',');
+async function fetchRegion(lat, lon, tsList, spanKm = RM_SPAN_KM) {
+  const pts = gridPoints(lat, lon, RM_N, spanKm), la = pts.map(p => p.lat.toFixed(3)).join(','), lo = pts.map(p => p.lon.toFixed(3)).join(',');
   const fd = Math.max(2, Math.min(16, Math.ceil((tsList[tsList.length - 1] - now()) / 86400) + 2));
   const common = `latitude=${la}&longitude=${lo}&timezone=UTC&timeformat=unixtime&forecast_days=${fd}`;
   const [w, v] = await Promise.all([
@@ -2278,27 +2291,33 @@ async function fetchRegion(lat, lon, tsList) {
 function mountRegionMap(ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, hsMax = res.limits.hs_max;
   const btn = el('button', { type: 'button', class: 'primary' }, 'Ver mapa da região');
+  const size = el('select', { id: 'rm-size', class: 'f', 'aria-label': 'Tamanho da região', style: 'width:auto;margin:0' },
+    ...[100, 200, 300].map(k => el('option', { value: String(k), selected: k === RM_SPAN_KM }, `${k} km`)));
   const msg = el('span', { class: 'msg', 'aria-live': 'polite' });
   const box = el('div', { hidden: true });
+  let state = null;   // { sel, hour } da última vez que o mapa foi desenhado
   const wrap = el('div', { class: 'rmwrap', style: 'margin:14px 0' },
     el('h2', {}, 'Mapa da região: onda e vento'),
-    el('p', { class: 'sub' }, 'Quadrado de 300 km em volta do ponto (grade de 7×7). Cor = altura de onda; seta = para onde o vento vai. Buscado na hora, só na tela (não vai no HTML nem no PDF).'),
-    el('div', { class: 'row' }, btn, msg), box);
-  btn.addEventListener('click', async () => {
-    btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Buscando a grade na Open-Meteo…';
+    el('p', { class: 'sub' }, 'Quadrado em volta do ponto (grade de 7×7). Cor = altura de onda; seta = para onde o vento vai. Buscado na hora, só na tela (não vai no HTML nem no PDF).'),
+    el('div', { class: 'row' }, btn, el('label', { style: 'display:flex;align-items:center;gap:6px' }, 'Tamanho da região', size), msg), box);
+  async function load() {
+    const span = +size.value;
+    btn.disabled = true; size.disabled = true; msg.className = 'msg'; msg.textContent = 'Buscando a grade na Open-Meteo…';
     try {
-      const data = await fetchRegion(ctx.location.lat, ctx.location.lon, grid);
+      const data = await fetchRegion(ctx.location.lat, ctx.location.lon, grid, span);
       msg.textContent = ''; btn.textContent = 'Atualizar mapa';
-      drawRegionMap(box, data, grid, tz, hsMax, ctx.location, now());
+      state = drawRegionMap(box, data, grid, tz, hsMax, ctx.location, now(), span, state);
     } catch (e) {
       msg.className = 'msg bad';
       msg.textContent = 'Não consegui carregar o mapa: ' + (e && e.message ? e.message : 'erro') + '. O relatório não foi afetado.';
-    } finally { btn.disabled = false; }
-  });
+    } finally { btn.disabled = false; size.disabled = false; }
+  }
+  btn.addEventListener('click', load);
+  size.addEventListener('change', () => { if (state) load(); });   // sem mapa aberto, só guarda a escolha
   return wrap;
 }
-function drawRegionMap(box, data, grid, tz, hsMax, loc, fetchedAt) {
-  box.hidden = false;
+function drawRegionMap(box, data, grid, tz, hsMax, loc, fetchedAt, spanKm, keep) {
+  box.hidden = false; clearInterval(box._rmTimer);
   const W = Math.max(280, Math.floor(box.clientWidth || box.parentElement.clientWidth || 600)), H = Math.min(W, 720), TILE = 256;
   const ll2t = (la, lo, zz) => { const r = la * Math.PI / 180; return [(lo + 180) / 360 * 2 ** zz, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** zz]; };
   const nw = data[0], se = data[data.length - 1], N = RM_N;
@@ -2321,9 +2340,10 @@ function drawRegionMap(box, data, grid, tz, hsMax, loc, fetchedAt) {
   const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Mapa de altura de onda e direção do vento em grade de 7 por 7 pontos');
   const map = el('div', { class: 'rmap', style: `height:${H}px` }, tiles, svg, el('div', { class: 'att' }, '© OpenStreetMap'));
   const slider = el('input', { type: 'range', min: '0', max: String(grid.length - 1), value: '0', id: 'rm-hour', 'aria-label': 'Horário da previsão' });
+  const play = el('button', { type: 'button', id: 'rm-play', 'aria-label': 'Reproduzir as horas da previsão' }, 'Reproduzir');
   const lab = el('span', { class: 'mono', style: 'min-width:150px' });
   const prev = el('button', { type: 'button', 'aria-label': 'Hora anterior' }, '◀'), next = el('button', { type: 'button', 'aria-label': 'Próxima hora' }, '▶');
-  let sel = Math.floor(data.length / 2);
+  let sel = keep && keep.sel < data.length ? keep.sel : Math.floor(data.length / 2);
   const info = el('div', { id: 'rm-info', class: 'rminfo', 'aria-live': 'polite' });
   function paint(i) {
     lab.textContent = `${fmt(grid[i], tz)} (${tzlabel(tz)})`;
@@ -2351,13 +2371,25 @@ function drawRegionMap(box, data, grid, tz, hsMax, loc, fetchedAt) {
   svg.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') pick(e); });
   slider.addEventListener('input', () => paint(+slider.value));
   prev.addEventListener('click', () => go(+slider.value - 1)); next.addEventListener('click', () => go(+slider.value + 1));
+  const stop = () => { clearInterval(box._rmTimer); box._rmTimer = null; play.textContent = 'Reproduzir'; };
+  play.addEventListener('click', () => {
+    if (box._rmTimer) return stop();
+    if (+slider.value >= grid.length - 1) go(0);   // no fim, recomeça do início
+    play.textContent = 'Pausar';
+    box._rmTimer = setInterval(() => {
+      if (!box.isConnected || +slider.value >= grid.length - 1) return stop();
+      go(+slider.value + 1);
+      if (+slider.value >= grid.length - 1) stop();
+    }, 500);
+  });
   const L = hsMax
     ? [['ok', `Hs abaixo de 70% do limite (${hsMax} m)`], ['mid', `70% a 100% do limite`], ['bad', `acima do limite`], ['none', 'sem dado (terra)']]
     : [['ok', 'até 1 m'], ['lo', '1 a 2 m'], ['mid', '2 a 3 m'], ['bad', 'acima de 3 m'], ['none', 'sem dado (terra)']];
   const legend = el('div', { class: 'rmleg' }, ...L.map(([c, t]) => el('span', {}, el('i', { class: 'c-' + c }), t)));
-  box.replaceChildren(map, info, el('div', { class: 'rmctl' }, prev, slider, next, lab), legend,
-    el('p', { class: 'sub', style: 'font-size:12.5px' }, `Modelo: melhor modelo automático da Open-Meteo. Mapa buscado às ${fmtUtc(fetchedAt)}.${hsMax ? '' : ' Sem limite de Hs no perfil: escala fixa em metros.'} A seta aponta para onde o vento vai; o número é a Hs em metros; toque ou passe o mouse numa célula para ver os dados dela no quadro acima do horário. O círculo marca o ponto da operação.`));
-  go(0);
+  box.replaceChildren(map, info, el('div', { class: 'rmctl' }, play, prev, slider, next, lab), legend,
+    el('p', { class: 'sub', style: 'font-size:12.5px' }, `Região de ${spanKm} km de lado. Modelo: melhor modelo automático da Open-Meteo. Mapa buscado às ${fmtUtc(fetchedAt)}.${hsMax ? '' : ' Sem limite de Hs no perfil: escala fixa em metros.'} A seta aponta para onde o vento vai; o número é a Hs em metros; toque ou passe o mouse numa célula para ver os dados dela no quadro acima do horário. O círculo marca o ponto da operação.`));
+  go(keep && keep.hour < grid.length ? keep.hour : 0);
+  return { get sel() { return sel; }, get hour() { return +slider.value; } };
 }
 
 /* =============================== mapa (tiles OSM, sem bibliotecas) =============================== */
@@ -2435,14 +2467,14 @@ const MapView = (() => {
 const QKEY = 'mco:quick';
 function quickLoad() {
   try { const q = JSON.parse(localStorage.getItem(QKEY) || 'null'); if (!q) return;
-    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['cur', '#q-cur'], ['dfrom', '#q-dfrom'], ['dto', '#q-dto'], ['win', '#q-win'], ['days', '#q-days'], ['name', '#q-name'], ['proj', '#q-proj'], ['client', '#h-client'], ['vessel', '#h-vessel'], ['resp', '#h-resp'], ['doc', '#h-doc'], ['obs', '#h-obs']]) if (q[k] !== undefined) $(id).value = q[k];
+    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['cur', '#q-cur'], ['dfrom', '#q-dfrom'], ['dto', '#q-dto'], ['wfrom', '#q-wfrom'], ['wto', '#q-wto'], ['win', '#q-win'], ['days', '#q-days'], ['name', '#q-name'], ['proj', '#q-proj'], ['client', '#h-client'], ['vessel', '#h-vessel'], ['resp', '#h-resp'], ['doc', '#h-doc'], ['obs', '#h-obs']]) if (q[k] !== undefined) $(id).value = q[k];
     $('#q-day').checked = !!q.day;
     if (q.an) { $('#q-an-wind').checked = !!q.an.wind; $('#q-an-wave').checked = !!q.an.wave; $('#q-an-tide').checked = !!q.an.tide; $('#q-an-cur').checked = q.an.cur !== false; }
     if (q.mode) { const r = document.querySelector(`input[name="q-mode"][value="${q.mode}"]`); if (r) r.checked = true; }
   } catch (e) { /* opcional */ }
 }
 function quickSave() {
-  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, cur: $('#q-cur').value, dfrom: $('#q-dfrom').value, dto: $('#q-dto').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
+  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, cur: $('#q-cur').value, dfrom: $('#q-dfrom').value, dto: $('#q-dto').value, wfrom: $('#q-wfrom').value, wto: $('#q-wto').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
     an: { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked, cur: $('#q-an-cur').checked }, mode: (document.querySelector('input[name="q-mode"]:checked') || {}).value })); } catch (e) { /* opcional */ }
 }
 function limitsLabel(L) {
@@ -2453,6 +2485,7 @@ function limitsLabel(L) {
   if (L.tp_min !== null && L.tp_min !== undefined) parts.push(`Tp ≥ ${L.tp_min} s`);
   if (L.cur_max !== null && L.cur_max !== undefined) parts.push(`corrente ≤ ${L.cur_max} kn`);
   if (L.dir_from !== null && L.dir_from !== undefined && L.dir_to !== null && L.dir_to !== undefined) parts.push(`sem vento de ${PONTOS16[L.dir_from]} a ${PONTOS16[L.dir_to]}`);
+  if (L.wdir_from !== null && L.wdir_from !== undefined && L.wdir_to !== null && L.wdir_to !== undefined) parts.push(`sem onda de ${PONTOS16[L.wdir_from]} a ${PONTOS16[L.wdir_to]}`);
   if (L.min_window_h) parts.push(`janela ≥ ${L.min_window_h} h`);
   if (L.daylight_only) parts.push('só diurno');
   return parts.join(', ') || 'sem limites';
@@ -2461,7 +2494,7 @@ function limitsLabel(L) {
 function applyLocToQuick(l) {
   $('#q-name').value = l.name; $('#q-proj').value = l.project || '';
   if (l.limits) {
-    const L = l.limits; $('#q-hs').value = L.hs_max ?? ''; $('#q-wind').value = L.wind_max ?? ''; $('#q-gust').value = L.gust_max ?? ''; $('#q-tp').value = L.tp_min ?? ''; $('#q-cur').value = L.cur_max ?? ''; setIdx('#q-dfrom', L.dir_from); setIdx('#q-dto', L.dir_to); if (L.min_window_h) $('#q-win').value = L.min_window_h; $('#q-day').checked = !!L.daylight_only;
+    const L = l.limits; $('#q-hs').value = L.hs_max ?? ''; $('#q-wind').value = L.wind_max ?? ''; $('#q-gust').value = L.gust_max ?? ''; $('#q-tp').value = L.tp_min ?? ''; $('#q-cur').value = L.cur_max ?? ''; setIdx('#q-dfrom', L.dir_from); setIdx('#q-dto', L.dir_to); setIdx('#q-wfrom', L.wdir_from); setIdx('#q-wto', L.wdir_to); if (L.min_window_h) $('#q-win').value = L.min_window_h; $('#q-day').checked = !!L.daylight_only;
     setMsg('#q-coordsmsg', `Local salvo "${l.name}": limites do local aplicados (${limitsLabel(L)}).`, 'ok');
   } else setMsg('#q-coordsmsg', `Local salvo "${l.name}".`, 'ok');
 }
@@ -2478,13 +2511,15 @@ async function quickRun() {
   const an = { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked, cur: $('#q-an-cur').checked };
   if (!an.wind && !an.wave && !an.tide && !an.cur) return msg('Marque pelo menos uma análise: vento, ondas, maré ou corrente.', 'bad');
   let limits;
-  try { limits = normalizeLimits({ hs_max: an.wave ? nOrNull('#q-hs') : null, tp_min: an.wave ? nOrNull('#q-tp') : null, wind_max: an.wind ? nOrNull('#q-wind') : null, gust_max: an.wind ? nOrNull('#q-gust') : null, cur_max: an.cur ? nOrNull('#q-cur') : null, dir_from: an.wind ? selIdx('#q-dfrom') : null, dir_to: an.wind ? selIdx('#q-dto') : null, min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
+  try { limits = normalizeLimits({ hs_max: an.wave ? nOrNull('#q-hs') : null, tp_min: an.wave ? nOrNull('#q-tp') : null, wind_max: an.wind ? nOrNull('#q-wind') : null, gust_max: an.wind ? nOrNull('#q-gust') : null, cur_max: an.cur ? nOrNull('#q-cur') : null, dir_from: an.wind ? selIdx('#q-dfrom') : null, dir_to: an.wind ? selIdx('#q-dto') : null, wdir_from: an.wave ? selIdx('#q-wfrom') : null, wdir_to: an.wave ? selIdx('#q-wto') : null, min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
   catch (e) { return msg(e.message, 'bad'); }
-  const days = Math.max(1, Math.min(10, parseInt($('#q-days').value, 10) || 5));
+  const days = Math.max(1, Math.min(16, parseInt($('#q-days').value, 10) || 5));
   quickSave();
   const tz = -new Date().getTimezoneOffset() / 60;
   const nm = $('#q-name').value.trim(), saved = matchLoc(c.lat, c.lon);
   const loc = { id: saved ? saved.id : null, name: nm || (saved ? saved.name : `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`), lat: c.lat, lon: c.lon, tz_offset: saved ? saved.tz_offset : tz, areas: saved ? saved.areas || '' : '', tags: saved ? saved.tags || [] : [], project: $('#q-proj').value.trim() || (saved ? saved.project || '' : '') };
+  const ini = parseStart($('#q-start').value, loc.tz_offset, now(), days);
+  if (ini.error) return msg(ini.error, 'bad');
   const header = { client: $('#h-client').value.trim(), vessel: $('#h-vessel').value.trim(), resp: $('#h-resp').value.trim(), doc: $('#h-doc').value.trim(), obs: $('#h-obs').value.trim(), project: loc.project };
   const mode = (document.querySelector('input[name="q-mode"]:checked') || {}).value || 'completo';
   const parts = [];
@@ -2498,7 +2533,7 @@ async function quickRun() {
   try {
     let mcp = null;
     try { mcp = await claude.use('mcp'); } catch (e) { mcp = null; }
-    const u = buildUrls(c.lat, c.lon, days, S.rows), need = [];
+    const u = buildUrls(c.lat, c.lon, days, S.rows, ini.startTs ? Math.ceil(ini.aheadDays) : 0), need = [];
     if (an.wind) need.push('wind'); if (an.wave || an.tide || an.cur) need.push('wave');
     S.wind = null; S.wave = null; $('#paste-wind').value = ''; $('#paste-wave').value = '';
     for (const k of need) {
@@ -2507,13 +2542,27 @@ async function quickRun() {
       $(`#paste-${k}`).value = raw; validatePaste(k);
     }
     if ((an.wind && !S.wind) || ((an.wave || an.tide || an.cur) && !S.wave)) return msg('A resposta veio sem dados horários. Confira as coordenadas (ponto em terra?).', 'bad');
-    await runAnalysis(loc, prof, days, loc.tags, msg, { analyses: an, mode, header });
+    await runAnalysis(loc, prof, days, loc.tags, msg, { analyses: an, mode, header, startTs: ini.startTs });
   } catch (e) {
     msg(`Não consegui buscar a previsão (${(e && e.message) || (e && e.code) || 'erro'}). Verifique a internet ou use o modo completo abaixo.`, 'bad');
   } finally { btn.disabled = false; }
 }
+/* início opcional da análise, em "AAAA-MM-DDTHH:MM" no fuso do local (tz em horas de UTC). Total (agora → fim) até 16 dias. */
+function parseStart(value, tz, nowTs, days) {
+  if (!value) return { startTs: null };
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!m) return { error: 'Início inválido. Informe data e hora.' };
+  const H0 = Math.floor(nowTs / HOUR) * HOUR;
+  const startTs = Math.floor((Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 1000 - tz * 3600) / HOUR) * HOUR;
+  if (!Number.isFinite(startTs)) return { error: 'Início inválido. Informe data e hora.' };
+  if (startTs < H0) return { error: 'O início tem de ser a partir de agora.' };
+  const ahead = startTs - H0, maxDays = Math.floor((16 * 86400 - ahead) / 86400);
+  if (maxDays < 1) return { error: 'O início passa do limite de 16 dias à frente.' };
+  if (days > maxDays) return { error: `Início e duração passam de 16 dias à frente. Com esse início, use no máximo ${maxDays} dia(s).` };
+  return { startTs, aheadDays: ahead / 86400 };
+}
 async function runAnalysis(loc, prof, days, tags, msg, opts = {}) {
-  const startTs = Math.floor(now() / HOUR) * HOUR, endTs = startTs + days * 86400;
+  const startTs = opts.startTs || Math.floor(now() / HOUR) * HOUR, endTs = startTs + days * 86400;
   const ok = [], errors = [];
   for (const row of S.rows) {
     try { const r = buildSeries(opts.analyses && !opts.analyses.wind ? null : S.wind, opts.analyses && !(opts.analyses.wave || opts.analyses.tide || opts.analyses.cur) ? null : S.wave, row, startTs, endTs); ok.push({ id: row.label, label: row.label || 'Fonte', fetched_at: now(), ...r }); }
@@ -2525,7 +2574,7 @@ async function runAnalysis(loc, prof, days, tags, msg, opts = {}) {
   const ctx = { result, errors, location: { name: loc.name, lat: loc.lat, lon: loc.lon, tz_offset: loc.tz_offset, areas: loc.areas || '', project: loc.project || '' }, profileName: prof.name, tags,
     analyses: opts.analyses || { wind: true, wave: true, tide: true, cur: true }, mode: opts.mode || 'completo', header: opts.header || {},
     navyWarnings: warningsFor(S.navy.warnings || [], startTs, endTs, S.navy.fetched_at || 0), navyInfo: { fetched_at: S.navy.fetched_at, status: S.navy.status },
-    navyStale: !S.navy.fetched_at || (now() - S.navy.fetched_at) > 7 * 86400, generatedTs: now() };
+    navyStale: !S.navy.fetched_at || (now() - S.navy.fetched_at) > 7 * 86400, generatedTs: now(), startAheadDays: (startTs - Math.floor(now() / HOUR) * HOUR) / 86400 };
   showReport(ctx);
   msg(errors.length ? `Relatório gerado; ${errors.length} fonte(s) com problema (veja os alertas).` : 'Relatório gerado.', errors.length ? 'warn' : 'ok');
   await saveAnalysis(ctx, loc, prof);
