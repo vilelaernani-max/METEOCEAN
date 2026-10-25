@@ -781,6 +781,20 @@ const REPORT_CSS = `
 .rp .foot{color:var(--mut);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .rp .mine{color:var(--warn);font-weight:600}
 .rp .age{color:var(--mut);font-size:13px;margin:8px 0}
+.rmap{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#dde7ec;max-width:100%}
+.rmap .tiles{position:absolute;inset:0}
+.rmap .tiles img{position:absolute;width:256px;height:256px;pointer-events:none}
+.rmap svg{position:absolute;inset:0;width:100%;height:100%}
+.rmap .c-ok{fill:var(--go)}.rmap .c-lo{fill:var(--c4)}.rmap .c-mid{fill:var(--c2)}.rmap .c-bad{fill:var(--nogo)}.rmap .c-none{fill:none;stroke:#52656e;stroke-dasharray:3 3}
+.rmap .cell{fill-opacity:.62}
+.rmap text{font:600 10px var(--font-mono);fill:#13232b;paint-order:stroke;stroke:#fff;stroke-width:2px;stroke-linejoin:round;text-anchor:middle}
+.rmap .arr{fill:#13232b;stroke:#fff;stroke-width:1.3;stroke-linejoin:round}
+.rmap .att{position:absolute;right:4px;bottom:2px;font:10px var(--font-body);background:rgba(255,255,255,.8);color:#222;padding:1px 5px;border-radius:3px}
+.rmctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.rmctl input[type=range]{flex:1 1 200px;min-width:0;width:auto;padding:0}
+.rmleg{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;margin:6px 0}
+.rmleg i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-1px;opacity:.8}
+.rmleg i.c-ok{background:var(--go)}.rmleg i.c-lo{background:var(--c4)}.rmleg i.c-mid{background:var(--c2)}.rmleg i.c-bad{background:var(--nogo)}.rmleg i.c-none{border:1px dashed var(--mut)}
 .rp .age.alert.stale{background:var(--nogo);border-color:var(--nogo);color:#fff;font-weight:600}
 .rp .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
 .rp .kpi{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:8px;padding:10px 12px}
@@ -800,7 +814,8 @@ const REPORT_CSS = `
 .rp .dir{fill:none}
 .rp .wind2{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr);gap:12px 24px;align-items:start}
 .rp .wind2 svg{max-width:420px;margin:0 auto}
-@media (max-width:760px){.rp .wind2{grid-template-columns:1fr}}
+.rp .wind2>*{min-width:0}
+@media (max-width:760px){.rp .wind2{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:700px){.rp .charts{grid-template-columns:1fr}}
 `;
 
@@ -2186,6 +2201,122 @@ async function generate() {
   await runAnalysis(loc, prof, days, anTags.get(), msg);
 }
 
+/* =============================== mapa da região: onda + vento =============================== */
+const RM_N = 7, RM_SPAN_KM = 300;
+/* grade n×n centrada no ponto; linha 0 = norte. O passo em longitude é corrigido pela latitude. */
+function gridPoints(lat, lon, n = RM_N, spanKm = RM_SPAN_KM) {
+  const step = spanKm / (n - 1), dLat = step / 111.32, dLon = step / (111.32 * Math.max(Math.cos(lat * Math.PI / 180), 0.05));
+  const h = (n - 1) / 2, pts = [];
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) pts.push({ r, c, lat: lat + (h - r) * dLat, lon: lon + (c - h) * dLon });
+  return pts;
+}
+/* classe de cor da Hs: relativa ao limite do perfil (70% e 100%); sem limite, escala fixa 1/2/3 m */
+function hsClass(hs, hsMax) {
+  if (hs === null || hs === undefined || !Number.isFinite(hs)) return 'none';
+  if (hsMax) return hs > hsMax ? 'bad' : hs >= 0.7 * hsMax ? 'mid' : 'ok';
+  return hs <= 1 ? 'ok' : hs <= 2 ? 'lo' : hs <= 3 ? 'mid' : 'bad';
+}
+async function rmJson(url) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 30000);
+  try {
+    const r = await fetch(url, { signal: ctl.signal });
+    if (r.status === 429) throw new Error('limite de uso da Open-Meteo atingido; tente de novo em alguns minutos');
+    const txt = await r.text();
+    if (!r.ok) { let why = ''; try { why = JSON.parse(txt).reason || ''; } catch (e) { /* texto simples */ } throw new Error(`Open-Meteo respondeu ${r.status}${why ? ': ' + why : ''}`); }
+    return JSON.parse(txt);
+  } finally { clearTimeout(t); }
+}
+/* devolve, para cada ponto da grade, séries alinhadas a tsList: hs (m), kn (nós), dir (graus, de onde vem) */
+async function fetchRegion(lat, lon, tsList) {
+  const pts = gridPoints(lat, lon), la = pts.map(p => p.lat.toFixed(3)).join(','), lo = pts.map(p => p.lon.toFixed(3)).join(',');
+  const fd = Math.max(2, Math.min(16, Math.ceil((tsList[tsList.length - 1] - now()) / 86400) + 2));
+  const common = `latitude=${la}&longitude=${lo}&timezone=UTC&timeformat=unixtime&forecast_days=${fd}`;
+  const [w, v] = await Promise.all([
+    rmJson(`https://api.open-meteo.com/v1/forecast?${common}&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn`),
+    rmJson(`https://marine-api.open-meteo.com/v1/marine?${common}&hourly=wave_height`)]);
+  const wa = Array.isArray(w) ? w : [w], va = Array.isArray(v) ? v : [v];
+  if (wa.length !== pts.length || va.length !== pts.length) throw new Error('a resposta da grade veio incompleta');
+  const col = (j, key, ts) => { const h = j.hourly || {}, t = (h.time || []).map(toTs), a = h[key] || [], m = new Map(t.map((x, i) => [x, a[i]])); return ts.map(x => numOrNull(m.get(x))); };
+  return pts.map((p, i) => ({ ...p, hs: col(va[i], 'wave_height', tsList), kn: col(wa[i], 'wind_speed_10m', tsList), dir: col(wa[i], 'wind_direction_10m', tsList) }));
+}
+function mountRegionMap(ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, grid = res.grid, hsMax = res.limits.hs_max;
+  const btn = el('button', { type: 'button', class: 'primary' }, 'Ver mapa da região');
+  const msg = el('span', { class: 'msg', 'aria-live': 'polite' });
+  const box = el('div', { hidden: true });
+  const wrap = el('div', { class: 'rmwrap', style: 'margin:14px 0' },
+    el('h2', {}, 'Mapa da região: onda e vento'),
+    el('p', { class: 'sub' }, 'Quadrado de 300 km em volta do ponto (grade de 7×7). Cor = altura de onda; seta = para onde o vento vai. Buscado na hora, só na tela (não vai no HTML nem no PDF).'),
+    el('div', { class: 'row' }, btn, msg), box);
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Buscando a grade na Open-Meteo…';
+    try {
+      const data = await fetchRegion(ctx.location.lat, ctx.location.lon, grid);
+      msg.textContent = ''; btn.textContent = 'Atualizar mapa';
+      drawRegionMap(box, data, grid, tz, hsMax, ctx.location, now());
+    } catch (e) {
+      msg.className = 'msg bad';
+      msg.textContent = 'Não consegui carregar o mapa: ' + (e && e.message ? e.message : 'erro') + '. O relatório não foi afetado.';
+    } finally { btn.disabled = false; }
+  });
+  return wrap;
+}
+function drawRegionMap(box, data, grid, tz, hsMax, loc, fetchedAt) {
+  box.hidden = false;
+  const W = Math.max(280, Math.floor(box.clientWidth || box.parentElement.clientWidth || 600)), H = Math.min(W, 720), TILE = 256;
+  const ll2t = (la, lo, zz) => { const r = la * Math.PI / 180; return [(lo + 180) / 360 * 2 ** zz, (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** zz]; };
+  const nw = data[0], se = data[data.length - 1], N = RM_N;
+  let z = 4;
+  for (let zz = 4; zz <= 10; zz++) {
+    const a = ll2t(nw.lat, nw.lon, zz), b = ll2t(se.lat, se.lon, zz), N = RM_N;
+    if ((b[0] - a[0]) * TILE * (N / (N - 1)) + 8 <= W && (b[1] - a[1]) * TILE * (N / (N - 1)) + 8 <= H) z = zz; else break;
+  }
+  const [cx, cy] = ll2t(loc.lat, loc.lon, z), x0 = cx - W / 2 / TILE, y0 = cy - H / 2 / TILE, nT = 2 ** z;
+  const tiles = el('div', { class: 'tiles' });
+  for (let tx = Math.floor(x0); tx < x0 + W / TILE; tx++) for (let ty = Math.floor(y0); ty < y0 + H / TILE; ty++) {
+    if (ty < 0 || ty >= nT) continue;
+    const wx = ((tx % nT) + nT) % nT;
+    tiles.append(el('img', { alt: '', draggable: 'false', src: `https://tile.openstreetmap.org/${z}/${wx}/${ty}.png`, style: `left:${Math.round((tx - x0) * TILE)}px;top:${Math.round((ty - y0) * TILE)}px` }));
+  }
+  const a = ll2t(nw.lat, nw.lon, z), b = ll2t(se.lat, se.lon, z);
+  const cw = (b[0] - a[0]) * TILE / (N - 1), ch = (b[1] - a[1]) * TILE / (N - 1);
+  const px = d => [(ll2t(d.lat, d.lon, z)[0] - x0) * TILE, (ll2t(d.lat, d.lon, z)[1] - y0) * TILE];
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Mapa de altura de onda e direção do vento em grade de 7 por 7 pontos');
+  const map = el('div', { class: 'rmap', style: `height:${H}px` }, tiles, svg, el('div', { class: 'att' }, '© OpenStreetMap'));
+  const slider = el('input', { type: 'range', min: '0', max: String(grid.length - 1), value: '0', id: 'rm-hour', 'aria-label': 'Horário da previsão' });
+  const lab = el('span', { class: 'mono', style: 'min-width:150px' });
+  const prev = el('button', { type: 'button', 'aria-label': 'Hora anterior' }, '◀'), next = el('button', { type: 'button', 'aria-label': 'Próxima hora' }, '▶');
+  function paint(i) {
+    lab.textContent = `${fmt(grid[i], tz)} (${tzlabel(tz)})`;
+    const parts = [];
+    for (const d of data) {
+      const [x, y] = px(d), hs = d.hs[i], kn = d.kn[i], dir = d.dir[i], cls = hsClass(hs, hsMax);
+      const tip = `Hs ${hs === null ? 'sem dado' : hs.toFixed(1) + ' m'} · vento ${kn === null ? 'sem dado' : Math.round(kn) + ' kn'}${dir === null ? '' : ' de ' + pontoDe(dir) + ' (' + Math.round(dir) + '°)'}`;
+      let g = `<g><title>${esc(tip)}</title><rect class="cell c-${cls}" x="${(x - cw / 2 + 1).toFixed(1)}" y="${(y - ch / 2 + 1).toFixed(1)}" width="${(cw - 2).toFixed(1)}" height="${(ch - 2).toFixed(1)}" rx="3"/>`;
+      if (hs !== null) g += `<text x="${x.toFixed(1)}" y="${(y - ch / 2 + 11).toFixed(1)}">${hs.toFixed(1)}</text>`;
+      if (dir !== null && kn !== null) {
+        const sc = (Math.min(cw, ch) / 46) * (0.55 + Math.min(kn, 40) / 40 * 0.55);
+        g += `<path class="arr" transform="translate(${x.toFixed(1)} ${(y + ch * 0.1).toFixed(1)}) rotate(${((dir + 180) % 360).toFixed(0)}) scale(${sc.toFixed(2)})" d="M0,-9 L5,6 L0,3 L-5,6 Z"/>`;
+      }
+      parts.push(g + '</g>');
+    }
+    const [mx, my] = px(loc.lat !== undefined ? { lat: loc.lat, lon: loc.lon } : data[24]);
+    parts.push(`<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="5" fill="none" stroke="#13232b" stroke-width="2"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="2" fill="#fff"/>`);
+    svg.innerHTML = parts.join('');
+  }
+  const go = i => { i = Math.max(0, Math.min(grid.length - 1, i)); slider.value = String(i); paint(i); };
+  slider.addEventListener('input', () => paint(+slider.value));
+  prev.addEventListener('click', () => go(+slider.value - 1)); next.addEventListener('click', () => go(+slider.value + 1));
+  const L = hsMax
+    ? [['ok', `Hs abaixo de 70% do limite (${hsMax} m)`], ['mid', `70% a 100% do limite`], ['bad', `acima do limite`], ['none', 'sem dado (terra)']]
+    : [['ok', 'até 1 m'], ['lo', '1 a 2 m'], ['mid', '2 a 3 m'], ['bad', 'acima de 3 m'], ['none', 'sem dado (terra)']];
+  const legend = el('div', { class: 'rmleg' }, ...L.map(([c, t]) => el('span', {}, el('i', { class: 'c-' + c }), t)));
+  box.replaceChildren(map, el('div', { class: 'rmctl' }, prev, slider, next, lab), legend,
+    el('p', { class: 'sub', style: 'font-size:12.5px' }, `Modelo: melhor modelo automático da Open-Meteo. Mapa buscado às ${fmtUtc(fetchedAt)}.${hsMax ? '' : ' Sem limite de Hs no perfil: escala fixa em metros.'} A seta aponta para onde o vento vai; o número é a Hs em metros; passe o dedo ou o mouse sobre a célula para ver o vento. O círculo marca o ponto da operação.`));
+  go(0);
+}
+
 /* =============================== mapa (tiles OSM, sem bibliotecas) =============================== */
 const MapView = (() => {
   const TILE = 256, el_ = () => $('#map');
@@ -2360,6 +2491,7 @@ function showReport(ctx) {
   S.current = ctx;
   $('#report').innerHTML = buildReport(ctx);
   ageFill($('#report'));
+  { const v = $('#report .verdict'), m = mountRegionMap(ctx); if (v) v.after(m); else $('#report').append(m); }
   $('#report-wrap').classList.add('on');
   $('#report-wrap').scrollIntoView({ block: 'start' });
 }
