@@ -1,6 +1,7 @@
 """Limites operacionais configuráveis e avaliação hora a hora (GO / NO-GO)."""
 import math
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 HOUR = 3600
 
@@ -12,6 +13,11 @@ DEFAULT_LIMITS = {
     "daylight_only": False,
     "min_window_h": 4,    # janela só conta se tiver ao menos N horas seguidas
 }
+
+
+def fmt1(value):
+    """Uma casa decimal, empate para cima: igual ao toFixed(1) do app web (o :.1f do Python arredonda empate para par)."""
+    return str(Decimal(value).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
 
 
 def normalize(raw):
@@ -101,9 +107,9 @@ def evaluate_hour(row, limits, day_intervals=None):
         if value is None:
             missing.append(label)
         elif kind == "max" and value > limit:
-            reasons.append(f"{label} {value:.1f} > {limit:g} {unit}")
+            reasons.append(f"{label} {fmt1(value)} > {limit:g} {unit}")
         elif kind == "min" and value < limit:
-            reasons.append(f"{label} {value:.1f} < {limit:g} {unit}")
+            reasons.append(f"{label} {fmt1(value)} < {limit:g} {unit}")
 
     check(row.get("hs"), limits.get("hs_max"), "Hs", "m", "max")
     check(row.get("tp"), limits.get("tp_min"), "Tp", "s", "min")

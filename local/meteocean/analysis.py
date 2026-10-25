@@ -7,6 +7,8 @@ Definições:
   * janela otimista       -> GO se QUALQUER fonte disser GO
   * concordância          -> % das horas (com >= 2 fontes opinando) em que todas decidem igual
 """
+import math
+
 from . import limits as lim
 
 HOUR = 3600
@@ -113,7 +115,7 @@ def analyze(source_results, limits, lat, lon, start_ts, end_ts):
         "conservative": {"status": cons, "n_sources": nsrc, "windows": cons_w, "dropped_short": cons_drop},
         "optimistic": {"status": opt, "windows": opt_w},
         "agreement": {"compared": compared, "agree": agree_ok, "disagree": compared - agree_ok,
-                      "pct": round(100 * agree_ok / compared, 1) if compared else None},
+                      "pct": math.floor(1000 * agree_ok / compared + 0.5) / 10 if compared else None},
     }
 
 
