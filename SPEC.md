@@ -184,3 +184,53 @@ Pedido do Ernani (29/10/2026): "cadastrar equipamentos; na previsão usar o limi
 
 ## Fora do escopo
 Fabricante, modelo, número de série, limites de operação (diurno, janela mínima) dentro do equipamento, a regra "limite mais alto", seleção de equipamento no modo completo (colagem manual).
+
+---
+
+# Spec 5: gráficos do resumido, corrente e maré, identidade e ajuda
+
+Pedido do Ernani (29/10/2026), em quatro partes. Mapa de módulos (independentes, nesta ordem):
+
+| Módulo | O que entrega | Depende de | Ciclo |
+|---|---|---|---|
+| M1 Resumido | ordem e gráficos por variável (vento, onda) | nada | leve (tela) |
+| M2 Corrente e maré | gráficos de corrente e de maré no resumido e no completo, quando selecionados | M1 (ordem do resumido) | leve |
+| M3 Identidade | logotipo discreto no app e nos relatórios (tela, HTML, PDF) e "Desenvolvido por" | nada | leve |
+| M4 Ajuda | aba Ajuda e pontos de ajuda onde convém | M3 (rodapé) | leve |
+
+## M1 Resumido: ordem
+Depois do cabeçalho, indicadores, aviso de idade, veredito, janelas e linha do tempo, nesta ordem (cada bloco só aparece se a análise foi marcada):
+1. **Gráfico de vento e onda juntos** (o atual).
+2. **Embaixo: rosa dos ventos e rosa de ondas**, lado a lado (o atual).
+3. **Vento (gráfico):** intensidade (linha), rajada (linha mais fina, tracejada) e direção (setas numa faixa abaixo do gráfico), com os limites de vento e de rajada.
+4. **Onda (gráfico):** Hs (linha, eixo esquerdo), Tp (linha, eixo direito) e direção (setas numa faixa abaixo), com o limite de Hs e de Tp.
+5. **Corrente (gráfico):** ver M2.
+6. **Maré (gráfico):** ver M2.
+7. Limites aplicados e rodapé.
+"Ps" do pedido = **período de pico (Tp)**. A direção do vento usa a seta que aponta para onde ele vai (como no gráfico combinado); a direção da onda, de onde ela vem, com a seta apontando para onde a onda vai; a legenda diz isso e a bússola do Norte aparece nos gráficos com setas.
+Aceite: ordem acima; cada gráfico traz as séries pedidas; blocos de variáveis desmarcadas não aparecem; o completo não perde nenhuma seção que já tem.
+
+## M2 Corrente e maré
+- Quando **corrente** estiver marcada: gráfico de velocidade (linha, com limite de corrente) e direção (setas), tanto no resumido quanto no completo (o completo já tem os gráficos de corrente; o resumido passa a ter o de velocidade com setas e o stick plot atual).
+- Quando **maré** estiver marcada: curva da maré (nível do mar em m, com preamar e baixa-mar marcadas) no resumido (o completo já tem).
+- Sem dado de corrente ou de maré no ponto: aviso curto no lugar do gráfico, como hoje.
+- Aceite: com cada análise marcada e com dados, o gráfico aparece nos dois modos; desmarcada, não aparece; sem dado, aparece o aviso e o relatório não quebra.
+
+## M3 Identidade
+- **Logotipo** (o selo circular do cartão enviado, recortado com fundo transparente), embutido no `index.html` (arquivo único; versão com fundo branco para o PDF). Discreto: no cabeçalho do app (cerca de 36 px), no cabeçalho do relatório na tela e no HTML baixado (cerca de 40 px, ao lado do título) e no PDF (cabeçalho, pequeno).
+- **"Desenvolvido por Ernani Vilela · Oceanógrafo Surveyor · © 2026"** com e-mail e WhatsApp do cartão (vilelaernani@gmail.com, (35) 99159-5388), em letra pequena e cor suave, no rodapé do app, no rodapé de todos os relatórios (tela, HTML, PDF) e na Ajuda.
+- Aceite: logotipo visível sem atrapalhar o conteúdo (claro e escuro), imagem leve (até ~40 KB no total), rodapé presente nos três formatos.
+
+## M4 Ajuda
+- Nova aba **Ajuda** com roteiro curto e perguntas frequentes: como gerar uma análise; limites, perfis e equipamentos; direção bloqueada; resumido x completo; como ler o gráfico (setas, Norte, cores do frio ao quente); mapa da região; avisos da Marinha e idade da previsão; backup e dados salvos; contato ("Desenvolvido por").
+- Pontos de ajuda ("?" que leva ao trecho da Ajuda) ao lado de: equipamentos, direção bloqueada, tipo de relatório e o gráfico combinado.
+- Aceite: a aba abre no celular sem rolagem lateral; cada "?" abre a aba Ajuda no trecho certo; o texto está em português simples.
+
+## Testes
+`tests/resumido.js` (ordem e novos gráficos), `tests/equipamentos.js`/novo `tests/identidade.js` (logotipo, rodapé nas três saídas), novo `tests/ajuda.js`, e os existentes continuam passando.
+
+## Fora do escopo
+Boletim Meteoromarinha (depende da coleta pelo GitHub), uso offline, mudar os gráficos do relatório completo além do que é pedido.
+
+## Perguntas em aberto
+Nenhuma que bloqueie. Suposições a corrigir: (1) rajada em linha tracejada no gráfico de vento; (2) direção em setas numa faixa abaixo de cada gráfico; (3) e-mail e WhatsApp visíveis no rodapé dos relatórios que você envia a clientes.
