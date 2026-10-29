@@ -252,7 +252,7 @@ O app, a ajuda e os relatórios (tela, HTML, PDF) funcionam em **português** e 
 
 ## Decisões
 - **Idioma inicial:** o do navegador (`pt*` → português; qualquer outro → inglês). Depois, vale o que o usuário escolher e fica salvo.
-- **Botão** "PT | EN" no cabeçalho (celular incluso). Troca na hora, sem recarregar e sem perder o que foi digitado; um relatório aberto é refeito no novo idioma.
+- **Botão com bandeirinhas:** Brasil (português) e Estados Unidos (inglês), lado a lado no cabeçalho (celular incluso); a do idioma atual fica destacada. As bandeiras são desenhadas em SVG dentro do arquivo (emoji de bandeira não aparece no Windows), com texto alternativo "Português" e "English" para leitor de tela. Mesmo link, nada de endereço separado. Troca na hora, sem recarregar e sem perder o que foi digitado; um relatório aberto é refeito no novo idioma.
 - **Conteúdo do usuário não é traduzido:** nomes de locais, equipamentos, cliente, embarcação, responsável.
 - **Avisos da Marinha** vêm em português da fonte: continuam em português, com uma nota em inglês ("Source text in Portuguese").
 - **Unidades:** as mesmas do app (nós, m, s, °). Em inglês, "kt" no lugar de "nós"; e "N, NE, E…" já são iguais. Ponto decimal em inglês, vírgula em português, como hoje.

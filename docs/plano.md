@@ -105,7 +105,7 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 ---
 
 # Plano 6: versão em inglês (spec 6)
-- [ ] L1 Base: `I18N`, `t()`, idioma (navegador e preferência salva), botão PT/EN, `lang` do HTML. Teste: chaves pareadas.
+- [ ] L1 Base: `I18N`, `t()`, idioma (navegador e preferência salva), bandeirinhas Brasil/EUA em SVG (botão de idioma), `lang` do HTML. Teste: chaves pareadas.
 - [ ] L2 App: extrair os textos fixos do HTML (`data-i18n`) e das funções (`t()`), por área: análise, locais, perfis, equipamentos, histórico, mapa, mensagens e erros, Ajuda. Teste: tela em inglês sem português.
 - [ ] L3 Relatórios: `buildReport`, HTML baixado e `buildPdf` pelo idioma; legendas e eixos dos gráficos; nomes de arquivo. Teste: relatórios resumido e completo em inglês (tela, HTML, PDF via `pdftotext`).
 - [ ] L4 Entorno: datas, números, título da aba, manifest; troca de idioma sem perder dados; artefato republicado.
