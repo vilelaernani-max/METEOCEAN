@@ -71,3 +71,4 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - [x] G6 (29/10/2026) Linha suave de vento (curva por todas as horas, colorida) sob setas menores desenhadas por cima; PDF acompanha; testes atualizados.
 - [x] G7 (29/10/2026) Seta do vento com haste e ponta, estreita, com contorno escuro, para a direção ficar legível (tela e PDF); testes de formato e tamanho.
 - [x] G8 (29/10/2026) Bússola com o Norte no topo do gráfico (tela e PDF) e nota explicando a seta do vento; testes atualizados.
+- [x] G9 (29/10/2026) Relatório resumido com o gráfico combinado e as rosas de vento e de ondas (tela, HTML e PDF); completo inalterado. Teste `tests/resumido.js`.

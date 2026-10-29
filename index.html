@@ -793,6 +793,9 @@ const REPORT_CSS = `
 .rp .foot{color:var(--mut);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .rp .mine{color:var(--warn);font-weight:600}
 .rp .age{color:var(--mut);font-size:13px;margin:8px 0}
+.rp .roses{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 24px}
+.rp .roses>div{min-width:0}
+.rp .roses svg{max-width:420px;margin:0 auto}
 .rp .dualsrc{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--mut);margin:4px 0}
 .rp .dualleg{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center;font-size:12.5px;margin:6px 0}
 .rp .dualscroll{overflow-x:auto}
@@ -965,6 +968,11 @@ function windRoseSvg(res) {
   const st = windStats(res);
   if (!st) return '<p class="sub">Sem dados de direção do vento neste ponto.</p>';
   return roseSvg(st, SPD_CLASSES, ['var(--c4)', 'var(--c1)', 'var(--c2)', 'var(--nogo)'], 'Rosa dos ventos: frequência por direção e classe de velocidade');
+}
+function waveRoseSvg(res, tz) {
+  const w = waveStats(res, tz);
+  if (!w || !w.tot) return '<p class="sub">Sem dados de direção das ondas neste ponto.</p>';
+  return roseSvg(w, HS_CLASSES, ['var(--c4)', 'var(--c1)', 'var(--c2)', 'var(--nogo)'], 'Rosa de ondas: frequência por direção e classe de Hs');
 }
 function roseSvg(st, classes, fills, aria) {
   const W = 420, H = 400, cx = W / 2, cy = 196, R = 150, maxc = Math.max(...st.cnt);
@@ -1457,8 +1465,9 @@ ${hdr}
   if (brief) {
     const charts = [];
     if (A.wind && A.wave) charts.push(chart('Vento e onda juntos', dualChartHtml(res, tz, 0, lm)));
-    if (A.wind) charts.push(chart('Vento a 10 m', lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')));
-    if (A.wave) charts.push(chart('Altura significativa (Hs)', lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')));
+    else if (A.wind) charts.push(chart('Vento a 10 m', lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')));
+    else if (A.wave) charts.push(chart('Altura significativa (Hs)', lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')));
+    const roses = [A.wind ? chart('Rosa dos ventos', windRoseSvg(res)) : '', A.wave ? chart('Rosa de ondas', waveRoseSvg(res, tz)) : ''].filter(Boolean);
     const t = A.tide ? tideStats(res, tz, ctx.generatedTs) : null;
     return `${head}
 ${hasLim ? kpis(res, tz) : ''}
@@ -1467,6 +1476,7 @@ ${alertHtml}
 ${hasLim ? verdict : ''}
 ${hasLim ? `<h2>Janelas — cenário conservador</h2>${windowsTable(cw, grid, tz, true)}<h2>Linha do tempo por fonte</h2>${legend}${timelineSvg(res, tz, rows)}` : ''}
 ${charts.length ? `<div class="charts">${charts.join('')}</div>` : ''}
+${roses.length ? `<div class="roses">${roses.join('')}</div>` : ''}
 ${A.cur ? `<h2>Corrente</h2>${curSectionHtml(ctx, true)}` : ''}
 ${A.tide ? `<h2>Maré</h2>${t ? `<p>Agora: maré <b>${t.state || '–'}</b> · amplitude <b>${{ crescendo: 'crescendo (rumo à sizígia)', diminuindo: 'diminuindo (rumo à quadratura)', 'estável': 'estável' }[t.trend]}</b>${t.nextSyz ? ` · próxima sizígia ${fmt(t.nextSyz.ts, tz)}` : ''}. Próximas: ${t.next.map(e => `${e.kind === 'HW' ? 'PM' : 'BM'} ${fmt(e.ts, tz)} (${fm(e.h)})`).join('; ')}.</p>${tideChartSvg(res, tz, t)}` : '<p class="sub">Sem previsão de nível do mar para este ponto.</p>'}` : ''}
 ${hasLim ? `<h2>Limites aplicados</h2>${limitsTable(lm)}` : ''}
@@ -1820,6 +1830,17 @@ function pdfWindSection(pdf, res) {
   pdfWindRose(pdf, res, cx, cy, R);
   pdf.y = Math.max(pdf.y, cy + R + 30) + 6;
 }
+function pdfRosesBrief(pdf, ctx) {
+  const res = ctx.result, tz = ctx.location.tz_offset, A = ctx.analyses || {};
+  const ws = A.wind ? windStats(res) : null, wv = A.wave ? waveStats(res, tz) : null, items = [];
+  if (ws) items.push(['Rosa dos ventos', (cx, cy, R) => pdfWindRose(pdf, res, cx, cy, R)]);
+  if (wv && wv.tot) items.push(['Rosa de ondas', (cx, cy, R) => pdfRose(pdf, wv, HS_CLASSES, [PDF_COL.c[3], PDF_COL.c[0], PDF_COL.c[1], PDF_COL.nogo], cx, cy, R)]);
+  if (!items.length) return;
+  pdf.ensure(230); pdf.h2(items.map(i => i[0]).join(' e '));
+  const R = 64, cy = pdf.y + R + 14, W = PDF_W - 2 * PDF_M;
+  items.forEach(([titulo, draw], k) => { const cx = PDF_M + W * (k + 0.5) / items.length; draw(cx, cy, R); });
+  pdf.y = cy + R + 38;
+}
 function pdfWaveSection(pdf, ctx) {
   const res = ctx.result, tz = ctx.location.tz_offset, w = waveStats(res, tz);
   if (!w) return;
@@ -1954,8 +1975,9 @@ function buildPdf(ctx) {
     pdfTimeline(pdf, res, tz, [['Conservador', res.conservative.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])]); }
   if (brief) {
     if (A.wind && A.wave) pdfDualChart(pdf, res, tz, lm);
-    if (A.wind) pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
-    if (A.wave) pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
+    else if (A.wind) pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
+    else if (A.wave) pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
+    pdfRosesBrief(pdf, ctx);
     if (A.cur) pdfCurSection(pdf, ctx, true);
     if (A.tide) pdfTideSection(pdf, ctx, true);
   } else {
