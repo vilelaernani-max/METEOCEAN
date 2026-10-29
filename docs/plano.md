@@ -101,3 +101,12 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - Decisões de construção: gráfico genérico `twoAxisBody` (tela) e `pdfTwoAxis` (PDF) com a mesma configuração (`windCfg`, `waveCfg`, `curCfg`); a direção da corrente já é "para onde vai" (sem somar 180°); logotipo em WebP (tela e HTML) e JPEG sobre o azul do cabeçalho (PDF), cerca de 8 KB cada em base64; botões "?" só na tela (não vão no HTML nem no PDF); botão "Voltar" na Ajuda leva à aba de onde veio.
 - Fora do plano: o texto "Fonte:" aparece em cada gráfico por variável do resumido; no resumido só com vento ou só com ondas, saiu o gráfico simples antigo (o bloco por variável o substitui).
 - Ajuste (29/10/2026, após relato de PDF sem logotipo no celular): o logotipo do PDF passou a ser imagem RGB crua 96×96 gerada na carga da página (sem depender de decodificador JPEG; o JPEG fica só de reserva), o cabeçalho da primeira página ganhou "Ernani Vilela · Oceanógrafo Surveyor", e o nome dos arquivos PDF e HTML agora traz data e hora (`-AAAAMMDD-HHMM`) para não confundir com um arquivo antigo do mesmo dia. Verificado com Poppler e PDFium (motor do Chrome); causa no celular do usuário não reproduzida. Testes em `tests/identidade.js`.
+
+---
+
+# Plano 6: versão em inglês (spec 6)
+- [ ] L1 Base: `I18N`, `t()`, idioma (navegador e preferência salva), botão PT/EN, `lang` do HTML. Teste: chaves pareadas.
+- [ ] L2 App: extrair os textos fixos do HTML (`data-i18n`) e das funções (`t()`), por área: análise, locais, perfis, equipamentos, histórico, mapa, mensagens e erros, Ajuda. Teste: tela em inglês sem português.
+- [ ] L3 Relatórios: `buildReport`, HTML baixado e `buildPdf` pelo idioma; legendas e eixos dos gráficos; nomes de arquivo. Teste: relatórios resumido e completo em inglês (tela, HTML, PDF via `pdftotext`).
+- [ ] L4 Entorno: datas, números, título da aba, manifest; troca de idioma sem perder dados; artefato republicado.
+- [ ] L5 Fechamento: todos os testes em português e inglês, GitHub, artefato, vídeo opcional em inglês.

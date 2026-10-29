@@ -234,3 +234,41 @@ Boletim Meteoromarinha (depende da coleta pelo GitHub), uso offline, mudar os gr
 
 ## Perguntas em aberto
 Nenhuma que bloqueie. Suposições a corrigir: (1) rajada em linha tracejada no gráfico de vento; (2) direção em setas numa faixa abaixo de cada gráfico; (3) e-mail e WhatsApp visíveis no rodapé dos relatórios que você envia a clientes.
+
+---
+
+# Spec 6: versão em inglês (troca PT/EN)
+
+## Objetivo
+O app, a ajuda e os relatórios (tela, HTML, PDF) funcionam em **português** e em **inglês**, com um botão de idioma. Mesmo arquivo, mesmo link; nada de segundo site.
+
+## Mapa de módulos
+| Módulo | O que faz | Depende de | Risco |
+|---|---|---|---|
+| L1 Base | dicionário `I18N` (pt/en), função `t(chave, vars)`, idioma salvo no navegador, botão PT/EN no cabeçalho | nada | médio |
+| L2 App | todos os textos fixos e gerados da tela (abas, formulários, mensagens, erros, ajuda, rodapé) passam por `t()` | L1 | alto (muito texto) |
+| L3 Relatórios | tela, HTML e PDF no idioma escolhido (títulos, tabelas, legendas dos gráficos, veredito, janelas, aviso de idade, rodapé) | L1, L2 | alto |
+| L4 Entorno | `lang` do HTML, título da aba, nomes de arquivo, datas e números no formato do idioma, manifest | L1 | leve |
+
+## Decisões
+- **Idioma inicial:** o do navegador (`pt*` → português; qualquer outro → inglês). Depois, vale o que o usuário escolher e fica salvo.
+- **Botão** "PT | EN" no cabeçalho (celular incluso). Troca na hora, sem recarregar e sem perder o que foi digitado; um relatório aberto é refeito no novo idioma.
+- **Conteúdo do usuário não é traduzido:** nomes de locais, equipamentos, cliente, embarcação, responsável.
+- **Avisos da Marinha** vêm em português da fonte: continuam em português, com uma nota em inglês ("Source text in Portuguese").
+- **Unidades:** as mesmas do app (nós, m, s, °). Em inglês, "kt" no lugar de "nós"; e "N, NE, E…" já são iguais. Ponto decimal em inglês, vírgula em português, como hoje.
+- **Datas:** dia/mês/ano em português; mês por extenso ou AAAA-MM-DD em inglês (sem ambiguidade). Fuso continua UTC no relatório.
+- **Rodapé "Desenvolvido por":** "Developed by Ernani Vilela · Surveyor Oceanographer · © 2026" com o mesmo e-mail e WhatsApp.
+- **Aviso da Open-Meteo** (uso não comercial, crédito à fonte) e "apoio à decisão" nos dois idiomas.
+- **Arquivo único:** o dicionário vai dentro do `index.html`; sem biblioteca nova.
+- **Saída salva de análises antigas:** ao reabrir, o relatório sai no idioma atual (os dados são os mesmos; só os textos mudam).
+
+## Testes
+- `tests/idiomas.js` (novo): (1) toda chave de português tem a de inglês e vice-versa, sem texto vazio; (2) em inglês, a tela principal, a Ajuda, o relatório resumido e o completo não têm palavras de português (lista de palavras-chave: "Janela", "Previsão", "Vento" etc., fora o conteúdo do usuário e os avisos da Marinha); (3) a troca de idioma mantém campos e resultado; (4) PDF em inglês lido por `pdftotext` traz os títulos em inglês.
+- Os testes atuais rodam em português (idioma fixo nos testes) e continuam passando; os de relatório e PDF rodam também em inglês.
+- Paridade Python × JavaScript não muda (números iguais nos dois idiomas).
+
+## Fora do escopo
+Outros idiomas; tradução dos avisos da Marinha; versão local em Python (`local/`); tradução do conteúdo digitado.
+
+## Perguntas em aberto
+Nenhuma que bloqueie. Suposições a corrigir: (1) idioma inicial pelo navegador; (2) "kt" em inglês; (3) data AAAA-MM-DD ou mês por extenso em inglês; (4) avisos da Marinha ficam em português com nota.
