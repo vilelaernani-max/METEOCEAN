@@ -127,7 +127,7 @@ Pedido do Ernani (29/10/2026): gráfico de linha e dispersão; eixo primário co
 - Seção "Vento e onda juntos" no relatório (tela, HTML baixado e PDF), quando vento e ondas estão na análise.
 - Eixo esquerdo: vento em nós, **linha sólida** em segmentos. Eixo direito: Hs em metros, **pontos**. Os dois eixos têm 5 divisões alinhadas à mesma grade.
 - Cores **do frio ao quente**: azul (valor baixo) → ciano → verde → laranja → vermelho (valor alto). A cor de cada trecho da linha segue a intensidade do vento e a de cada ponto segue a Hs, cada uma na escala do seu próprio eixo (0 até o máximo do eixo). A matiz só diminui do azul ao vermelho.
-- Limites do perfil aparecem como linhas tracejadas: vento no eixo esquerdo e Hs no direito, cada uma com seu rótulo.
+- Limites do perfil aparecem como **linhas bem visíveis e diferentes entre si**: vento no eixo esquerdo (preta, tracejada, 2,2 px) e Hs no direito (roxa, pontilhada, 2,6 px), com rótulo sobre fundo, desenhado por cima dos dados, que diz o valor e o eixo ("limite vento 20 kn (eixo esq.)"). A legenda lista as duas linhas; sem limite no perfil, ela avisa "sem limite de Hs/vento no perfil" e a linha não é desenhada. Pedido do Ernani em 29/10/2026.
 - Legenda com a escala de cores das duas séries e a frase "azul = baixo, vermelho = alto".
 - Fonte do gráfico: a primeira fonte. Na tela, com mais de uma fonte, um seletor troca a fonte (HTML baixado e PDF usam a primeira, e o nome da fonte aparece no gráfico).
 - Horas sem dado deixam buraco na linha e nos pontos (sem interpolar).

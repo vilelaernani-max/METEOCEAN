@@ -66,3 +66,4 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - [x] G2 Versão para o PDF (`pdfDualChart`) com legenda das escalas.
 - [x] G3 Teste `tests/grafico.js` (puro, navegador, PDF e celular).
 - Registro (2026-10-29): título do PDF sai em maiúsculas (padrão do `pdf.h2`); no celular o gráfico rola dentro do quadro para manter o texto legível.
+- [x] G4 (29/10/2026) Limites do gráfico mais visíveis: linha preta tracejada (vento, eixo esq.) e roxa pontilhada (Hs, eixo dir.), rótulos com fundo por cima dos dados, legenda dos limites, aviso quando não há limite; PDF com o mesmo destaque. Testes em `tests/grafico.js`.

@@ -799,6 +799,7 @@ const REPORT_CSS = `
 .rp .dualscroll svg{min-width:720px}
 .rp .dualleg .dl{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px}
 .rp .dualleg .sc{display:inline-flex;align-items:center;gap:6px}
+.rp .dualleg .lsw{display:inline-block;width:34px;height:0}
 .rp .dualleg .bar{display:inline-block;width:110px;height:10px;border-radius:5px}
 .rmap{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#dde7ec;max-width:100%}
 .rmap .tiles{position:absolute;inset:0}
@@ -1049,13 +1050,19 @@ function dualBody(res, tz, si, lm) {
     o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + ph}"/>`);
     if ((n - i) / n * pw > 40) o.push(`<text class="mut" x="${(x + 3).toFixed(1)}" y="${H - 8}" font-size="11">${dayLabel(d)}</text>`);
   }
-  if (lm.wind_max !== null && lm.wind_max !== undefined) {
-    o.push(`<line class="lim" x1="${left}" y1="${YW(lm.wind_max).toFixed(1)}" x2="${W - right}" y2="${YW(lm.wind_max).toFixed(1)}"/>`);
-    o.push(`<text x="${left + 4}" y="${(YW(lm.wind_max) - 4).toFixed(1)}" font-size="11" text-anchor="start" style="fill:var(--nogo)">limite vento ${lm.wind_max} kn</text>`);
+  const lbl = (x, y, txt, anchor, cor) => {
+    const w = txt.length * 6.4 + 10, rx = anchor === 'end' ? x - w + 5 : x - 5;
+    return `<rect class="lbg" x="${rx.toFixed(1)}" y="${(y - 12).toFixed(1)}" width="${w.toFixed(1)}" height="16" rx="4" fill="var(--surface)" fill-opacity="0.92"/><text x="${x}" y="${y.toFixed(1)}" font-size="11.5" font-weight="600" text-anchor="${anchor}" style="fill:${cor}">${esc(txt)}</text>`;
+  };
+  const late = [];   // rótulos dos limites, desenhados depois dos dados para a curva não cobri-los
+  const hasW = lm.wind_max !== null && lm.wind_max !== undefined, hasH = lm.hs_max !== null && lm.hs_max !== undefined;
+  if (hasW) {
+    o.push(`<line class="dlim" x1="${left}" y1="${YW(lm.wind_max).toFixed(1)}" x2="${W - right}" y2="${YW(lm.wind_max).toFixed(1)}" stroke="var(--ink)" stroke-width="2.2" stroke-dasharray="9 5"/>`);
+    late.push(lbl(left + 8, YW(lm.wind_max) - 6, `limite vento ${lm.wind_max} kn (eixo esq.)`, 'start', 'var(--ink)'));
   }
-  if (lm.hs_max !== null && lm.hs_max !== undefined) {
-    o.push(`<line class="lim" style="stroke-dasharray:2 3" x1="${left}" y1="${YH(lm.hs_max).toFixed(1)}" x2="${W - right}" y2="${YH(lm.hs_max).toFixed(1)}"/>`);
-    o.push(`<text x="${W - right - 4}" y="${(YH(lm.hs_max) - 4).toFixed(1)}" font-size="11" text-anchor="end" style="fill:var(--nogo)">limite Hs ${lm.hs_max} m</text>`);
+  if (hasH) {
+    o.push(`<line class="dlim" x1="${left}" y1="${YH(lm.hs_max).toFixed(1)}" x2="${W - right}" y2="${YH(lm.hs_max).toFixed(1)}" stroke="var(--c3)" stroke-width="2.6" stroke-dasharray="1.5 5" stroke-linecap="round"/>`);
+    late.push(lbl(W - right - 8, YH(lm.hs_max) - 6, `limite Hs ${lm.hs_max} m (eixo dir.)`, 'end', 'var(--c3)'));
   }
   for (let i = 1; i < n; i++) {
     const a = s.wind[i - 1], b = s.wind[i];
@@ -1063,9 +1070,12 @@ function dualBody(res, tz, si, lm) {
     o.push(`<line class="wl" x1="${X(i - 1).toFixed(1)}" y1="${YW(a).toFixed(1)}" x2="${X(i).toFixed(1)}" y2="${YW(b).toFixed(1)}" stroke="${coldWarm((a + b) / 2 / wmax)}" stroke-width="2.6" stroke-linecap="round"/>`);
   }
   s.hs.forEach((v, i) => { if (okv(v)) o.push(`<circle class="hp" cx="${X(i).toFixed(1)}" cy="${YH(v).toFixed(1)}" r="3.2" fill="${coldWarm(v / hmax)}" stroke="#fff" stroke-width="0.8"/>`); });
+  o.push(...late);
   o.push('</svg>');
   const bar = `<i class="bar" style="background:${coldWarmCss()}"></i>`;
-  return `<div class="dualscroll">${o.join('')}</div><div class="dualleg"><span class="dl"><span class="t"><b>Vento</b> (linha, eixo esquerdo)</span><span class="sc">0 ${bar} ${wmax} kn</span></span><span class="dl"><span class="t"><b>Altura de onda</b> (pontos, eixo direito)</span><span class="sc">0 ${bar} ${hmax} m</span></span><span class="sub">azul = baixo, vermelho = alto</span></div>`;
+  const limLeg = (hasW ? `<span class="dl"><span class="sc"><i class="lsw" style="border-top:2.2px dashed var(--ink)"></i>limite de vento ${lm.wind_max} kn (eixo esquerdo)</span></span>` : '<span class="dl sub">sem limite de vento no perfil</span>')
+    + (hasH ? `<span class="dl"><span class="sc"><i class="lsw" style="border-top:2.6px dotted var(--c3)"></i>limite de Hs ${lm.hs_max} m (eixo direito)</span></span>` : '<span class="dl sub">sem limite de Hs no perfil</span>');
+  return `<div class="dualscroll">${o.join('')}</div><div class="dualleg"><span class="dl"><span class="t"><b>Vento</b> (linha, eixo esquerdo)</span><span class="sc">0 ${bar} ${wmax} kn</span></span><span class="dl"><span class="t"><b>Altura de onda</b> (pontos, eixo direito)</span><span class="sc">0 ${bar} ${hmax} m</span></span><span class="sub">azul = baixo, vermelho = alto</span>${limLeg}</div>`;
 }
 function dualChartHtml(res, tz, si, lm) {
   return `<div class="dualchart"><div class="dualsrc"><span class="dualname">Fonte: ${esc(res.sources[si].label)}</span></div><div class="dualbody">${dualBody(res, tz, si, lm)}</div></div>`;
@@ -1533,7 +1543,7 @@ class Pdf {
     this.cur.push(ops.join(' '));
   }
   line(x1, y1, x2, y2, o = {}) {
-    this.cur.push(`${hexRgb(o.color || PDF_COL.line)} RG ${(o.lw || 0.6).toFixed(2)} w ${o.dash ? '[3 2] 0 d' : '[] 0 d'} ${x1.toFixed(2)} ${this.py(y1)} m ${x2.toFixed(2)} ${this.py(y2)} l S`);
+    this.cur.push(`${hexRgb(o.color || PDF_COL.line)} RG ${(o.lw || 0.6).toFixed(2)} w ${o.dash ? (typeof o.dash === 'string' ? o.dash : '[3 2] 0 d') : '[] 0 d'} ${x1.toFixed(2)} ${this.py(y1)} m ${x2.toFixed(2)} ${this.py(y2)} l S`);
   }
   poly(pts, o = {}) {
     if (pts.length < 2) return;
@@ -1611,10 +1621,13 @@ function pdfDualChart(pdf, res, tz, lm) {
   }
   pdf.text(left, top - 6, 'vento (kn)', 7, { color: PDF_COL.mut, align: 'right' }); pdf.text(right, top - 6, 'Hs (m)', 7, { color: PDF_COL.mut });
   for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(i); pdf.line(x, top, x, top + ph); if ((n - i) / n * pw > 30) pdf.text(x + 2, top + ph + 10, dayLabel(d), 7, { color: PDF_COL.mut }); }
-  if (lm.wind_max !== null && lm.wind_max !== undefined) { pdf.line(left, YW(lm.wind_max), right, YW(lm.wind_max), { color: PDF_COL.nogo, dash: true, lw: 0.9 }); pdf.text(left + 2, YW(lm.wind_max) - 3, `limite vento ${lm.wind_max} kn`, 7, { color: PDF_COL.nogo }); }
-  if (lm.hs_max !== null && lm.hs_max !== undefined) { pdf.line(left, YH(lm.hs_max), right, YH(lm.hs_max), { color: PDF_COL.nogo, dash: true, lw: 0.9 }); pdf.text(right - 2, YH(lm.hs_max) - 3, `limite Hs ${lm.hs_max} m`, 7, { color: PDF_COL.nogo, align: 'right' }); }
+  const pill = (x, y, txt, color, align) => { const w = pdf.width(txt, 7.5, true) + 6, rx = align === 'right' ? x - w + 2 : x - 2; pdf.rect(rx, y - 8.5, w, 11, { fill: PDF_COL.surface }); pdf.text(x, y, txt, 7.5, { color, align, bold: true }); };
+  const late = [];
+  if (lm.wind_max !== null && lm.wind_max !== undefined) { pdf.line(left, YW(lm.wind_max), right, YW(lm.wind_max), { color: PDF_COL.ink, dash: '[5 3] 0 d', lw: 1.4 }); late.push(() => pill(left + 4, YW(lm.wind_max) - 4, `limite vento ${lm.wind_max} kn (eixo esq.)`, PDF_COL.ink, 'left')); }
+  if (lm.hs_max !== null && lm.hs_max !== undefined) { pdf.line(left, YH(lm.hs_max), right, YH(lm.hs_max), { color: PDF_COL.c[2], dash: '[1.2 3] 0 d', lw: 1.6 }); late.push(() => pill(right - 4, YH(lm.hs_max) - 4, `limite Hs ${lm.hs_max} m (eixo dir.)`, PDF_COL.c[2], 'right')); }
   for (let i = 1; i < n; i++) { const a = s.wind[i - 1], b = s.wind[i]; if (okv(a) && okv(b)) pdf.line(X(i - 1), YW(a), X(i), YW(b), { color: coldWarm((a + b) / 2 / wmax), lw: 1.8 }); }
   s.hs.forEach((v, i) => { if (okv(v)) pdf.dot(X(i), YH(v), 1.6, coldWarm(v / hmax)); });
+  late.forEach(f => f());
   pdf.y = top + H - 14;
   const strip = (x, label, max) => { const lw = pdf.width(label, 7.5) + 6, w = 60; pdf.text(x, pdf.y + 5.5, label, 7.5, { color: PDF_COL.mut }); for (let k = 0; k < 20; k++) pdf.rect(x + lw + (w / 20) * k, pdf.y, w / 20 + 0.4, 6, { fill: coldWarm(k / 19) }); pdf.text(x + lw + w + 4, pdf.y + 5.5, `0 a ${max}`, 7.5, { color: PDF_COL.mut }); return lw + w + 4 + pdf.width(`0 a ${max}`, 7.5) + 24; };
   const dx = strip(left, 'Vento (linha)', `${wmax} kn`); const dx2 = strip(left + dx, 'Hs (pontos)', `${hmax} m`);

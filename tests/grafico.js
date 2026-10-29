@@ -29,7 +29,7 @@ ok('azul no começo e vermelho no fim (matiz)', matiz(coldWarm(0)) > 200 && mati
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright');
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
-  const run = async (w, h, scheme, fonteUnica) => {
+  const run = async (w, h, scheme, fonteUnica, campos = {}) => {
     const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, acceptDownloads: true });
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.route('**/*open-meteo.com/**', r => {
@@ -42,7 +42,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
     await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(700);
     if (fonteUnica) await p.evaluate(() => localStorage.setItem('mco:rows', JSON.stringify([{ label: 'Open-Meteo (melhor modelo)', wind: '', wave: '' }])));
     if (fonteUnica) { await p.reload(); await p.waitForTimeout(600); }
-    await p.fill('#q-coords', '-22.9519, -43.1859'); await p.dispatchEvent('#q-coords', 'input'); await p.fill('#q-wind', '20'); await p.fill('#q-hs', '2');
+    await p.fill('#q-coords', '-22.9519, -43.1859'); await p.dispatchEvent('#q-coords', 'input'); await p.fill('#q-wind', '20'); await p.fill('#q-hs', campos.hs !== undefined ? campos.hs : '2');
     await p.click('#q-go'); await p.waitForSelector('#report .dualchart svg', { timeout: 15000 });
     return { p, errs, ctx };
   };
@@ -65,7 +65,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   const eixos = await p.$$eval(g + ' text', ts => ts.map(t => t.textContent));
   ok('eixo principal identificado (vento, kn)', eixos.some(t => /kn/.test(t)));
   ok('eixo secundário identificado (Hs, m) à direita', await p.$$eval(g + ' text.ax2', ts => ts.length >= 5));
-  ok('limites desenhados (vento e Hs)', (await p.$$eval(g + ' line.lim', ls => ls.length)) === 2 && /limite vento 20 kn/.test(eixos.join('|')) && /limite Hs 2 m/.test(eixos.join('|')), eixos.join('|'));
+  ok('limites desenhados (vento e Hs)', (await p.$$eval(g + ' line.dlim', ls => ls.length)) === 2);
+  const lims = await p.$$eval(g + ' line.dlim', ls => ls.map(l => ({ cor: l.getAttribute('stroke'), traco: l.getAttribute('stroke-dasharray'), larg: +l.getAttribute('stroke-width') })));
+  ok('linhas de limite espessas (>= 2)', lims.length === 2 && lims.every(l => l.larg >= 2), JSON.stringify(lims));
+  ok('limites com cor e tracejado diferentes entre si', lims.length === 2 && lims[0].cor !== lims[1].cor && lims[0].traco !== lims[1].traco, JSON.stringify(lims));
+  ok('rótulos dos limites com fundo para ficarem legíveis', (await p.$$eval(g + ' rect.lbg', r => r.length)) === 2);
+  ok('rótulos dizem em qual eixo está cada limite', /limite vento 20 kn \(eixo esq\.\)/.test(eixos.join('|')) && /limite Hs 2 m \(eixo dir\.\)/.test(eixos.join('|')), eixos.join('|'));
+  ok('legenda mostra as duas linhas de limite', (await p.$$eval('#report .dualleg .lsw', e => e.length)) === 2 && /limite de vento 20 kn/.test(await p.textContent('#report .dualleg')) && /limite de Hs 2 m/.test(await p.textContent('#report .dualleg')));
   ok('legenda das duas escalas', (await p.$$('#report .dualchart .dualleg .bar')).length === 2);
   ok('seletor de fonte aparece com mais de uma fonte', (await p.$$('#report .dualchart select')).length === 1);
   const antes = await p.$eval(g, s => s.innerHTML);
@@ -86,6 +92,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('sem rolagem horizontal no celular', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), String(await p.evaluate(() => document.documentElement.scrollWidth)));
   if (shots) await p.locator('#report .dualchart').screenshot({ path: path.join(shots, 'grafico-celular-escuro.png') });
   ok('sem erros de página (celular)', errs.length === 0, JSON.stringify(errs)); await ctx.close();
+
+  // sem limite de Hs no perfil: uma só linha de limite e aviso na legenda
+  ({ p, errs, ctx } = await run(1100, 900, 'light', true, { hs: '' }));
+  ok('sem limite de Hs: só a linha de limite do vento', (await p.$$eval(g + ' line.dlim', ls => ls.length)) === 1);
+  ok('legenda avisa que não há limite de Hs', /sem limite de Hs/.test(await p.textContent('#report .dualleg')) && (await p.$$eval('#report .dualleg .lsw', e => e.length)) === 1);
+  await ctx.close();
 
   // só vento ligado: sem o gráfico combinado
   ctx = await b.newContext(); p = await ctx.newPage();
