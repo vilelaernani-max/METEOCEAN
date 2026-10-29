@@ -1030,6 +1030,15 @@ function coldWarm(t) {
   return '#' + a.map((v, j) => Math.round(v + (b[j] - v) * k).toString(16).padStart(2, '0')).join('');
 }
 const coldWarmCss = () => `linear-gradient(90deg,${COLD_WARM.map(([t, c]) => `rgb(${c.join(',')}) ${t * 100}%`).join(',')})`;
+/* trechos de curva suave (Catmull-Rom → Bézier cúbica) por uma série; cada trecho vai de um ponto ao próximo, o que permite colorir trecho a trecho */
+function smoothTrechos(pts) {
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || pts[i + 1];
+    out.push({ p1, p2, c1: [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2: [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6], v: (p1[2] + p2[2]) / 2 });
+  }
+  return out;
+}
 function dualBody(res, tz, si, lm) {
   const s = res.sources[si], grid = res.grid, n = grid.length, okv = v => v !== null && v !== undefined;
   const wv = s.wind.filter(okv), hv = s.hs.filter(okv);
@@ -1037,7 +1046,7 @@ function dualBody(res, tz, si, lm) {
   const wmax = niceMax(Math.max(0, ...wv, lm.wind_max ?? 0) * 1.08), hmax = niceMax(Math.max(0, ...hv, lm.hs_max ?? 0) * 1.08);
   const W = 980, H = 300, left = 46, right = 46, top = 16, bot = 26, pw = W - left - right, ph = H - top - bot;
   const X = i => left + (i / Math.max(n - 1, 1)) * pw, YW = v => top + ph - (Math.min(v, wmax) / wmax) * ph, YH = v => top + ph - (Math.min(v, hmax) / hmax) * ph;
-  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vento (setas que apontam para onde o vento vai, eixo esquerdo, em nós) e altura de onda (linha, eixo direito, em metros) ao longo do tempo, coloridos do frio ao quente">`];
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vento (linha suave com setas que apontam para onde o vento vai, eixo esquerdo, em nós) e altura de onda (linha, eixo direito, em metros) ao longo do tempo, coloridos do frio ao quente">`];
   for (let k = 0; k <= 5; k++) {
     const y = top + ph - ph * k / 5;
     o.push(`<line class="grid" x1="${left}" y1="${y.toFixed(1)}" x2="${W - right}" y2="${y.toFixed(1)}"/>`);
@@ -1069,20 +1078,24 @@ function dualBody(res, tz, si, lm) {
     if (!okv(a) || !okv(b)) continue;
     o.push(`<line class="hl" x1="${X(i - 1).toFixed(1)}" y1="${YH(a).toFixed(1)}" x2="${X(i).toFixed(1)}" y2="${YH(b).toFixed(1)}" stroke="${coldWarm((a + b) / 2 / hmax)}" stroke-width="2.8" stroke-linecap="round"/>`);
   }
-  const step = Math.max(1, Math.ceil(15 / (pw / Math.max(n - 1, 1))));   // uma seta a cada `step` h, para não sobrepor
+  let run = [];
+  const fechaRun = () => { for (const t of smoothTrechos(run)) o.push(`<path class="wl2" d="M${t.p1[0].toFixed(1)},${t.p1[1].toFixed(1)} C${t.c1[0].toFixed(1)},${t.c1[1].toFixed(1)} ${t.c2[0].toFixed(1)},${t.c2[1].toFixed(1)} ${t.p2[0].toFixed(1)},${t.p2[1].toFixed(1)}" fill="none" stroke="${coldWarm(t.v / wmax)}" stroke-width="1.6" stroke-opacity="0.85" stroke-linecap="round"/>`); run = []; };
+  for (let i = 0; i < n; i++) { const v = s.wind[i]; if (okv(v)) run.push([X(i), YW(v), Math.min(v, wmax)]); else fechaRun(); }
+  fechaRun();
+  const step = Math.max(1, Math.ceil(11 / (pw / Math.max(n - 1, 1))));   // uma seta a cada `step` h, para não sobrepor
   for (let i = 0; i < n; i += step) {
     const v = s.wind[i], d = s.wdir ? s.wdir[i] : null;
     if (!okv(v)) continue;
     const c = coldWarm(v / wmax);
-    if (okv(d)) o.push(`<path class="wa" transform="translate(${X(i).toFixed(1)} ${YW(v).toFixed(1)}) rotate(${Math.round(((d + 180) % 360 + 360) % 360)})" d="M0,-9 L5.5,6.5 L0,3.5 L-5.5,6.5 Z" fill="${c}" stroke="#fff" stroke-width="1" stroke-linejoin="round"/>`);
-    else o.push(`<circle class="wd" cx="${X(i).toFixed(1)}" cy="${YW(v).toFixed(1)}" r="3.2" fill="${c}" stroke="#fff" stroke-width="0.8"/>`);
+    if (okv(d)) o.push(`<path class="wa" transform="translate(${X(i).toFixed(1)} ${YW(v).toFixed(1)}) rotate(${Math.round(((d + 180) % 360 + 360) % 360)})" d="M0,-6.6 L4.1,5 L0,2.9 L-4.1,5 Z" fill="${c}" stroke="#fff" stroke-width="1" stroke-linejoin="round"/>`);
+    else o.push(`<circle class="wd" cx="${X(i).toFixed(1)}" cy="${YW(v).toFixed(1)}" r="2.4" fill="${c}" stroke="#fff" stroke-width="0.7"/>`);
   }
   o.push(...late);
   o.push('</svg>');
   const bar = `<i class="bar" style="background:${coldWarmCss()}"></i>`;
   const limLeg = (hasW ? `<span class="dl"><span class="sc"><i class="lsw" style="border-top:2.2px dashed var(--ink)"></i>limite de vento ${lm.wind_max} kn (eixo esquerdo)</span></span>` : '<span class="dl sub">sem limite de vento no perfil</span>')
     + (hasH ? `<span class="dl"><span class="sc"><i class="lsw" style="border-top:2.6px dotted var(--c3)"></i>limite de Hs ${lm.hs_max} m (eixo direito)</span></span>` : '<span class="dl sub">sem limite de Hs no perfil</span>');
-  return `<div class="dualscroll">${o.join('')}</div><div class="dualleg"><span class="dl"><span class="t"><b>Vento</b> (setas, eixo esquerdo; a seta aponta para onde o vento vai${step > 1 ? `; uma seta a cada ${step} h` : ''})</span><span class="sc">0 ${bar} ${wmax} kn</span></span><span class="dl"><span class="t"><b>Altura de onda</b> (linha, eixo direito)</span><span class="sc">0 ${bar} ${hmax} m</span></span><span class="sub">azul = baixo, vermelho = alto</span>${limLeg}</div>`;
+  return `<div class="dualscroll">${o.join('')}</div><div class="dualleg"><span class="dl"><span class="t"><b>Vento</b> (linha suave e setas, eixo esquerdo; a seta aponta para onde o vento vai${step > 1 ? `; uma seta a cada ${step} h` : ''})</span><span class="sc">0 ${bar} ${wmax} kn</span></span><span class="dl"><span class="t"><b>Altura de onda</b> (linha, eixo direito)</span><span class="sc">0 ${bar} ${hmax} m</span></span><span class="sub">azul = baixo, vermelho = alto</span>${limLeg}</div>`;
 }
 function dualChartHtml(res, tz, si, lm) {
   return `<div class="dualchart"><div class="dualsrc"><span class="dualname">Fonte: ${esc(res.sources[si].label)}</span></div><div class="dualbody">${dualBody(res, tz, si, lm)}</div></div>`;
@@ -1633,19 +1646,23 @@ function pdfDualChart(pdf, res, tz, lm) {
   if (lm.wind_max !== null && lm.wind_max !== undefined) { pdf.line(left, YW(lm.wind_max), right, YW(lm.wind_max), { color: PDF_COL.ink, dash: '[5 3] 0 d', lw: 1.4 }); late.push(() => pill(left + 4, YW(lm.wind_max) - 4, `limite vento ${lm.wind_max} kn (eixo esq.)`, PDF_COL.ink, 'left')); }
   if (lm.hs_max !== null && lm.hs_max !== undefined) { pdf.line(left, YH(lm.hs_max), right, YH(lm.hs_max), { color: PDF_COL.c[2], dash: '[1.2 3] 0 d', lw: 1.6 }); late.push(() => pill(right - 4, YH(lm.hs_max) - 4, `limite Hs ${lm.hs_max} m (eixo dir.)`, PDF_COL.c[2], 'right')); }
   for (let i = 1; i < n; i++) { const a = s.hs[i - 1], b = s.hs[i]; if (okv(a) && okv(b)) pdf.line(X(i - 1), YH(a), X(i), YH(b), { color: coldWarm((a + b) / 2 / hmax), lw: 1.8 }); }
-  const step = Math.max(1, Math.ceil(11 / (pw / Math.max(n - 1, 1))));
+  let run = [];
+  const fechaRun = () => { for (const t of smoothTrechos(run)) { let prev = t.p1; for (let q = 1; q <= 4; q++) { const u = q / 4, w = 1 - u, pt = [0, 1].map(m => w ** 3 * t.p1[m] + 3 * w * w * u * t.c1[m] + 3 * w * u * u * t.c2[m] + u ** 3 * t.p2[m]); pdf.line(prev[0], prev[1], pt[0], pt[1], { color: coldWarm(t.v / wmax), lw: 0.9 }); prev = pt; } } run = []; };
+  for (let i = 0; i < n; i++) { const v = s.wind[i]; if (okv(v)) run.push([X(i), YW(v), Math.min(v, wmax)]); else fechaRun(); }
+  fechaRun();
+  const step = Math.max(1, Math.ceil(8 / (pw / Math.max(n - 1, 1))));
   for (let i = 0; i < n; i += step) {
     const v = s.wind[i], d = s.wdir ? s.wdir[i] : null; if (!okv(v)) continue;
     const c = coldWarm(v / wmax), x = X(i), y = YW(v);
     if (!okv(d)) { pdf.dot(x, y, 1.8, c); continue; }
     const a = ((d + 180) % 360) * Math.PI / 180, rot = (px, py) => [x + px * Math.cos(a) - py * Math.sin(a), y + px * Math.sin(a) + py * Math.cos(a)];   // seta apontando para onde o vento vai (0° = norte = para cima)
-    const pts = [[0, -5.5], [3.2, 4], [0, 2.2], [-3.2, 4]].map(([px, py]) => rot(px, py));
+    const pts = [[0, -4.2], [2.5, 3.1], [0, 1.8], [-2.5, 3.1]].map(([px, py]) => rot(px, py));
     pdf.cur.push(`${hexRgb(c)} rg ${hexRgb(PDF_COL.surface)} RG 0.5 w ` + pts.map(([px, py], q) => `${px.toFixed(2)} ${pdf.py(py)} ${q ? 'l' : 'm'}`).join(' ') + ' h B');
   }
   late.forEach(f => f());
   pdf.y = top + H - 14;
   const strip = (x, label, max) => { const lw = pdf.width(label, 7.5) + 6, w = 60; pdf.text(x, pdf.y + 5.5, label, 7.5, { color: PDF_COL.mut }); for (let k = 0; k < 20; k++) pdf.rect(x + lw + (w / 20) * k, pdf.y, w / 20 + 0.4, 6, { fill: coldWarm(k / 19) }); pdf.text(x + lw + w + 4, pdf.y + 5.5, `0 a ${max}`, 7.5, { color: PDF_COL.mut }); return lw + w + 4 + pdf.width(`0 a ${max}`, 7.5) + 24; };
-  const dx = strip(left, 'Vento (setas)', `${wmax} kn`); const dx2 = strip(left + dx, 'Hs (linha)', `${hmax} m`);
+  const dx = strip(left, 'Vento (linha e setas)', `${wmax} kn`); const dx2 = strip(left + dx, 'Hs (linha)', `${hmax} m`);
   pdf.text(left + dx + dx2, pdf.y + 5.5, 'azul = baixo, vermelho = alto', 7.5, { color: PDF_COL.mut });
   pdf.text(left, pdf.y + 17, `A seta do vento aponta para onde o vento vai${step > 1 ? ` (uma seta a cada ${step} h)` : ''}; a linha é a altura de onda.`, 7.5, { color: PDF_COL.mut });
   pdf.y += 26;

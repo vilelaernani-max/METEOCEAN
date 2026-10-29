@@ -58,11 +58,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   const alto = rg([...seg].sort((a, b) => a[0] - b[0])[0][1]), baixo = rg([...seg].sort((a, b) => b[0] - a[0])[0][1]);
   ok('trecho de onda mais alto é quente e o mais baixo é frio', alto[0] > alto[2] && baixo[2] > baixo[0], `${alto} | ${baixo}`);
   const setas = await p.$$eval(g + ' path.wa', ps => ps.map(x => { const m = /translate\(([-\d.]+) ([-\d.]+)\) rotate\(([-\d.]+)\)/.exec(x.getAttribute('transform')); return { x: +m[1], y: +m[2], rot: +m[3], fill: x.getAttribute('fill') }; }));
-  ok('vento em setas (dispersão), uma a cada poucas horas', setas.length >= 30 && setas.length <= 70, String(setas.length));
+  ok('vento em setas (dispersão), uma a cada poucas horas', setas.length >= 30 && setas.length <= 75, String(setas.length));
   ok('seta aponta para onde o vento vai (vento de 120° → 300°)', setas.length > 0 && setas.every(s => s.rot === 300), JSON.stringify(setas.slice(0, 2)));
   const ord = [...setas].sort((a, b) => b.y - a.y), frio = rg(ord[0].fill), quente = rg(ord[ord.length - 1].fill);
   ok('seta mais baixa (menos vento) é fria e a mais alta (mais vento) é quente', frio[2] > frio[0] && quente[0] > quente[2], `${frio} | ${quente}`);
-  ok('setas espaçadas (sem sobrepor)', (() => { const xs = setas.map(s => s.x).sort((a, b) => a - b); return xs.every((x, i) => i === 0 || x - xs[i - 1] >= 12); })());
+  ok('setas espaçadas (sem sobrepor)', (() => { const xs = setas.map(s => s.x).sort((a, b) => a - b); return xs.every((x, i) => i === 0 || x - xs[i - 1] >= 10); })());
+  // linha suave de vento por baixo das setas
+  const lv = await p.$$eval(g + ' path.wl2', ps => ps.map(x => ({ d: x.getAttribute('d'), w: +x.getAttribute('stroke-width'), o: +x.getAttribute('stroke-opacity'), cor: x.getAttribute('stroke'), traco: x.getAttribute('stroke-dasharray') })));
+  ok('linha suave de vento em segmentos (curvas de Bézier)', lv.length > 60 && lv.every(x => /^M[^C]+C/.test(x.d)), String(lv.length));
+  ok('linha de vento é suave: fina, translúcida e sólida', lv.every(x => x.w <= 2 && x.w >= 1 && x.o < 1 && !x.traco), JSON.stringify(lv[0]));
+  ok('linha de vento também vai do frio ao quente', new Set(lv.map(x => x.cor)).size > 8);
+  ok('setas desenhadas por cima da linha de vento', await p.evaluate(g => { const svg = document.querySelector(g), ls = [...svg.querySelectorAll('path.wl2')], as = [...svg.querySelectorAll('path.wa')]; return ls.length && as.length && ls.every(l => as.every(a => !!(l.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING))); }, g));
+  ok('setas menores que as anteriores (de 15,5 para até 13 px no desenho)', await p.$$eval(g + ' path.wa', ps => ps.every(x => x.getBBox().height <= 13)));
   const eixos = await p.$$eval(g + ' text', ts => ts.map(t => t.textContent));
   ok('eixo principal identificado (vento, kn)', eixos.some(t => /kn/.test(t)));
   ok('eixo secundário identificado (Hs, m) à direita', await p.$$eval(g + ' text.ax2', ts => ts.length >= 5));
@@ -82,7 +89,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('rótulo da fonte muda', /GFS/.test(await p.textContent('#report .dualchart .dualsrc')) || (await p.$$eval('#report .dualchart select option', o => o.length)) >= 2);
   const [d] = await Promise.all([p.waitForEvent('download'), p.click('#rp-download')]);
   const html = fs.readFileSync(await d.path(), 'utf8');
-  ok('HTML baixado traz o gráfico', /class="dualchart"/.test(html) && /line class="hl"/.test(html) && /path class="wa"/.test(html));
+  ok('HTML baixado traz o gráfico', /class="dualchart"/.test(html) && /line class="hl"/.test(html) && /path class="wa"/.test(html) && /path class="wl2"/.test(html));
   const [pd] = await Promise.all([p.waitForEvent('download', { timeout: 20000 }), p.click('#rp-pdf')]).catch(() => [null]);
   ok('PDF gera', !!pd);
   if (pd) { const pdf = fs.readFileSync(await pd.path(), 'latin1'); ok('PDF contém o título do gráfico (h2 do PDF vai em maiúsculas)', /VENTO E ONDA JUNTOS/.test(pdf), String(pdf.length)); }

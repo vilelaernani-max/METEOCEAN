@@ -146,3 +146,10 @@ Pedido do Ernani: "Onda linha; vento dispersão representada pela seta com dire�
 - Para não sobrepor, uma seta a cada N horas (N escolhido pela largura do gráfico: pelo menos ~15 px entre setas; a legenda informa o N). Hora sem direção mas com vento vira ponto redondo.
 - Os limites (linha preta tracejada do vento, linha roxa pontilhada da Hs), a legenda das escalas, o seletor de fonte e o PDF seguem como antes; a legenda e a nota do PDF dizem que a seta aponta para onde o vento vai.
 - Testes: `tests/grafico.js` (linha da onda, setas, rotação, cores, espaçamento).
+
+## Revisão 2 (29/10/2026): linha suave de vento e setas menores por cima
+Pedido do Ernani: "seta pode ser menor, coloque uma linha suave e as setas por cima" (leitura: "pro cima" = por cima; se for "apontando para cima", a seta perderia a direção do vento e isso precisa ser confirmado).
+- **Linha suave de vento:** curva (Catmull-Rom → Bézier cúbica) passando por todas as horas com vento, em trechos coloridos do frio ao quente pela intensidade, fina (1,6 px) e translúcida. Sem dado, a curva se interrompe (sem interpolar).
+- **Setas menores** (altura de cerca de 11 px no desenho, antes 15,5), desenhadas **depois** da linha (por cima), uma a cada N h (N para dar pelo menos ~11 px de espaço).
+- A linha da onda (sólida, mais grossa) e os limites seguem como antes. PDF acompanha (linha suave e setas menores).
+- Testes: `tests/grafico.js` confere curvas, linha fina e translúcida, ordem (setas depois da linha) e tamanho das setas.
