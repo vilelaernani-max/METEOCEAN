@@ -50,18 +50,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   let { p, errs, ctx } = await run(1100, 900, 'light', false);
   const g = '#report .dualchart svg';
   ok('título da seção', /Vento e onda juntos/.test(await p.textContent('#report')));
-  const seg = await p.$$eval(g + ' line.wl', ls => ls.map(l => l.getAttribute('stroke')));
-  ok('linha de vento em segmentos coloridos (muitos)', seg.length > 60, String(seg.length));
-  ok('linha sólida (sem tracejado) e espessa', await p.$$eval(g + ' line.wl', ls => ls.every(l => !l.getAttribute('stroke-dasharray') && +l.getAttribute('stroke-width') >= 2)));
-  const pts = await p.$$eval(g + ' circle.hp', cs => cs.map(c => [c.getAttribute('cy'), c.getAttribute('fill')]));
-  ok('pontos de onda presentes e com buracos onde falta dado', pts.length > 80 && pts.length < 130, String(pts.length));
   const rg = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-  const ordenaPorAltura = [...pts].sort((a, b) => b[0] - a[0]);    // cy maior = ponto mais baixo no gráfico = menor Hs
-  const frio = rg(ordenaPorAltura[0][1]), quente = rg(ordenaPorAltura[ordenaPorAltura.length - 1][1]);
-  ok('ponto mais baixo (menor Hs) é frio e o mais alto (maior Hs) é quente', frio[2] > frio[0] && quente[0] > quente[2], `${frio} | ${quente}`);
-  const linhas = await p.$$eval(g + ' line.wl', ls => ls.map(l => [(+l.getAttribute('y1') + +l.getAttribute('y2')) / 2, l.getAttribute('stroke')]));
-  const alto = rg([...linhas].sort((a, b) => a[0] - b[0])[0][1]), baixo = rg([...linhas].sort((a, b) => b[0] - a[0])[0][1]);
-  ok('trecho de vento mais forte é quente e o mais fraco é frio', alto[0] > alto[2] && baixo[2] > baixo[0], `${alto} | ${baixo}`);
+  const seg = await p.$$eval(g + ' line.hl', ls => ls.map(l => [(+l.getAttribute('y1') + +l.getAttribute('y2')) / 2, l.getAttribute('stroke')]));
+  ok('onda (Hs) em linha de segmentos coloridos, com buracos onde falta dado', seg.length > 60 && seg.length < 125, String(seg.length));
+  ok('linha da onda sólida (sem tracejado) e espessa', await p.$$eval(g + ' line.hl', ls => ls.every(l => !l.getAttribute('stroke-dasharray') && +l.getAttribute('stroke-width') >= 2)));
+  ok('não há mais pontos de onda nem linha de vento', (await p.$$(g + ' circle.hp')).length === 0 && (await p.$$(g + ' line.wl')).length === 0);
+  const alto = rg([...seg].sort((a, b) => a[0] - b[0])[0][1]), baixo = rg([...seg].sort((a, b) => b[0] - a[0])[0][1]);
+  ok('trecho de onda mais alto é quente e o mais baixo é frio', alto[0] > alto[2] && baixo[2] > baixo[0], `${alto} | ${baixo}`);
+  const setas = await p.$$eval(g + ' path.wa', ps => ps.map(x => { const m = /translate\(([-\d.]+) ([-\d.]+)\) rotate\(([-\d.]+)\)/.exec(x.getAttribute('transform')); return { x: +m[1], y: +m[2], rot: +m[3], fill: x.getAttribute('fill') }; }));
+  ok('vento em setas (dispersão), uma a cada poucas horas', setas.length >= 30 && setas.length <= 70, String(setas.length));
+  ok('seta aponta para onde o vento vai (vento de 120° → 300°)', setas.length > 0 && setas.every(s => s.rot === 300), JSON.stringify(setas.slice(0, 2)));
+  const ord = [...setas].sort((a, b) => b.y - a.y), frio = rg(ord[0].fill), quente = rg(ord[ord.length - 1].fill);
+  ok('seta mais baixa (menos vento) é fria e a mais alta (mais vento) é quente', frio[2] > frio[0] && quente[0] > quente[2], `${frio} | ${quente}`);
+  ok('setas espaçadas (sem sobrepor)', (() => { const xs = setas.map(s => s.x).sort((a, b) => a - b); return xs.every((x, i) => i === 0 || x - xs[i - 1] >= 12); })());
   const eixos = await p.$$eval(g + ' text', ts => ts.map(t => t.textContent));
   ok('eixo principal identificado (vento, kn)', eixos.some(t => /kn/.test(t)));
   ok('eixo secundário identificado (Hs, m) à direita', await p.$$eval(g + ' text.ax2', ts => ts.length >= 5));
@@ -73,6 +74,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('rótulos dizem em qual eixo está cada limite', /limite vento 20 kn \(eixo esq\.\)/.test(eixos.join('|')) && /limite Hs 2 m \(eixo dir\.\)/.test(eixos.join('|')), eixos.join('|'));
   ok('legenda mostra as duas linhas de limite', (await p.$$eval('#report .dualleg .lsw', e => e.length)) === 2 && /limite de vento 20 kn/.test(await p.textContent('#report .dualleg')) && /limite de Hs 2 m/.test(await p.textContent('#report .dualleg')));
   ok('legenda das duas escalas', (await p.$$('#report .dualchart .dualleg .bar')).length === 2);
+  ok('legenda diz setas para o vento e linha para a onda', /Vento[^]*setas[^]*Altura de onda[^]*linha/.test(await p.textContent('#report .dualleg')) && /para onde o vento vai/.test(await p.textContent('#report .dualleg')), await p.textContent('#report .dualleg'));
   ok('seletor de fonte aparece com mais de uma fonte', (await p.$$('#report .dualchart select')).length === 1);
   const antes = await p.$eval(g, s => s.innerHTML);
   await p.selectOption('#report .dualchart select', { index: 1 }); await p.waitForTimeout(200);
@@ -80,7 +82,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('rótulo da fonte muda', /GFS/.test(await p.textContent('#report .dualchart .dualsrc')) || (await p.$$eval('#report .dualchart select option', o => o.length)) >= 2);
   const [d] = await Promise.all([p.waitForEvent('download'), p.click('#rp-download')]);
   const html = fs.readFileSync(await d.path(), 'utf8');
-  ok('HTML baixado traz o gráfico', /class="dualchart"/.test(html) && /line class="wl"/.test(html));
+  ok('HTML baixado traz o gráfico', /class="dualchart"/.test(html) && /line class="hl"/.test(html) && /path class="wa"/.test(html));
   const [pd] = await Promise.all([p.waitForEvent('download', { timeout: 20000 }), p.click('#rp-pdf')]).catch(() => [null]);
   ok('PDF gera', !!pd);
   if (pd) { const pdf = fs.readFileSync(await pd.path(), 'latin1'); ok('PDF contém o título do gráfico (h2 do PDF vai em maiúsculas)', /VENTO E ONDA JUNTOS/.test(pdf), String(pdf.length)); }

@@ -138,3 +138,11 @@ Direção do vento ou da onda no gráfico, gráfico por fonte lado a lado, rajad
 
 ## Testes
 `tests/grafico.js`: escala de cores (função pura), segmentos e pontos, cores frio/quente nos extremos, eixos, limites, legenda, seletor de fonte, HTML baixado, PDF, celular escuro sem rolagem da página, e ausência do gráfico quando só o vento está ligado.
+
+## Revisão (29/10/2026): onda em linha, vento em setas
+Pedido do Ernani: "Onda linha; vento dispersão representada pela seta com direção do vento". Substitui o desenho original:
+- **Altura de onda (Hs):** **linha sólida** no eixo direito, em segmentos, colorida do frio ao quente pela própria Hs.
+- **Vento:** **dispersão de setas** no eixo esquerdo (posição vertical = intensidade em nós). Cada seta **aponta para onde o vento vai** (direção de onde vem + 180°; vento de 120° → seta a 300°), preenchida do frio ao quente pela intensidade. Não há mais linha de vento.
+- Para não sobrepor, uma seta a cada N horas (N escolhido pela largura do gráfico: pelo menos ~15 px entre setas; a legenda informa o N). Hora sem direção mas com vento vira ponto redondo.
+- Os limites (linha preta tracejada do vento, linha roxa pontilhada da Hs), a legenda das escalas, o seletor de fonte e o PDF seguem como antes; a legenda e a nota do PDF dizem que a seta aponta para onde o vento vai.
+- Testes: `tests/grafico.js` (linha da onda, setas, rotação, cores, espaçamento).
