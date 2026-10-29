@@ -48,12 +48,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
     ok(`${modo}: rodapé do relatório com Desenvolvido por`, DEV.test(await p.textContent('#report .foot')) && /vilelaernani@gmail\.com/.test(await p.textContent('#report .foot')));
     const [d] = await Promise.all([p.waitForEvent('download'), p.click('#rp-download')]);
     const html = fs.readFileSync(await d.path(), 'utf8');
+    ok(`${modo}: nome do arquivo HTML traz data e hora`, /-\d{8}-\d{4}\.html$/.test(d.suggestedFilename()), d.suggestedFilename());
     ok(`${modo}: HTML baixado leva logotipo e rodapé`, /class="rplogo" src="data:image\/webp/.test(html) && DEV.test(html.replace(/<[^>]+>/g, ' ')), '');
     const [pd] = await Promise.all([p.waitForEvent('download', { timeout: 20000 }), p.click('#rp-pdf')]).catch(() => [null]);
     ok(`${modo}: PDF gera`, !!pd);
     if (pd) {
       const caminho = await pd.path(), pdf = fs.readFileSync(caminho, 'latin1');
-      ok(`${modo}: PDF tem a imagem do logotipo (JPEG)`, /\/Subtype \/Image/.test(pdf) && /\/DCTDecode/.test(pdf) && /\/XObject/.test(pdf));
+      ok(`${modo}: PDF tem a imagem do logotipo sem depender de decodificador JPEG (RGB cru)`, /\/Subtype \/Image/.test(pdf) && /\/XObject/.test(pdf) && /\/Width 96 \/Height 96/.test(pdf) && !/\/DCTDecode/.test(pdf) && !/\/Filter/.test(pdf.slice(pdf.indexOf('/Subtype /Image') - 40, pdf.indexOf('/Subtype /Image') + 200)), pdf.slice(pdf.indexOf('/Subtype /Image') - 20, pdf.indexOf('/Subtype /Image') + 160));
+      const pgs = (pdf.match(/\/Type \/Page /g) || []).length;
+      ok(`${modo}: identidade também no cabeçalho da primeira página (nome e papel além do rodapé)`, (pdf.match(/Ernani Vilela/g) || []).length >= pgs + 1 && (pdf.match(/Oceanógrafo Surveyor/g) || []).length >= pgs + 1, `${(pdf.match(/Ernani Vilela/g) || []).length} / ${pgs}`);
+      ok(`${modo}: nome do arquivo PDF traz data e hora (evita abrir um arquivo antigo)`, /-\d{8}-\d{4}\.pdf$/.test(pd.suggestedFilename()), pd.suggestedFilename());
       ok(`${modo}: PDF tem o "Desenvolvido por" em todas as páginas`, (pdf.match(/Desenvolvido por Ernani Vilela/g) || []).length === (pdf.match(/\/Type \/Page /g) || []).length && (pdf.match(/Desenvolvido por/g) || []).length >= 1, `${(pdf.match(/Desenvolvido por/g) || []).length} / ${(pdf.match(/\/Type \/Page /g) || []).length}`);
       try { const info = execFileSync('pdfinfo', [caminho]).toString(); ok(`${modo}: PDF válido (pdfinfo)`, /Pages:\s+\d+/.test(info), info.slice(0, 80)); } catch (e) { if (e.code !== 'ENOENT') ok(`${modo}: PDF válido (pdfinfo)`, false, String(e.message).slice(0, 120)); }
       if (shots && modo === 'resumido') fs.copyFileSync(caminho, path.join(shots, 'identidade.pdf'));
