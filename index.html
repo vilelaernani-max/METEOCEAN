@@ -1070,6 +1070,7 @@ Object.assign(EN, {
   "Texto copiado.": "Text copied.",
   "Selecionei o texto: use Ctrl+C.": "Text selected: use Ctrl+C.",
   "página {0} de {1}": "page {0} of {1}",
+  "a busca falhou (sem conexão, bloqueio do navegador/anúncios ou limite de uso da Open-Meteo): tente de novo em 1 minuto": "the request failed (no connection, browser/ad blocker, or Open-Meteo usage limit): try again in 1 minute",
   "MetOcean OP": "MetOcean OP",
   "janelas operacionais de vento e onda · uso pessoal": "wind and wave operational windows · personal use",
   "Seções": "Sections",
@@ -3504,7 +3505,11 @@ async function getRaw(mcp, url) {
   try { return await fetchDirect(url); }   // páginas fora do ambiente restrito do Claude buscam direto
   catch (e) {
     if (e && /(respondeu|responded) \d+/.test(e.message || '')) throw e;   // a API respondeu com erro: não adianta tentar outro caminho
-    if (!mcp) throw new Error(tt('o navegador bloqueou a busca direta'));
+    if (!mcp) {   // falha de rede: uma segunda tentativa antes de desistir
+      await new Promise(r => setTimeout(r, 1500));
+      try { return await fetchDirect(url); } catch (e2) { if (e2 && /(respondeu|responded) \d+/.test(e2.message || '')) throw e2; }
+      throw new Error(tt('a busca falhou (sem conexão, bloqueio do navegador/anúncios ou limite de uso da Open-Meteo): tente de novo em 1 minuto'));
+    }
     return fetchViaBrowser(mcp, url);
   }
 }

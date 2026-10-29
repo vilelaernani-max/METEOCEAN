@@ -171,6 +171,15 @@ const PT_WORDS = /\b(janelas?|previs[ãa]o|vento|ondas?|mar[ée]|corrente|relat[
   ok('sem erros de página (fontes/mapa)', errs.length === 0, JSON.stringify(errs));
   await ctx.close();
 
+  // ---- falha de rede: duas tentativas e mensagem clara ----
+  { const ctx2 = await b.newContext({ locale: 'pt-BR' }); const p2 = await ctx2.newPage(); let n = 0;
+    await p2.route('**/*open-meteo.com/**', r => { n++; r.abort(); });
+    await p2.goto('file://' + path.resolve(__dirname, '../index.html')); await p2.waitForTimeout(500);
+    await p2.fill('#q-coords', '-22.9519, -43.1859'); await p2.dispatchEvent('#q-coords', 'input'); await p2.click('#q-go');
+    await p2.waitForFunction(() => /tente de novo em 1 minuto/.test(document.querySelector('#q-msg').textContent), null, { timeout: 15000 });
+    ok('falha de rede: tenta duas vezes e explica o que fazer', n === 2 && /limite de uso da Open-Meteo/.test(await p2.textContent('#q-msg')), n + ' ' + await p2.textContent('#q-msg'));
+    await ctx2.close(); }
+
   // ---- 9. celular: bandeiras visíveis e sem rolagem lateral ----
   ({ p, ctx } = await abre({ lang: 'en', w: 390, h: 800 }));
   ok('celular: bandeiras visíveis e clicáveis', await p.evaluate(() => [...document.querySelectorAll('button.flag')].every(b => { const r = b.getBoundingClientRect(); return r.width >= 30 && r.height >= 20 && r.right <= innerWidth && r.left >= 0; })));
