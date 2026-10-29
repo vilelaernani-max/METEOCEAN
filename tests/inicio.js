@@ -7,7 +7,7 @@ const ok = (n, c, x = '') => { if (!c) { fails++; console.log('FALHOU', n, x); }
 const grab = re => { const m = src.match(re); if (!m) throw new Error('trecho não encontrado: ' + re); return m[0]; };
 
 // ---- função pura parseStart(valor, tz, agora, dias) ----
-const { parseStart } = new Function(grab(/const HOUR = 3600;\n/) + grab(/function parseStart\([\s\S]*?\n\}\n/) + '\nreturn { parseStart };')();
+const { parseStart } = new Function('const tt = (s, ...a) => a.length ? s.replace(/\\{(\\d+)\\}/g, (_, i) => a[+i]) : s;\n' + grab(/const HOUR = 3600;\n/) + grab(/function parseStart\([\s\S]*?\n\}\n/) + '\nreturn { parseStart };')();
 const AGORA = Date.UTC(2026, 9, 25, 14, 37) / 1000;                 // 25/10/2026 14:37 UTC
 const H = Math.floor(AGORA / 3600) * 3600;
 ok('vazio = agora (sem erro, sem início)', JSON.stringify(parseStart('', -3, AGORA, 5)) === JSON.stringify({ startTs: null }));
@@ -28,7 +28,7 @@ r = parseStart('2026-11-01T00:00', 0, AGORA, 3); ok('informa quantos dias à fre
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright');
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
-  const ctx = await b.newContext({ timezoneId: 'America/Sao_Paulo' });
+  const ctx = await b.newContext({ locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   let pedidos = [];
   await p.route('**/*open-meteo.com/**', r => {

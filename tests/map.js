@@ -26,7 +26,7 @@ function resp(u) {
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
   const run = async (w, h, scheme, tag) => {
-    const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme });
+    const ctx = await b.newContext({ locale: 'pt-BR', viewport: { width: w, height: h }, colorScheme: scheme });
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.route('**/tile.openstreetmap.org/**', r => r.fulfill({ body: PNG, contentType: 'image/png' }));
     await p.route('**/*open-meteo.com/**', r => {

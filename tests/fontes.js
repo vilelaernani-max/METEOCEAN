@@ -5,7 +5,7 @@ let fails = 0;
 const ok = (n, c, x = '') => { if (!c) { fails++; console.log('FALHOU', n, x); } };
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
-  const p = await b.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  const p = await (await b.newContext({ locale: 'pt-BR' })).newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   const vistos = [];
   await p.route('**/*open-meteo.com/**', r => {
     const u = new URL(r.request().url()), models = u.searchParams.get('models') || '', marine = u.pathname.includes('marine');

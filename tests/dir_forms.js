@@ -17,7 +17,7 @@ function openMeteo(dir) {
 }
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
-  const ctx = await b.newContext({ acceptDownloads: true });
+  const ctx = await b.newContext({ locale: 'pt-BR', acceptDownloads: true });
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.route('**/*open-meteo.com/**', openMeteo(180));
   await p.goto('file://' + require('path').resolve(__dirname, '../index.html')); await p.waitForTimeout(800);

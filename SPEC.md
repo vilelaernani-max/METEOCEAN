@@ -272,3 +272,12 @@ Outros idiomas; tradução dos avisos da Marinha; versão local em Python (`loca
 
 ## Perguntas em aberto
 Nenhuma que bloqueie. Suposições a corrigir: (1) idioma inicial pelo navegador; (2) "kt" em inglês; (3) data AAAA-MM-DD ou mês por extenso em inglês; (4) avisos da Marinha ficam em português com nota.
+
+## Revisão (29/10/2026): decisões da construção
+- **Unidade:** em inglês fica **kn** (como os gráficos já mostravam), não "kt".
+- **Datas:** em inglês, `Thu 29 Oct 07:00` (dia da semana, dia, mês abreviado, hora); em português, `qui 29/10 07:00` como antes. Com ano: `29 Oct 2026` / `29/10/2026`.
+- **Números:** os valores já saíam com ponto na maior parte do app; só o texto do regime de ondas, a maré e as legendas de classe usavam vírgula em português. Em inglês tudo sai com ponto.
+- **Avisos da Marinha:** continuam em português (texto da fonte); a linha de fonte do relatório em inglês diz "(in Portuguese)".
+- **Idioma dos relatórios salvos:** o histórico guarda os dados, não o texto; ao abrir, o relatório sai no idioma escolhido na hora. O nome automático do perfil da análise rápida ("Hs ≤ 2 m, vento ≤ 20 kn") também troca de idioma.
+- **Rótulos padrão** (fontes, perfis de exemplo, fases da Lua, estado da maré) trocam de idioma na tela e no relatório; nomes digitados pelo usuário não.
+

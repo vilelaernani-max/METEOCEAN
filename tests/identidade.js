@@ -16,7 +16,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
   const abre = async (w, h, scheme) => {
-    const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, acceptDownloads: true });
+    const ctx = await b.newContext({ locale: 'pt-BR', viewport: { width: w, height: h }, colorScheme: scheme, acceptDownloads: true });
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.route('**/*open-meteo.com/**', r => {
       const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(130)].map((_, i) => t0 + i * 3600), m = r.request().url().includes('marine');
@@ -43,6 +43,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
 
   for (const modo of ['resumido', 'completo']) {
     await gera(p, modo);
+    await p.waitForFunction(() => { const i = document.querySelector('#report .rplogo'); return i && i.complete && i.getBoundingClientRect().width > 0; }, null, { timeout: 5000 }).catch(() => {});
     const rl = await p.$eval('#report .rplogo', i => ({ w: i.getBoundingClientRect().width, ok: i.complete && i.naturalWidth > 0, alt: i.alt }));
     ok(`${modo}: logotipo no relatório, discreto`, rl.ok && rl.w <= 52 && rl.w >= 30 && /MetOcean/.test(rl.alt), JSON.stringify(rl));
     ok(`${modo}: rodapé do relatório com Desenvolvido por`, DEV.test(await p.textContent('#report .foot')) && /vilelaernani@gmail\.com/.test(await p.textContent('#report .foot')));

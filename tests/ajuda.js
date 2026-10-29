@@ -9,7 +9,7 @@ const SECOES = ['aj-gerar', 'aj-limites', 'aj-equip', 'aj-direcao', 'aj-relatori
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
   const abre = async (w, h, scheme) => {
-    const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme });
+    const ctx = await b.newContext({ locale: 'pt-BR', viewport: { width: w, height: h }, colorScheme: scheme });
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.route('**/*open-meteo.com/**', r => {
       const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(130)].map((_, i) => t0 + i * 3600), m = r.request().url().includes('marine');

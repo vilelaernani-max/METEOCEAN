@@ -3,8 +3,9 @@ const fs = require('fs');
 const src = fs.readFileSync(__dirname + '/../index.html', 'utf8');
 const grab = re => { const m = src.match(re); if (!m) throw new Error('trecho não encontrado: ' + re); return m[0]; };
 const code = [
+  'const tt = (s, ...a) => a.length ? s.replace(/\\{(\\d+)\\}/g, (_, i) => a[+i]) : s;',
   grab(/const HOUR = 3600;\n/),
-  grab(/const PONTOS16 = [^\n]*\n/), grab(/const pontoDe = [^\n]*\n/), grab(/function dirBlocked\([\s\S]*?\n\}\n/), grab(/const rangesOf = [^\n]*\n/),
+  grab(/const PONTOS_PT = [^\n]*\n/), grab(/const PONTOS_EN = [^\n]*\n/), grab(/const PONTOS16 = [^\n]*\n/), grab(/const pontoDe = [^\n]*\n/), grab(/function dirBlocked\([\s\S]*?\n\}\n/), grab(/const rangesOf = [^\n]*\n/),
   grab(/function normalizeLimits\(raw\) \{[\s\S]*?\n\}\n/),
   grab(/function sunUtc\([\s\S]*?\n\}\n/), grab(/function daylightIntervals\([\s\S]*?\n\}\n/), grab(/const isDaylight = [^\n]*\n/),
   grab(/function evaluateHour\(row, L, day\) \{[\s\S]*?\n\}\n/),

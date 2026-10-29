@@ -2,8 +2,8 @@
 const fs = require('fs');
 const src = fs.readFileSync(__dirname + '/../index.html', 'utf8');
 const grab = re => { const m = src.match(re); if (!m) throw new Error('trecho não encontrado: ' + re); return m[0]; };
-const code = [
-  grab(/const PONTOS16 = [^\n]*\n/),
+const code = ['const tt = (s, ...a) => a.length ? s.replace(/\\{(\\d+)\\}/g, (_, i) => a[+i]) : s;',
+  grab(/const PONTOS_PT = [^\n]*\n/), grab(/const PONTOS_EN = [^\n]*\n/), grab(/const PONTOS16 = [^\n]*\n/),
   grab(/const pontoDe = [^\n]*\n/),
   grab(/function dirBlocked\(dir, fromIdx, toIdx\) \{[\s\S]*?\n\}\n/),
   grab(/const rangesOf = [^\n]*\n/),

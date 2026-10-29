@@ -10,8 +10,8 @@ const eq = (n, got, want) => ok(n, JSON.stringify(got) === JSON.stringify(want),
 const grab = re => { const m = src.match(re); if (!m) throw new Error('trecho não encontrado: ' + re); return m[0]; };
 
 // ---------------- parte pura ----------------
-const code = [
-  grab(/const HOUR = 3600;\n/), grab(/const PONTOS16 = [^\n]*\n/), grab(/const pontoDe = [^\n]*\n/), grab(/function dirBlocked\([\s\S]*?\n\}\n/),
+const code = ['const tt = (s, ...a) => a.length ? s.replace(/\\{(\\d+)\\}/g, (_, i) => a[+i]) : s;',
+  grab(/const HOUR = 3600;\n/), grab(/const PONTOS_PT = [^\n]*\n/), grab(/const PONTOS_EN = [^\n]*\n/), grab(/const PONTOS16 = [^\n]*\n/), grab(/const pontoDe = [^\n]*\n/), grab(/function dirBlocked\([\s\S]*?\n\}\n/),
   grab(/const rangesOf = [^\n]*\n/), grab(/function combineEquipLimits\([\s\S]*?\n\}\n/),
   grab(/function normalizeLimits\(raw\) \{[\s\S]*?\n\}\n/), grab(/const isDaylight = [^\n]*\n/), grab(/function evaluateHour\(row, L, day\) \{[\s\S]*?\n\}\n/),
   grab(/const dirTxt = [^\n]*\n/),
@@ -66,7 +66,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
   let dirVento = 180, dirOnda = 270;
   const abre = async (w = 1100, h = 900, scheme = 'light') => {
-    const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, acceptDownloads: true });
+    const ctx = await b.newContext({ locale: 'pt-BR', viewport: { width: w, height: h }, colorScheme: scheme, acceptDownloads: true });
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.route('**/*open-meteo.com/**', r => {
       const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(130)].map((_, i) => t0 + i * 3600), m = r.request().url().includes('marine');

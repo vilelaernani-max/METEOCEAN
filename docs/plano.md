@@ -105,8 +105,16 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 ---
 
 # Plano 6: versão em inglês (spec 6)
-- [ ] L1 Base: `I18N`, `t()`, idioma (navegador e preferência salva), bandeirinhas Brasil/EUA em SVG (botão de idioma), `lang` do HTML. Teste: chaves pareadas.
-- [ ] L2 App: extrair os textos fixos do HTML (`data-i18n`) e das funções (`t()`), por área: análise, locais, perfis, equipamentos, histórico, mapa, mensagens e erros, Ajuda. Teste: tela em inglês sem português.
-- [ ] L3 Relatórios: `buildReport`, HTML baixado e `buildPdf` pelo idioma; legendas e eixos dos gráficos; nomes de arquivo. Teste: relatórios resumido e completo em inglês (tela, HTML, PDF via `pdftotext`).
-- [ ] L4 Entorno: datas, números, título da aba, manifest; troca de idioma sem perder dados; artefato republicado.
-- [ ] L5 Fechamento: todos os testes em português e inglês, GitHub, artefato, vídeo opcional em inglês.
+- [x] L1 Base: `I18N`, `t()`, idioma (navegador e preferência salva), bandeirinhas Brasil/EUA em SVG (botão de idioma), `lang` do HTML. Teste: chaves pareadas.
+- [x] L2 App: extrair os textos fixos do HTML (`data-i18n`) e das funções (`t()`), por área: análise, locais, perfis, equipamentos, histórico, mapa, mensagens e erros, Ajuda. Teste: tela em inglês sem português.
+- [x] L3 Relatórios: `buildReport`, HTML baixado e `buildPdf` pelo idioma; legendas e eixos dos gráficos; nomes de arquivo. Teste: relatórios resumido e completo em inglês (tela, HTML, PDF via `pdftotext`).
+- [x] L4 Entorno: datas, números, título da aba, manifest; troca de idioma sem perder dados; artefato republicado.
+- [x] L5 Fechamento: todos os testes em português e inglês, GitHub, artefato, vídeo opcional em inglês.
+
+## Registro do plano 6 (29/10/2026)
+- L1 a L5 concluídas. Mecanismo: o texto em português é a chave (`tt('texto {0}', valor)`); o dicionário `EN` vai dentro do `index.html`. Os textos fixos do HTML são coletados uma vez (`collectUnits`) e trocados por `applyUnits`; textos montados no código, relatórios e PDF passam por `tt()`.
+- Bandeiras do Brasil e dos EUA em SVG (`button.flag`), idioma inicial pelo navegador (`pt*` → português, o resto → inglês) ou por `?lang=pt|en`; a escolha fica em `localStorage` (`mco:lang`).
+- Troca de idioma sem recarregar: refaz abas, listas, seletores de direção (valores mantidos), notas e o relatório aberto.
+- Testes: `tests/idiomas.js` (dicionário, telas fixas, cadastros, relatórios completo e resumido em tela/HTML/PDF, histórico, fontes, backup, avisos, mapa da região, celular). Os testes antigos agora abrem com `locale: 'pt-BR'`. Todos passam, mais a paridade Python × JavaScript.
+- Salvaguarda: `window.__missing` lista os textos sem tradução vistos em inglês; o teste exige lista vazia.
+- Fora do plano: `limitsLabel` virou `limitsParts`/`autoName`; o histórico guarda `profile_limits` para o nome automático do perfil trocar de idioma.
