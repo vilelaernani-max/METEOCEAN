@@ -83,6 +83,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('rótulos dos limites com fundo para ficarem legíveis', (await p.$$eval(g + ' rect.lbg', r => r.length)) === 2);
   ok('rótulos dizem em qual eixo está cada limite', /limite vento 20 kn \(eixo esq\.\)/.test(eixos.join('|')) && /limite Hs 2 m \(eixo dir\.\)/.test(eixos.join('|')), eixos.join('|'));
   ok('legenda mostra as duas linhas de limite', (await p.$$eval('#report .dualleg .lsw', e => e.length)) === 2 && /limite de vento 20 kn/.test(await p.textContent('#report .dualleg')) && /limite de Hs 2 m/.test(await p.textContent('#report .dualleg')));
+  // ---- bússola: o Norte no gráfico ----
+  const bus = await p.$$eval(g + ' g.bussola text', ts => ts.map(x => ({ t: x.textContent, x: +x.getAttribute('x'), y: +x.getAttribute('y'), w: x.getAttribute('font-weight') })));
+  const letra = l => bus.find(b => b.t === l);
+  ok('bússola com N, L, S e O', ['N', 'L', 'S', 'O'].every(l => !!letra(l)), JSON.stringify(bus.map(b => b.t)));
+  ok('N acima, S abaixo, L à direita e O à esquerda', letra('N') && letra('S') && letra('L') && letra('O') && letra('N').y < letra('L').y && letra('L').y < letra('S').y && letra('O').x < letra('N').x && letra('N').x < letra('L').x, JSON.stringify(bus));
+  ok('N em negrito', letra('N') && letra('N').w === '700');
+  ok('nota explica: seta para cima = vento indo para o norte', /seta para cima = vento indo para o norte/.test(bus.map(b => b.t).join('|')), bus.map(b => b.t).join('|'));
+  ok('seta do norte desenhada na bússola', (await p.$$(g + ' g.bussola path.norte')).length === 1);
+  ok('bússola fora da área dos dados (acima da grade)', await p.evaluate(g => { const svg = document.querySelector(g), bb = svg.querySelector('g.bussola').getBBox(), gr = svg.querySelector('line.grid'); return bb.y + bb.height <= +gr.getAttribute('y1') + 0.5 && bb.y >= 0; }, g));
   ok('legenda das duas escalas', (await p.$$('#report .dualchart .dualleg .bar')).length === 2);
   ok('legenda diz setas para o vento e linha para a onda', /Vento[^]*setas[^]*Altura de onda[^]*linha/.test(await p.textContent('#report .dualleg')) && /para onde o vento vai/.test(await p.textContent('#report .dualleg')), await p.textContent('#report .dualleg'));
   ok('seletor de fonte aparece com mais de uma fonte', (await p.$$('#report .dualchart select')).length === 1);
@@ -95,7 +104,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('HTML baixado traz o gráfico', /class="dualchart"/.test(html) && /line class="hl"/.test(html) && /path class="wa"/.test(html) && /path class="wl2"/.test(html));
   const [pd] = await Promise.all([p.waitForEvent('download', { timeout: 20000 }), p.click('#rp-pdf')]).catch(() => [null]);
   ok('PDF gera', !!pd);
-  if (pd) { const pdf = fs.readFileSync(await pd.path(), 'latin1'); ok('PDF contém o título do gráfico (h2 do PDF vai em maiúsculas)', /VENTO E ONDA JUNTOS/.test(pdf), String(pdf.length)); }
+  if (pd) { const pdf = fs.readFileSync(await pd.path(), 'latin1'); ok('PDF contém o título do gráfico (h2 do PDF vai em maiúsculas)', /VENTO E ONDA JUNTOS/.test(pdf), String(pdf.length));
+    ok('PDF explica o Norte', /seta para cima = vento indo para o norte/.test(pdf), ''); }
   if (shots) await p.locator('#report .dualchart').screenshot({ path: path.join(shots, 'grafico-desktop-claro.png') });
   ok('sem erros de página (desktop)', errs.length === 0, JSON.stringify(errs)); await ctx.close();
 

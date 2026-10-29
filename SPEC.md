@@ -156,3 +156,6 @@ Pedido do Ernani: "seta pode ser menor, coloque uma linha suave e as setas por c
 
 ## Revisão 3 (29/10/2026): a seta tem de mostrar a direção
 Pedido do Ernani: "Seta tem q mostrar direção". A seta menor da revisão 2 virou um triângulo pequeno, sem direção legível. Passa a ser uma **seta com haste e ponta**, estreita e alongada (cerca de 14 px de altura por 8 px de largura, ainda menor que a primeira, de 15,5 × 11), com **contorno escuro** para se destacar da linha de mesma cor. Aceite: altura entre 12 e 15 px, altura pelo menos 1,6 vez a largura, formato com haste e ponta, contorno #13232b; rotação segue sendo "de onde vem + 180°". PDF acompanha. Teste: `tests/grafico.js`.
+
+## Revisão 4 (29/10/2026): o Norte no gráfico
+Pedido do Ernani: representar o Norte no gráfico. Faixa nova no alto do gráfico com uma **bússola** pequena (cruz com N em negrito e triângulo vermelho para cima, e L, S, O nos outros pontos) e a nota "Norte para cima: a seta do vento aponta para onde ele vai (seta para cima = vento indo para o norte)". Fica acima da grade, sem cobrir dados. No PDF, a mesma bússola e a mesma nota. Altura do gráfico passa de 300 para 340 (faixa de 58 px no topo). Teste: `tests/grafico.js` (letras N/L/S/O nas posições certas, N em negrito, seta do norte, nota, bússola acima da grade, nota no PDF).
