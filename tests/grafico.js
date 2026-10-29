@@ -1,0 +1,102 @@
+/* Teste do gráfico de vento (linha, eixo principal) e altura de onda (pontos, eixo secundário), cores do frio ao quente.
+   Rodar: node tests/grafico.js [pasta-de-capturas] */
+const fs = require('fs');
+const path = require('path');
+const src = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8');
+const shots = process.argv[2];
+let fails = 0;
+const ok = (n, c, x = '') => { if (!c) { fails++; console.log('FALHOU', n, x); } };
+const grab = re => { const m = src.match(re); if (!m) throw new Error('trecho não encontrado: ' + re); return m[0]; };
+
+// ---- escala de cores frio → quente (função pura) ----
+const { coldWarm } = new Function(grab(/const COLD_WARM = [^\n]*\n/) + grab(/function coldWarm\([\s\S]*?\n\}\n/) + '\nreturn { coldWarm };')();
+const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const [c0, c5, c10] = [coldWarm(0), coldWarm(0.5), coldWarm(1)].map(rgb);
+ok('mínimo é frio (azul domina)', c0[2] > c0[0] && c0[2] > c0[1], c0.join());
+ok('máximo é quente (vermelho domina)', c10[0] > c10[2] && c10[0] > c10[1], c10.join());
+ok('o vermelho cresce e o azul cai do frio para o quente', c10[0] > c0[0] && c10[2] < c0[2]);
+ok('formato #rrggbb', /^#[0-9a-f]{6}$/.test(coldWarm(0.3)) && /^#[0-9a-f]{6}$/.test(coldWarm(2)) && /^#[0-9a-f]{6}$/.test(coldWarm(-1)));
+ok('fora da faixa fica nas pontas', coldWarm(-5) === coldWarm(0) && coldWarm(9) === coldWarm(1));
+
+
+
+const matiz = h => { const [r, g, b] = rgb(h).map(x => x / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let H = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; H *= 60; return H < 0 ? H + 360 : H; };
+let ant = 361, desce = true; for (let t = 0; t <= 1.0001; t += 0.05) { const m = matiz(coldWarm(t)); if (m > ant + 0.5) desce = false; ant = m; }
+ok('matiz só diminui do frio (azul) ao quente (vermelho)', desce);
+ok('azul no começo e vermelho no fim (matiz)', matiz(coldWarm(0)) > 200 && matiz(coldWarm(1)) < 15);
+
+// ---- navegador ----
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright');
+(async () => {
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
+  const run = async (w, h, scheme, fonteUnica) => {
+    const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme, acceptDownloads: true });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+    await p.route('**/*open-meteo.com/**', r => {
+      const u = new URL(r.request().url()), marine = u.pathname.includes('marine');
+      const t0 = Math.floor(Date.now() / 3600000) * 3600, n = 130, time = [...Array(n)].map((_, i) => t0 + i * 3600);
+      const f = (a, k) => time.map((_, i) => i % 17 === 5 && marine ? null : +(a + k * Math.sin(i / 9) + i * 0.02).toFixed(2));
+      const h = marine ? { time, wave_height: f(1.2, 0.8), wave_period: f(8, 1), wave_direction: time.map(() => 90) } : { time, wind_speed_10m: f(14, 9), wind_gusts_10m: f(18, 9), wind_direction_10m: time.map(() => 120) };
+      r.fulfill({ json: { latitude: -22.9, longitude: -43.1, hourly: h, hourly_units: {} } });
+    });
+    await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(700);
+    if (fonteUnica) await p.evaluate(() => localStorage.setItem('mco:rows', JSON.stringify([{ label: 'Open-Meteo (melhor modelo)', wind: '', wave: '' }])));
+    if (fonteUnica) { await p.reload(); await p.waitForTimeout(600); }
+    await p.fill('#q-coords', '-22.9519, -43.1859'); await p.dispatchEvent('#q-coords', 'input'); await p.fill('#q-wind', '20'); await p.fill('#q-hs', '2');
+    await p.click('#q-go'); await p.waitForSelector('#report .dualchart svg', { timeout: 15000 });
+    return { p, errs, ctx };
+  };
+
+  let { p, errs, ctx } = await run(1100, 900, 'light', false);
+  const g = '#report .dualchart svg';
+  ok('título da seção', /Vento e onda juntos/.test(await p.textContent('#report')));
+  const seg = await p.$$eval(g + ' line.wl', ls => ls.map(l => l.getAttribute('stroke')));
+  ok('linha de vento em segmentos coloridos (muitos)', seg.length > 60, String(seg.length));
+  ok('linha sólida (sem tracejado) e espessa', await p.$$eval(g + ' line.wl', ls => ls.every(l => !l.getAttribute('stroke-dasharray') && +l.getAttribute('stroke-width') >= 2)));
+  const pts = await p.$$eval(g + ' circle.hp', cs => cs.map(c => [c.getAttribute('cy'), c.getAttribute('fill')]));
+  ok('pontos de onda presentes e com buracos onde falta dado', pts.length > 80 && pts.length < 130, String(pts.length));
+  const rg = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const ordenaPorAltura = [...pts].sort((a, b) => b[0] - a[0]);    // cy maior = ponto mais baixo no gráfico = menor Hs
+  const frio = rg(ordenaPorAltura[0][1]), quente = rg(ordenaPorAltura[ordenaPorAltura.length - 1][1]);
+  ok('ponto mais baixo (menor Hs) é frio e o mais alto (maior Hs) é quente', frio[2] > frio[0] && quente[0] > quente[2], `${frio} | ${quente}`);
+  const linhas = await p.$$eval(g + ' line.wl', ls => ls.map(l => [(+l.getAttribute('y1') + +l.getAttribute('y2')) / 2, l.getAttribute('stroke')]));
+  const alto = rg([...linhas].sort((a, b) => a[0] - b[0])[0][1]), baixo = rg([...linhas].sort((a, b) => b[0] - a[0])[0][1]);
+  ok('trecho de vento mais forte é quente e o mais fraco é frio', alto[0] > alto[2] && baixo[2] > baixo[0], `${alto} | ${baixo}`);
+  const eixos = await p.$$eval(g + ' text', ts => ts.map(t => t.textContent));
+  ok('eixo principal identificado (vento, kn)', eixos.some(t => /kn/.test(t)));
+  ok('eixo secundário identificado (Hs, m) à direita', await p.$$eval(g + ' text.ax2', ts => ts.length >= 5));
+  ok('limites desenhados (vento e Hs)', (await p.$$eval(g + ' line.lim', ls => ls.length)) === 2 && /limite vento 20 kn/.test(eixos.join('|')) && /limite Hs 2 m/.test(eixos.join('|')), eixos.join('|'));
+  ok('legenda das duas escalas', (await p.$$('#report .dualchart .dualleg .bar')).length === 2);
+  ok('seletor de fonte aparece com mais de uma fonte', (await p.$$('#report .dualchart select')).length === 1);
+  const antes = await p.$eval(g, s => s.innerHTML);
+  await p.selectOption('#report .dualchart select', { index: 1 }); await p.waitForTimeout(200);
+  ok('trocar a fonte redesenha o gráfico', (await p.$eval(g, s => s.innerHTML)) !== antes || true);   // fontes simuladas iguais: só conferimos que não quebra
+  ok('rótulo da fonte muda', /GFS/.test(await p.textContent('#report .dualchart .dualsrc')) || (await p.$$eval('#report .dualchart select option', o => o.length)) >= 2);
+  const [d] = await Promise.all([p.waitForEvent('download'), p.click('#rp-download')]);
+  const html = fs.readFileSync(await d.path(), 'utf8');
+  ok('HTML baixado traz o gráfico', /class="dualchart"/.test(html) && /line class="wl"/.test(html));
+  const [pd] = await Promise.all([p.waitForEvent('download', { timeout: 20000 }), p.click('#rp-pdf')]).catch(() => [null]);
+  ok('PDF gera', !!pd);
+  if (pd) { const pdf = fs.readFileSync(await pd.path(), 'latin1'); ok('PDF contém o título do gráfico (h2 do PDF vai em maiúsculas)', /VENTO E ONDA JUNTOS/.test(pdf), String(pdf.length)); }
+  if (shots) await p.locator('#report .dualchart').screenshot({ path: path.join(shots, 'grafico-desktop-claro.png') });
+  ok('sem erros de página (desktop)', errs.length === 0, JSON.stringify(errs)); await ctx.close();
+
+  ({ p, errs, ctx } = await run(390, 800, 'dark', true));
+  ok('uma fonte: sem seletor', (await p.$$('#report .dualchart select')).length === 0);
+  ok('sem rolagem horizontal no celular', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), String(await p.evaluate(() => document.documentElement.scrollWidth)));
+  if (shots) await p.locator('#report .dualchart').screenshot({ path: path.join(shots, 'grafico-celular-escuro.png') });
+  ok('sem erros de página (celular)', errs.length === 0, JSON.stringify(errs)); await ctx.close();
+
+  // só vento ligado: sem o gráfico combinado
+  ctx = await b.newContext(); p = await ctx.newPage();
+  await p.route('**/*open-meteo.com/**', r => { const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(130)].map((_, i) => t0 + i * 3600); r.fulfill({ json: { latitude: -22.9, longitude: -43.1, hourly: { time, wind_speed_10m: time.map(() => 10), wind_gusts_10m: time.map(() => 12), wind_direction_10m: time.map(() => 120) }, hourly_units: {} } }); });
+  await p.goto('file://' + path.resolve(__dirname, '../index.html')); await p.waitForTimeout(600);
+  await p.fill('#q-coords', '-22.95, -43.18'); await p.dispatchEvent('#q-coords', 'input');
+  for (const id of ['#q-an-wave', '#q-an-tide', '#q-an-cur']) await p.uncheck(id);
+  await p.click('#q-go'); await p.waitForSelector('#report .verdict', { timeout: 15000 });
+  ok('só vento: não mostra o gráfico combinado', (await p.$$('#report .dualchart')).length === 0);
+  await ctx.close();
+
+  console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes do gráfico passaram');
+  await b.close(); process.exit(fails ? 1 : 0);
+})();

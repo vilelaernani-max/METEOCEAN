@@ -793,6 +793,13 @@ const REPORT_CSS = `
 .rp .foot{color:var(--mut);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .rp .mine{color:var(--warn);font-weight:600}
 .rp .age{color:var(--mut);font-size:13px;margin:8px 0}
+.rp .dualsrc{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--mut);margin:4px 0}
+.rp .dualleg{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center;font-size:12.5px;margin:6px 0}
+.rp .dualscroll{overflow-x:auto}
+.rp .dualscroll svg{min-width:720px}
+.rp .dualleg .dl{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px}
+.rp .dualleg .sc{display:inline-flex;align-items:center;gap:6px}
+.rp .dualleg .bar{display:inline-block;width:110px;height:10px;border-radius:5px}
 .rmap{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#dde7ec;max-width:100%}
 .rmap .tiles{position:absolute;inset:0}
 .rmap .tiles img{position:absolute;width:256px;height:256px;pointer-events:none}
@@ -1012,6 +1019,68 @@ function kpis(res, tz) {
   const ag = res.agreement.pct;
   const k = (v, l, cls = '') => `<div class="kpi ${cls}"><div class="v"${String(v).length > 7 ? ' style="font-size:19px"' : ''}>${v}</div><div class="l">${l}</div></div>`;
   return `<div class="kpis">${k(cw.length, 'janelas (conservador)', cw.length ? 'go' : 'nogo')}${k(cw.length ? fmt(grid[cw[0].i0], tz) : '—', 'próxima janela', cw.length ? 'go' : 'nogo')}${k(longest ? longest.hours + ' h' : '—', 'janela mais longa')}${k(`${Math.round(100 * goH / st.length)}%`, 'horas GO no período', goH / st.length >= 0.5 ? 'go' : goH ? 'warn' : 'nogo')}${k(ag === null ? '—' : Math.round(ag) + '%', 'concordância entre fontes', ag === null ? '' : ag >= 75 ? 'go' : ag >= 50 ? 'warn' : 'nogo')}</div>`;
+}
+/* gráfico combinado: vento em linha sólida (eixo esquerdo) e altura de onda em pontos (eixo direito), cores do frio (baixo) ao quente (alto) */
+const COLD_WARM = [[0, [43, 89, 195]], [0.25, [42, 167, 214]], [0.5, [92, 184, 92]], [0.75, [240, 173, 44]], [1, [217, 56, 42]]];
+function coldWarm(t) {
+  t = Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : 0;
+  let i = 0; while (i < COLD_WARM.length - 2 && t > COLD_WARM[i + 1][0]) i++;
+  const [t0, a] = COLD_WARM[i], [t1, b] = COLD_WARM[i + 1], k = (t - t0) / (t1 - t0);
+  return '#' + a.map((v, j) => Math.round(v + (b[j] - v) * k).toString(16).padStart(2, '0')).join('');
+}
+const coldWarmCss = () => `linear-gradient(90deg,${COLD_WARM.map(([t, c]) => `rgb(${c.join(',')}) ${t * 100}%`).join(',')})`;
+function dualBody(res, tz, si, lm) {
+  const s = res.sources[si], grid = res.grid, n = grid.length, okv = v => v !== null && v !== undefined;
+  const wv = s.wind.filter(okv), hv = s.hs.filter(okv);
+  if (!wv.length && !hv.length) return '<p class="sub">Sem dados de vento e de onda neste ponto.</p>';
+  const wmax = niceMax(Math.max(0, ...wv, lm.wind_max ?? 0) * 1.08), hmax = niceMax(Math.max(0, ...hv, lm.hs_max ?? 0) * 1.08);
+  const W = 980, H = 300, left = 46, right = 46, top = 16, bot = 26, pw = W - left - right, ph = H - top - bot;
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, YW = v => top + ph - (Math.min(v, wmax) / wmax) * ph, YH = v => top + ph - (Math.min(v, hmax) / hmax) * ph;
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Vento (linha, eixo esquerdo, em nós) e altura de onda (pontos, eixo direito, em metros) ao longo do tempo, coloridos do frio ao quente">`];
+  for (let k = 0; k <= 5; k++) {
+    const y = top + ph - ph * k / 5;
+    o.push(`<line class="grid" x1="${left}" y1="${y.toFixed(1)}" x2="${W - right}" y2="${y.toFixed(1)}"/>`);
+    o.push(`<text class="mut" x="${left - 6}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end">${+(wmax * k / 5).toFixed(2)}</text>`);
+    o.push(`<text class="mut ax2" x="${W - right + 6}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="start">${+(hmax * k / 5).toFixed(2)}</text>`);
+  }
+  o.push(`<text class="mut" x="4" y="10" font-size="11">vento (kn)</text><text class="mut" x="${W - 4}" y="10" font-size="11" text-anchor="end">Hs (m)</text>`);
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) {
+    const x = X(i);
+    o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + ph}"/>`);
+    if ((n - i) / n * pw > 40) o.push(`<text class="mut" x="${(x + 3).toFixed(1)}" y="${H - 8}" font-size="11">${dayLabel(d)}</text>`);
+  }
+  if (lm.wind_max !== null && lm.wind_max !== undefined) {
+    o.push(`<line class="lim" x1="${left}" y1="${YW(lm.wind_max).toFixed(1)}" x2="${W - right}" y2="${YW(lm.wind_max).toFixed(1)}"/>`);
+    o.push(`<text x="${left + 4}" y="${(YW(lm.wind_max) - 4).toFixed(1)}" font-size="11" text-anchor="start" style="fill:var(--nogo)">limite vento ${lm.wind_max} kn</text>`);
+  }
+  if (lm.hs_max !== null && lm.hs_max !== undefined) {
+    o.push(`<line class="lim" style="stroke-dasharray:2 3" x1="${left}" y1="${YH(lm.hs_max).toFixed(1)}" x2="${W - right}" y2="${YH(lm.hs_max).toFixed(1)}"/>`);
+    o.push(`<text x="${W - right - 4}" y="${(YH(lm.hs_max) - 4).toFixed(1)}" font-size="11" text-anchor="end" style="fill:var(--nogo)">limite Hs ${lm.hs_max} m</text>`);
+  }
+  for (let i = 1; i < n; i++) {
+    const a = s.wind[i - 1], b = s.wind[i];
+    if (!okv(a) || !okv(b)) continue;
+    o.push(`<line class="wl" x1="${X(i - 1).toFixed(1)}" y1="${YW(a).toFixed(1)}" x2="${X(i).toFixed(1)}" y2="${YW(b).toFixed(1)}" stroke="${coldWarm((a + b) / 2 / wmax)}" stroke-width="2.6" stroke-linecap="round"/>`);
+  }
+  s.hs.forEach((v, i) => { if (okv(v)) o.push(`<circle class="hp" cx="${X(i).toFixed(1)}" cy="${YH(v).toFixed(1)}" r="3.2" fill="${coldWarm(v / hmax)}" stroke="#fff" stroke-width="0.8"/>`); });
+  o.push('</svg>');
+  const bar = `<i class="bar" style="background:${coldWarmCss()}"></i>`;
+  return `<div class="dualscroll">${o.join('')}</div><div class="dualleg"><span class="dl"><span class="t"><b>Vento</b> (linha, eixo esquerdo)</span><span class="sc">0 ${bar} ${wmax} kn</span></span><span class="dl"><span class="t"><b>Altura de onda</b> (pontos, eixo direito)</span><span class="sc">0 ${bar} ${hmax} m</span></span><span class="sub">azul = baixo, vermelho = alto</span></div>`;
+}
+function dualChartHtml(res, tz, si, lm) {
+  return `<div class="dualchart"><div class="dualsrc"><span class="dualname">Fonte: ${esc(res.sources[si].label)}</span></div><div class="dualbody">${dualBody(res, tz, si, lm)}</div></div>`;
+}
+/* na tela, com mais de uma fonte, um seletor troca a fonte do gráfico (o HTML baixado e o PDF usam a primeira) */
+function wireDual(ctx) {
+  const box = $('#report .dualchart'), res = ctx.result;
+  if (!box || res.sources.length < 2) return;
+  const sel = el('select', { 'aria-label': 'Fonte do gráfico', style: 'width:auto;margin:0' }, ...res.sources.map((s, i) => el('option', { value: String(i) }, s.label)));
+  box.querySelector('.dualsrc').append(sel);
+  sel.addEventListener('change', () => {
+    const i = +sel.value;
+    box.querySelector('.dualname').textContent = 'Fonte: ' + res.sources[i].label;
+    box.querySelector('.dualbody').innerHTML = dualBody(res, ctx.location.tz_offset, i, res.limits);
+  });
 }
 function windowsTable(wins, grid, tz, showSources) {
   if (!wins.length) return '<p class="sub">Nenhuma janela.</p>';
@@ -1349,6 +1418,7 @@ ${hdr}
   const chart = (title, body) => `<div><h2>${title}</h2>${body}</div>`;
   if (brief) {
     const charts = [];
+    if (A.wind && A.wave) charts.push(chart('Vento e onda juntos', dualChartHtml(res, tz, 0, lm)));
     if (A.wind) charts.push(chart('Vento a 10 m', lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')));
     if (A.wave) charts.push(chart('Altura significativa (Hs)', lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')));
     const t = A.tide ? tideStats(res, tz, ctx.generatedTs) : null;
@@ -1378,6 +1448,8 @@ ${legend}
 ${timelineSvg(res, tz, rows)}` : ''}
 ${A.wind ? `<h2>Vento predominante</h2>
 ${windSummaryHtml(res, tz)}` : ''}
+${A.wind && A.wave ? `<h2>Vento e onda juntos</h2>
+${dualChartHtml(res, tz, 0, lm)}` : ''}
 <div class="charts">
 ${A.wave ? chart('Altura significativa (Hs)', lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')) + chart('Período de pico (Tp)', lineChartSvg(res, tz, 'tp', 'Tp', 's', lm.tp_min, 'Tp por fonte com o limite operacional')) : ''}
 ${A.wind ? chart('Vento a 10 m', lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')) + chart('Rajada', lineChartSvg(res, tz, 'gust', 'Rajada', 'kn', lm.gust_max, 'Rajada por fonte com o limite operacional')) + chart('Direção do vento', dirChartSvg(res, tz, 'wdir', 'Direção do vento por fonte')) : ''}
@@ -1522,6 +1594,33 @@ class Pdf {
   }
 }
 
+function pdfDualChart(pdf, res, tz, lm) {
+  const s = res.sources[0], grid = res.grid, n = grid.length, okv = v => v !== null && v !== undefined;
+  const wv = s.wind.filter(okv), hv = s.hs.filter(okv);
+  const H = 135, left = PDF_M + 30, right = PDF_W - PDF_M - 30, pw = right - left, ph = H - 40;
+  pdf.ensure(H + 70);
+  pdf.h2('Vento e onda juntos');
+  if (!wv.length && !hv.length) { pdf.para('Sem dados de vento e de onda neste ponto.', 9, { color: PDF_COL.mut }); return; }
+  const top = pdf.y + 14;
+  const wmax = niceMax(Math.max(0, ...wv, lm.wind_max ?? 0) * 1.08), hmax = niceMax(Math.max(0, ...hv, lm.hs_max ?? 0) * 1.08);
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, YW = v => top + ph - (Math.min(v, wmax) / wmax) * ph, YH = v => top + ph - (Math.min(v, hmax) / hmax) * ph;
+  for (let k = 0; k <= 4; k++) {
+    const y = top + ph - ph * k / 4; pdf.line(left, y, right, y);
+    pdf.text(left - 4, y + 3, String(+(wmax * k / 4).toFixed(2)), 7, { color: PDF_COL.mut, align: 'right' });
+    pdf.text(right + 4, y + 3, String(+(hmax * k / 4).toFixed(2)), 7, { color: PDF_COL.mut });
+  }
+  pdf.text(left, top - 6, 'vento (kn)', 7, { color: PDF_COL.mut, align: 'right' }); pdf.text(right, top - 6, 'Hs (m)', 7, { color: PDF_COL.mut });
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(i); pdf.line(x, top, x, top + ph); if ((n - i) / n * pw > 30) pdf.text(x + 2, top + ph + 10, dayLabel(d), 7, { color: PDF_COL.mut }); }
+  if (lm.wind_max !== null && lm.wind_max !== undefined) { pdf.line(left, YW(lm.wind_max), right, YW(lm.wind_max), { color: PDF_COL.nogo, dash: true, lw: 0.9 }); pdf.text(left + 2, YW(lm.wind_max) - 3, `limite vento ${lm.wind_max} kn`, 7, { color: PDF_COL.nogo }); }
+  if (lm.hs_max !== null && lm.hs_max !== undefined) { pdf.line(left, YH(lm.hs_max), right, YH(lm.hs_max), { color: PDF_COL.nogo, dash: true, lw: 0.9 }); pdf.text(right - 2, YH(lm.hs_max) - 3, `limite Hs ${lm.hs_max} m`, 7, { color: PDF_COL.nogo, align: 'right' }); }
+  for (let i = 1; i < n; i++) { const a = s.wind[i - 1], b = s.wind[i]; if (okv(a) && okv(b)) pdf.line(X(i - 1), YW(a), X(i), YW(b), { color: coldWarm((a + b) / 2 / wmax), lw: 1.8 }); }
+  s.hs.forEach((v, i) => { if (okv(v)) pdf.dot(X(i), YH(v), 1.6, coldWarm(v / hmax)); });
+  pdf.y = top + H - 14;
+  const strip = (x, label, max) => { const lw = pdf.width(label, 7.5) + 6, w = 60; pdf.text(x, pdf.y + 5.5, label, 7.5, { color: PDF_COL.mut }); for (let k = 0; k < 20; k++) pdf.rect(x + lw + (w / 20) * k, pdf.y, w / 20 + 0.4, 6, { fill: coldWarm(k / 19) }); pdf.text(x + lw + w + 4, pdf.y + 5.5, `0 a ${max}`, 7.5, { color: PDF_COL.mut }); return lw + w + 4 + pdf.width(`0 a ${max}`, 7.5) + 24; };
+  const dx = strip(left, 'Vento (linha)', `${wmax} kn`); const dx2 = strip(left + dx, 'Hs (pontos)', `${hmax} m`);
+  pdf.text(left + dx + dx2, pdf.y + 5.5, 'azul = baixo, vermelho = alto', 7.5, { color: PDF_COL.mut });
+  pdf.y += 14;
+}
 function pdfLineChart(pdf, res, tz, key, title, unit, limit) {
   const grid = res.grid, n = grid.length, series = res.sources.map(s => [s.label, s[key] || []]);
   const vals = series.flatMap(([, a]) => a).filter(v => v !== null && v !== undefined);
@@ -1792,12 +1891,14 @@ function buildPdf(ctx) {
   if (hasLim) { pdf.ensure(res.sources.length * 13 + 90); pdf.h2('Linha do tempo por fonte');
     pdfTimeline(pdf, res, tz, [['Conservador', res.conservative.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])]); }
   if (brief) {
+    if (A.wind && A.wave) pdfDualChart(pdf, res, tz, lm);
     if (A.wind) pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
     if (A.wave) pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
     if (A.cur) pdfCurSection(pdf, ctx, true);
     if (A.tide) pdfTideSection(pdf, ctx, true);
   } else {
     if (A.wind) pdfWindSection(pdf, res);
+    if (A.wind && A.wave) pdfDualChart(pdf, res, tz, lm);
     if (A.wave) { pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max); pdfLineChart(pdf, res, tz, 'tp', 'Período de pico (Tp)', 's', lm.tp_min); }
     if (A.wind) { pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max); pdfLineChart(pdf, res, tz, 'gust', 'Rajada', 'kn', lm.gust_max); pdfDirChart(pdf, res, tz, 'wdir', 'Direção do vento (de onde vem)'); }
     if (A.wave) pdfDirChart(pdf, res, tz, 'wvdir', 'Direção das ondas (de onde vêm)');
@@ -2582,7 +2683,7 @@ async function runAnalysis(loc, prof, days, tags, msg, opts = {}) {
 function showReport(ctx) {
   S.current = ctx;
   $('#report').innerHTML = buildReport(ctx);
-  ageFill($('#report'));
+  ageFill($('#report')); wireDual(ctx);
   { const v = $('#report .verdict'), m = mountRegionMap(ctx); if (v) v.after(m); else $('#report').append(m); }
   $('#report-wrap').classList.add('on');
   $('#report-wrap').scrollIntoView({ block: 'start' });

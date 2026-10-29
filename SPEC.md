@@ -116,3 +116,25 @@ Data de início no modo completo (colagem manual), direção de onda no PDF do m
 
 ## Perguntas em aberto
 Nenhuma. Estou supondo: (1) direção da onda bloqueia, como a do vento; (2) data de início só na análise rápida; (3) animação de 0,5 s por hora, sem escolha de velocidade.
+
+---
+
+# Spec 3: gráfico combinado de vento e onda
+
+Pedido do Ernani (29/10/2026): gráfico de linha e dispersão; eixo primário com a intensidade do vento em linha sólida; eixo secundário com a altura da onda em pontos; plotagem do frio para o quente.
+
+## Objetivo e aceite
+- Seção "Vento e onda juntos" no relatório (tela, HTML baixado e PDF), quando vento e ondas estão na análise.
+- Eixo esquerdo: vento em nós, **linha sólida** em segmentos. Eixo direito: Hs em metros, **pontos**. Os dois eixos têm 5 divisões alinhadas à mesma grade.
+- Cores **do frio ao quente**: azul (valor baixo) → ciano → verde → laranja → vermelho (valor alto). A cor de cada trecho da linha segue a intensidade do vento e a de cada ponto segue a Hs, cada uma na escala do seu próprio eixo (0 até o máximo do eixo). A matiz só diminui do azul ao vermelho.
+- Limites do perfil aparecem como linhas tracejadas: vento no eixo esquerdo e Hs no direito, cada uma com seu rótulo.
+- Legenda com a escala de cores das duas séries e a frase "azul = baixo, vermelho = alto".
+- Fonte do gráfico: a primeira fonte. Na tela, com mais de uma fonte, um seletor troca a fonte (HTML baixado e PDF usam a primeira, e o nome da fonte aparece no gráfico).
+- Horas sem dado deixam buraco na linha e nos pontos (sem interpolar).
+- No celular o gráfico rola na horizontal dentro do próprio quadro (largura mínima de 720 px), sem rolagem da página.
+
+## Fora do escopo
+Direção do vento ou da onda no gráfico, gráfico por fonte lado a lado, rajada.
+
+## Testes
+`tests/grafico.js`: escala de cores (função pura), segmentos e pontos, cores frio/quente nos extremos, eixos, limites, legenda, seletor de fonte, HTML baixado, PDF, celular escuro sem rolagem da página, e ausência do gráfico quando só o vento está ligado.

@@ -58,3 +58,11 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 ## Registro
 - Concluído em 2026-10-25. Todos os testes e o de paridade passam.
 - Decisões de construção: "Dias à frente" passa a aceitar até 16 (antes 10); o início é arredondado para a hora cheia em UTC (com fuso de meia hora, 08:00 local vira o início da hora UTC anterior); ao chegar ao fim, Reproduzir recomeça do início; o início escolhido não é lembrado entre visitas (evita erro de "início no passado").
+
+---
+
+# Plano 3: gráfico combinado de vento e onda (spec 3)
+- [x] G1 Escala de cores frio → quente (`coldWarm`) e gráfico SVG de dois eixos (`dualBody`/`dualChartHtml`), com seletor de fonte na tela (`wireDual`).
+- [x] G2 Versão para o PDF (`pdfDualChart`) com legenda das escalas.
+- [x] G3 Teste `tests/grafico.js` (puro, navegador, PDF e celular).
+- Registro (2026-10-29): título do PDF sai em maiúsculas (padrão do `pdf.h2`); no celular o gráfico rola dentro do quadro para manter o texto legível.
