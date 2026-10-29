@@ -129,6 +129,21 @@ function resp(u) {
   ok('resposta incompleta avisa', /incompleta/.test(await p.textContent('.rmwrap .msg.bad')));
   await ctx.close();
 
+  // zoom da roda: 12 giros seguidos valem um nível só; depois de uma pausa, outro nível
+  { const ctx3 = await b.newContext({ locale: 'pt-BR', viewport: { width: 900, height: 800 } }); const p3 = await ctx3.newPage();
+    await p3.route('**/tile.openstreetmap.org/**', r => r.fulfill({ body: PNG, contentType: 'image/png' }));
+    await p3.goto('file://' + path.resolve(__dirname, '../index.html')); await p3.waitForTimeout(700);
+    const zoomAtual = () => p3.$eval('#map .map-tiles img', i => +i.dataset.k.split('/')[0]);
+    const z0 = await zoomAtual(), box = await p3.locator('#map').boundingBox();
+    await p3.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    for (let i = 0; i < 12; i++) await p3.mouse.wheel(0, -100);
+    await p3.waitForTimeout(100);
+    ok('roda: muitos giros seguidos dão só um nível de zoom', (await zoomAtual()) === z0 + 1, `${z0} → ${await zoomAtual()}`);
+    await p3.waitForTimeout(650); await p3.mouse.wheel(0, -100); await p3.waitForTimeout(100);
+    ok('roda: depois de uma pausa vem o próximo nível', (await zoomAtual()) === z0 + 2, String(await zoomAtual()));
+    await p3.waitForTimeout(650); await p3.mouse.wheel(0, 100); await p3.waitForTimeout(100);
+    ok('roda: giro para o outro lado afasta', (await zoomAtual()) === z0 + 1, String(await zoomAtual()));
+    await ctx3.close(); }
   console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes do mapa passaram');
   await b.close(); process.exit(fails ? 1 : 0);
 })();
