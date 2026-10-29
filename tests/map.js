@@ -43,8 +43,8 @@ function resp(u) {
   // 1) fluxo normal, desktop claro
   chamadasGrade = 0; modo = 'ok';
   let { p, errs, ctx } = await run(1100, 900, 'light', 'desktop');
-  ok('botão existe e nada buscado antes do clique', (await p.textContent('.rmwrap button')) === 'Ver mapa da região' && chamadasGrade === 0);
-  await p.click('.rmwrap button'); await p.waitForSelector('.rmap svg g', { timeout: 15000 });
+  ok('botão existe e nada buscado antes do clique', (await p.textContent('.rmwrap button.primary')) === 'Ver mapa da região' && chamadasGrade === 0);
+  await p.click('.rmwrap button.primary'); await p.waitForSelector('.rmap svg g', { timeout: 15000 });
   ok('uma busca por API (2 no total)', chamadasGrade === 2, String(chamadasGrade));
   ok('49 células', (await p.$$eval('.rmap svg g', g => g.length)) === 49);
   ok('2 pontos de terra sem cor', (await p.$$eval('.rmap rect.c-none', r => r.length)) === 2);
@@ -107,7 +107,7 @@ function resp(u) {
 
   // 2) celular escuro: sem rolagem horizontal
   ({ p, errs, ctx } = await run(390, 800, 'dark', 'celular'));
-  await p.click('.rmwrap button'); await p.waitForSelector('.rmap svg g', { timeout: 15000 });
+  await p.click('.rmwrap button.primary'); await p.waitForSelector('.rmap svg g', { timeout: 15000 });
   ok('sem rolagem horizontal no celular', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), String(await p.evaluate(() => document.documentElement.scrollWidth)));
   await p.locator('.rmwrap').scrollIntoViewIfNeeded();
   if (shots) await p.locator('.rmwrap').screenshot({ path: path.join(shots, 'mapa-celular-escuro.png') });
@@ -116,16 +116,16 @@ function resp(u) {
   // 3) erro 429: mensagem, relatório intacto
   modo = '429';
   ({ p, errs, ctx } = await run(1100, 900, 'light', 'e429'));
-  await p.click('.rmwrap button'); await p.waitForSelector('.rmwrap .msg.bad', { timeout: 10000 });
+  await p.click('.rmwrap button.primary'); await p.waitForSelector('.rmwrap .msg.bad', { timeout: 10000 });
   ok('429 mostra mensagem clara', /limite de uso/.test(await p.textContent('.rmwrap .msg.bad')), await p.textContent('.rmwrap .msg.bad'));
   ok('relatório segue na tela', (await p.$$('#report .verdict')).length === 1);
-  ok('botão volta a funcionar', !(await p.$eval('.rmwrap button', b => b.disabled)));
+  ok('botão volta a funcionar', !(await p.$eval('.rmwrap button.primary', b => b.disabled)));
   await ctx.close();
 
   // 4) resposta incompleta
   modo = 'curta';
   ({ p, errs, ctx } = await run(1100, 900, 'light', 'curta'));
-  await p.click('.rmwrap button'); await p.waitForSelector('.rmwrap .msg.bad', { timeout: 10000 });
+  await p.click('.rmwrap button.primary'); await p.waitForSelector('.rmwrap .msg.bad', { timeout: 10000 });
   ok('resposta incompleta avisa', /incompleta/.test(await p.textContent('.rmwrap .msg.bad')));
   await ctx.close();
 

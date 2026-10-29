@@ -90,8 +90,13 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 ---
 
 # Plano 5: gráficos do resumido, corrente e maré, identidade e ajuda (spec 5)
-- [ ] I1 Gráfico genérico de dois eixos com faixa de direção (`twoAxisChart`) e bússola reaproveitada; gráficos de Vento (intensidade, rajada, direção) e de Onda (Hs, Tp, direção) no resumido, com testes.
-- [ ] I2 Corrente (velocidade + direção) e maré (curva) no resumido; conferir os do completo; testes.
-- [ ] I3 Logotipo embutido (WebP com transparência para a tela e HTML; JPEG com fundo branco para o PDF), cabeçalho do app e dos relatórios (tela, HTML, PDF) e "Desenvolvido por" no rodapé; testes.
-- [ ] I4 Aba Ajuda, pontos "?" e testes.
-- [ ] I5 Fechamento: todos os testes, republicar o artefato.
+- [x] I1 Gráfico genérico de dois eixos com faixa de direção (`twoAxisChart`) e bússola reaproveitada; gráficos de Vento (intensidade, rajada, direção) e de Onda (Hs, Tp, direção) no resumido, com testes.
+- [x] I2 Corrente (velocidade + direção) e maré (curva) no resumido; conferir os do completo; testes.
+- [x] I3 Logotipo embutido (WebP com transparência para a tela e HTML; JPEG com fundo branco para o PDF), cabeçalho do app e dos relatórios (tela, HTML, PDF) e "Desenvolvido por" no rodapé; testes.
+- [x] I4 Aba Ajuda, pontos "?" e testes.
+- [x] I5 Fechamento: todos os testes, republicar o artefato.
+
+## Registro do plano 5 (29/10/2026)
+- I1 a I5 concluídas. Testes novos: `tests/identidade.js`, `tests/ajuda.js`; estendidos: `tests/resumido.js` (ordem dos blocos, gráficos por variável, PDF). Todos os testes e a paridade Python × JavaScript passam.
+- Decisões de construção: gráfico genérico `twoAxisBody` (tela) e `pdfTwoAxis` (PDF) com a mesma configuração (`windCfg`, `waveCfg`, `curCfg`); a direção da corrente já é "para onde vai" (sem somar 180°); logotipo em WebP (tela e HTML) e JPEG sobre o azul do cabeçalho (PDF), cerca de 8 KB cada em base64; botões "?" só na tela (não vão no HTML nem no PDF); botão "Voltar" na Ajuda leva à aba de onde veio.
+- Fora do plano: o texto "Fonte:" aparece em cada gráfico por variável do resumido; no resumido só com vento ou só com ondas, saiu o gráfico simples antigo (o bloco por variável o substitui).

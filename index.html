@@ -65,6 +65,15 @@ html,body{min-height:100%}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-body);padding-inline:16px;padding-block:0 48px}
 .wrap{max-width:980px;margin-inline:auto}
 header.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;padding-block:18px 8px}
+header.top .logo{width:38px;height:38px;border-radius:50%;flex:none;align-self:center}
+button.help{width:22px;height:22px;min-width:22px;padding:0;border-radius:50%;margin-left:6px;vertical-align:middle;font:700 12px/1 var(--font-body);color:var(--accent);border:1px solid var(--accent);background:none;text-transform:none;letter-spacing:0}
+details.aj{border:1px solid var(--line);border-radius:8px;padding:2px 12px;margin-top:8px}
+details.aj>summary{padding:10px 0;font:600 15px var(--font-body);cursor:pointer}
+details.aj[open]>summary{border-bottom:1px solid var(--line);margin-bottom:8px}
+details.aj p,details.aj li{font-size:14px;max-width:70ch}
+details.aj ul,details.aj ol{padding-left:20px}
+footer.appfoot{margin-top:28px;padding-top:12px;border-top:1px solid var(--line);color:var(--mut);font-size:12px;line-height:1.5;text-align:center}
+footer.appfoot a{color:var(--mut)}
 header.top h1{font:700 30px/1 var(--font-display);letter-spacing:.02em;margin:0;text-transform:uppercase}
 header.top .sub{color:var(--mut);font-size:13.5px}
 .store{margin-left:auto;font:12px var(--font-mono);color:var(--mut);border:1px solid var(--line);border-radius:4px;padding:1px 8px}
@@ -124,6 +133,7 @@ details>summary{cursor:pointer}
 
 <div class="wrap">
 <header class="top">
+  <img id="app-logo" class="logo" alt="MetOcean Previsão" width="38" height="38">
   <h1>MetOcean OP</h1>
   <span class="sub">janelas operacionais de vento e onda · uso pessoal</span>
   <span id="store" class="store" title="Onde ficam salvos seus locais, limites e relatórios">carregando…</span>
@@ -136,6 +146,7 @@ details>summary{cursor:pointer}
   <button role="tab" id="t-equip" data-tab="equip" aria-selected="false" aria-controls="p-equip">Equipamentos</button>
   <button role="tab" id="t-historico" data-tab="historico" aria-selected="false" aria-controls="p-historico">Histórico</button>
   <button role="tab" id="t-avisos" data-tab="avisos" aria-selected="false" aria-controls="p-avisos">Avisos da Marinha</button>
+  <button role="tab" id="t-ajuda" data-tab="ajuda" aria-selected="false" aria-controls="p-ajuda">Ajuda</button>
 </nav>
 
 <!-- ANÁLISE -->
@@ -165,7 +176,7 @@ details>summary{cursor:pointer}
       <label class="check"><input id="q-an-tide" type="checkbox" checked> Maré</label>
       <label class="check"><input id="q-an-cur" type="checkbox" checked> Corrente</label>
     </fieldset>
-    <fieldset class="fs"><legend>Relatório</legend>
+    <fieldset class="fs"><legend>Relatório <button type="button" class="help" data-help="aj-relatorio" aria-label="Ajuda: relatório resumido ou completo">?</button></legend>
       <label class="check"><input type="radio" name="q-mode" value="resumido"> Resumido (janelas + gráficos do que foi pedido)</label>
       <label class="check"><input type="radio" name="q-mode" value="completo" checked> Completo</label>
     </fieldset>
@@ -178,7 +189,7 @@ details>summary{cursor:pointer}
       </div>
       <label style="margin-top:8px">Observações<input id="h-obs" class="f" maxlength="200" autocomplete="off"></label>
     </details>
-    <fieldset class="fs" id="q-equip-box" style="display:block"><legend>Equipamentos (opcional)</legend>
+    <fieldset class="fs" id="q-equip-box" style="display:block"><legend>Equipamentos (opcional) <button type="button" class="help" data-help="aj-equip" aria-label="Ajuda: equipamentos">?</button></legend>
       <div id="q-equips" class="row" style="gap:6px 18px"></div>
       <p class="note" id="q-equip-note" style="margin:6px 0 0"></p>
     </fieldset>
@@ -304,7 +315,7 @@ details>summary{cursor:pointer}
 <!-- LIMITES -->
 <section class="panel" id="p-limites" role="tabpanel" aria-labelledby="t-limites" hidden>
   <div class="card">
-    <h2>Perfil de limites</h2>
+    <h2>Perfil de limites <button type="button" class="help" data-help="aj-limites" aria-label="Ajuda: limites e perfis">?</button></h2>
     <label>Perfil <select id="p-sel" class="f"></select></label>
     <div class="grid" style="margin-top:10px">
       <label>Nome <input id="p-name" class="f" maxlength="80" autocomplete="off"></label>
@@ -332,7 +343,7 @@ details>summary{cursor:pointer}
 <!-- EQUIPAMENTOS -->
 <section class="panel" id="p-equip" role="tabpanel" aria-labelledby="t-equip" hidden>
   <div class="card">
-    <h2>Equipamento</h2>
+    <h2>Equipamento <button type="button" class="help" data-help="aj-equip" aria-label="Ajuda: equipamentos">?</button></h2>
     <p class="note">Cadastre cada equipamento com os limites do ambiente que ele suporta. Na análise rápida, marque um ou mais: vale o limite mais restritivo entre eles. Campo vazio = o equipamento não limita aquele parâmetro.</p>
     <div class="grid">
       <label>Nome <input id="e-name" class="f" maxlength="80" autocomplete="off" placeholder="ex.: Guindaste de popa"></label>
@@ -364,7 +375,7 @@ details>summary{cursor:pointer}
     <ul id="h-list" class="list" style="margin-top:10px"></ul>
   </div>
   <div class="card">
-    <h2>Backup dos dados</h2>
+    <h2>Backup dos dados <button type="button" class="help" data-help="aj-backup" aria-label="Ajuda: dados salvos e backup">?</button></h2>
     <p class="note">Locais, perfis de limites, fontes e relatórios ficam salvos só neste navegador. Exporte um arquivo para guardar ou para levar a outro aparelho (celular ↔ computador). Ao importar, itens com o mesmo identificador são sobrescritos.</p>
     <div class="row">
       <button id="b-export" type="button" class="primary">Exportar backup</button>
@@ -378,7 +389,7 @@ details>summary{cursor:pointer}
 <!-- AVISOS -->
 <section class="panel" id="p-avisos" role="tabpanel" aria-labelledby="t-avisos" hidden>
   <div class="card">
-    <h2>Avisos de Mau Tempo (METAREA V)</h2>
+    <h2>Avisos de Mau Tempo (METAREA V) <button type="button" class="help" data-help="aj-avisos" aria-label="Ajuda: avisos da Marinha e idade da previsão">?</button></h2>
     <p class="note">No GitHub Pages os avisos são coletados automaticamente a cada 6 horas e importados ao abrir a página. Use “Buscar da Marinha” para atualizar na hora. Se o site da Marinha não permitir (comum), abra a página oficial, selecione e copie o texto dos avisos e cole abaixo. Avisos já importados ficam salvos e entram nos relatórios pelo período de vigência.</p>
     <div class="row"><button id="n-fetch" class="primary" type="button">Buscar da Marinha</button><a class="btn" target="_blank" rel="noopener" href="https://www.marinha.mil.br/chm/dados-do-smm-avisos-de-mau-tempo/avisos-de-mau-tempo">Abrir avisos da Marinha</a></div>
     <label style="margin-top:10px">Texto copiado da página<textarea id="n-text" class="f" spellcheck="false" style="min-height:140px"></textarea></label>
@@ -387,6 +398,75 @@ details>summary{cursor:pointer}
   </div>
   <div class="card"><h2>Avisos salvos</h2><p id="n-info" class="note"></p><ul id="n-list" class="list"></ul></div>
 </section>
+
+<!-- AJUDA -->
+<section class="panel" id="p-ajuda" role="tabpanel" aria-labelledby="t-ajuda" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Ajuda</h2><button id="aj-voltar" type="button" class="lnk" hidden>← Voltar</button></div>
+    <p class="note">Toque num assunto para abrir. Os botões <b>?</b> espalhados pelo app trazem você direto ao trecho certo.</p>
+    <details id="aj-gerar" class="aj"><summary>Como gerar uma análise</summary>
+      <ol>
+        <li>Na aba <b>Análise</b>, digite as coordenadas do ponto (ex.: -22.9519, -43.1859) ou toque no mapa. No celular, toque no ponto e use o botão de posição se estiver no local.</li>
+        <li>Marque o que quer analisar: vento, ondas, maré e corrente.</li>
+        <li>Escolha o relatório <b>resumido</b> (o essencial) ou <b>completo</b> (com todos os detalhes).</li>
+        <li>Preencha os limites da operação, ou marque um ou mais equipamentos cadastrados. Campo vazio é limite que não será usado.</li>
+        <li>Se quiser, informe o início da análise (padrão: agora) e o número de dias, até 16.</li>
+        <li>Toque em <b>Gerar previsão</b>. Depois baixe o PDF ou o HTML do relatório.</li>
+      </ol>
+      <p>A previsão é buscada na hora e nada fica guardado como previsão: ela envelhece. Gere de novo perto da operação. O relatório avisa há quanto tempo foi gerada.</p>
+    </details>
+    <details id="aj-limites" class="aj"><summary>Limites, perfis e janelas</summary>
+      <p><b>Hs máxima</b> é a altura significativa de onda que a operação aguenta; <b>Tp mínimo</b> é o período de pico mínimo; <b>vento</b>, <b>rajada</b> e <b>corrente</b> são máximos em nós. <b>Janela mínima</b> é quantas horas seguidas dentro dos limites contam como uma janela de operação. <b>Somente diurno</b> deixa de fora a noite no local.</p>
+      <p>Cada hora recebe <b>GO</b> (dentro de todos os limites), <b>NO-GO</b> (algum limite estourado) ou <b>sem dado</b> (faltou informação de um parâmetro que tem limite). No cenário <b>conservador</b>, a hora só é GO se todas as fontes de previsão concordarem; no <b>otimista</b>, basta uma.</p>
+      <p>Na aba <b>Limites</b> você salva perfis de limites para reaproveitar. Na aba <b>Locais</b>, cada local pode ter seus próprios limites.</p>
+    </details>
+    <details id="aj-equip" class="aj"><summary>Equipamentos</summary>
+      <p>Na aba <b>Equipamentos</b>, cadastre cada equipamento com nome, tipo e os limites do ambiente que ele suporta. Na <b>Análise</b>, marque um ou mais: os campos de limite se preenchem sozinhos com o limite <b>mais restritivo</b> entre eles.</p>
+      <ul>
+        <li>Hs, vento, rajada e corrente: vale o <b>menor</b> máximo.</li>
+        <li>Tp mínimo: vale o <b>maior</b> valor.</li>
+        <li>Direção bloqueada: vale a <b>união</b> das faixas, ou seja, a hora é bloqueada se qualquer equipamento bloquear aquela direção.</li>
+      </ul>
+      <p>Você pode digitar por cima dos campos antes de gerar. Ao desmarcar todos os equipamentos, os campos voltam ao que estavam. O relatório lista os equipamentos usados.</p>
+    </details>
+    <details id="aj-direcao" class="aj"><summary>Direção bloqueada (vento e onda)</summary>
+      <p>Escolha <b>de</b> e <b>até</b> entre os 16 pontos cardeais (N, NNE, NE, ENE, L, ESE, SE, SSE, S, SSO, SO, OSO, O, ONO, NO, NNO). A faixa vai do início do setor "de" ao fim do setor "até", no sentido horário, e pode passar pelo Norte (por exemplo, NO até NE).</p>
+      <p>É a direção <b>de onde</b> o vento ou a onda vem. Hora com vento ou onda vindo dessa faixa vira NO-GO, e o motivo aparece no relatório. Preencha os dois lados ou nenhum. Vazio significa que a direção não é usada.</p>
+    </details>
+    <details id="aj-relatorio" class="aj"><summary>Relatório resumido ou completo</summary>
+      <p>O <b>resumido</b> traz o veredito, os indicadores, as janelas, a linha do tempo, o gráfico de vento e onda juntos, as rosas de vento e de onda e um gráfico para cada variável analisada: vento (intensidade, rajada e direção), onda (Hs, Tp e direção), corrente e maré.</p>
+      <p>O <b>completo</b> traz tudo isso e mais: estatísticas, regime de ondas, resumo por dia, tabelas de maré e de corrente e a comparação detalhada entre as fontes.</p>
+      <p>Os dois podem ser baixados em PDF ou HTML. Em ambos, só aparecem os blocos das análises que você marcou.</p>
+    </details>
+    <details id="aj-grafico" class="aj"><summary>Como ler os gráficos</summary>
+      <ul>
+        <li><b>Cores do frio ao quente:</b> azul é valor baixo e vermelho é valor alto, na escala de cada eixo (mostrada na legenda).</li>
+        <li><b>Eixo esquerdo</b> e <b>eixo direito</b> têm unidades diferentes, escritas no alto de cada um.</li>
+        <li><b>Setas:</b> mostram a direção. No vento e na onda, cada seta aponta para <b>onde</b> o vento ou a onda vai. Seta para cima é indo para o Norte. A bússola no alto do gráfico lembra o Norte.</li>
+        <li>Para não amontoar, o gráfico desenha uma seta a cada algumas horas (a legenda diz quantas).</li>
+        <li><b>Linhas de limite</b> (tracejada ou pontilhada) mostram o limite da operação; o rótulo diz o valor e o eixo.</li>
+        <li>Nas <b>rosas</b>, cada pétala é uma direção (de onde vem) e o tamanho é a frequência no período.</li>
+      </ul>
+    </details>
+    <details id="aj-mapa" class="aj"><summary>Mapa da região</summary>
+      <p>No relatório, o botão <b>Ver mapa da região</b> mostra uma grade de 7×7 pontos em volta do seu ponto, com a altura de onda em cores e o vento em setas. Escolha o tamanho da região (100, 200 ou 300 km), use a barra para mudar o horário ou toque em <b>Reproduzir</b> para passar as horas. Toque ou passe o mouse numa célula para ver os dados dela.</p>
+      <p>O mapa precisa de internet e funciona no navegador (endereço do GitHub Pages). Dentro do app do Claude o mapa de fundo não carrega.</p>
+    </details>
+    <details id="aj-avisos" class="aj"><summary>Avisos da Marinha e idade da previsão</summary>
+      <p>Na aba <b>Avisos da Marinha</b> você importa os avisos de mau tempo da METAREA V (buscando ou colando o texto da página oficial). Eles entram no relatório pelo período de vigência. Se a última importação tem mais de 7 dias, o relatório avisa.</p>
+      <p>O relatório mostra a <b>idade da previsão</b>: abaixo de 3 h é só informação; de 3 h a 12 h pede para gerar de novo antes de decidir; acima de 12 h aparece em vermelho e a previsão não deve ser usada para decidir. Confira sempre o site oficial da Marinha antes de operar.</p>
+    </details>
+    <details id="aj-backup" class="aj"><summary>Dados salvos e backup</summary>
+      <p>Locais, perfis, equipamentos e relatórios ficam salvos <b>só neste navegador</b> (ou na sua conta, quando abre pelo app do Claude). Limpar os dados do navegador apaga tudo.</p>
+      <p>Na aba <b>Histórico</b>, <b>Exportar backup</b> gera um arquivo para guardar ou levar a outro aparelho, e <b>Importar backup</b> restaura. Itens com o mesmo identificador são sobrescritos.</p>
+    </details>
+    <details id="aj-contato" class="aj"><summary>Sobre e contato</summary>
+      <p>O MetOcean OP é uma ferramenta de apoio à decisão. Ela não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local.</p>
+      <p><span id="aj-dev"></span></p>
+    </details>
+  </div>
+</section>
+<footer class="appfoot" id="appfoot"></footer>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
 
@@ -395,6 +475,11 @@ details>summary{cursor:pointer}
 'use strict';
 
 /* =============================== utilidades =============================== */
+/* identidade: selo MetOcean Previsão (WebP com transparência para a tela e o HTML; JPEG sobre o azul do cabeçalho para o PDF) */
+const LOGO_WEBP = 'data:image/webp;base64,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';
+const LOGO_JPG_B64 = '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';
+const DEV = { nome: 'Ernani Vilela', papel: 'Oceanógrafo Surveyor', email: 'vilelaernani@gmail.com', fone: '(35) 99159-5388', wa: '5535991595388', ano: 2026 };
+const devTexto = () => `Desenvolvido por ${DEV.nome} · ${DEV.papel} · © ${DEV.ano} · ${DEV.email} · WhatsApp ${DEV.fone}`;
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function el(tag, props = {}, ...kids) {
@@ -843,10 +928,18 @@ const REPORT_CSS = `
 .rp pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;font:12.5px/1.4 var(--font-mono)}
 .rp .foot{color:var(--mut);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .rp .mine{color:var(--warn);font-weight:600}
+.rp .rphead{display:flex;gap:12px;align-items:center}
+.rp .rphead h1{margin:0}
+.rp .rphead .sub{margin:2px 0 0}
+.rp .rplogo{width:44px;height:44px;border-radius:50%;flex:none}
+.rp .dev{margin:6px 0 0;color:var(--mut);font-size:11.5px}
+.rp .dev a{color:var(--mut)}
 .rp .age{color:var(--mut);font-size:13px;margin:8px 0}
 .rp .roses{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 24px}
 .rp .roses>div{min-width:0}
 .rp .roses svg{max-width:420px;margin:0 auto}
+.rp .axchart{margin:6px 0 10px}
+.rp .blk{margin:0}
 .rp .dualsrc{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--mut);margin:4px 0}
 .rp .dualleg{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center;font-size:12.5px;margin:6px 0}
 .rp .dualscroll{overflow-x:auto}
@@ -1098,6 +1191,110 @@ function smoothTrechos(pts) {
   }
   return out;
 }
+/* bússola do Norte (N para cima) e nota ao lado, para os gráficos com setas */
+function compassSvg(cx, cy, r, note) {
+  return `<g class="bussola"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--mut)" stroke-width="1"/><line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}" stroke="var(--mut)" stroke-width="1"/><line x1="${cx - r}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="var(--mut)" stroke-width="1"/>`
+    + `<path class="norte" d="M${cx},${cy - r} L${cx + 3.6},${cy} L${cx - 3.6},${cy} Z" fill="var(--nogo)"/>`
+    + `<text x="${cx}" y="${cy - r - 3}" font-size="12" font-weight="700" text-anchor="middle">N</text><text class="mut" x="${cx + r + 9}" y="${cy + 4}" font-size="10" text-anchor="middle">L</text>`
+    + `<text class="mut" x="${cx}" y="${cy + r + 12}" font-size="10" text-anchor="middle">S</text><text class="mut" x="${cx - r - 9}" y="${cy + 4}" font-size="10" text-anchor="middle">O</text>`
+    + `<text class="mut" x="${cx + r + 30}" y="${cy + 4}" font-size="11" text-anchor="start">${esc(note)}</text></g>`;
+}
+const ARROW_D = 'M-1,6.4 L-1,-1 L-4,-1 L0,-7.6 L4,-1 L1,-1 L1,6.4 Z';
+/* gráfico genérico de dois eixos com faixa de direção em setas (vento, onda, corrente).
+   cfg: { grid, tz, left: [{ vals, mode: 'ramp'|'dash'|'solid', color }], right: [...], limL: [{ v, label, unit, color, dash, w }], limR: [...], uL, uR,
+          dir: { vals, add (180 se a direção é "de onde vem"; 0 se já é "para onde vai"), color: { vals }, note, aria }, aria } */
+function twoAxisBody(cfg) {
+  const grid = cfg.grid, tz = cfg.tz, n = grid.length, okv = v => v !== null && v !== undefined && Number.isFinite(v);
+  const L = cfg.left || [], R = cfg.right || [], limL = (cfg.limL || []).filter(l => okv(l.v)), limR = (cfg.limR || []).filter(l => okv(l.v));
+  const vl = L.flatMap(x => x.vals).filter(okv), vr = R.flatMap(x => x.vals).filter(okv);
+  if (!vl.length && !vr.length) return '<p class="sub">Sem dados neste ponto.</p>';
+  const mx = (vals, lims) => niceMax(Math.max(0, ...vals, ...lims.map(l => l.v)) * 1.08);
+  const maxL = mx(vl, limL), maxR = R.length ? mx(vr, limR) : 0;
+  const hasDir = !!cfg.dir && cfg.dir.vals.some(okv), bandH = hasDir ? 36 : 0;
+  const W = 980, left = 46, right = R.length ? 46 : 14, top = 58, bot = 26 + bandH, H = 306 + bandH, pw = W - left - right, ph = H - top - bot;
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, YL = v => top + ph - (Math.min(v, maxL) / maxL) * ph, YR = v => top + ph - (Math.min(v, maxR) / maxR) * ph;
+  const o = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(cfg.aria)}">`];
+  for (let k = 0; k <= 5; k++) {
+    const y = top + ph - ph * k / 5;
+    o.push(`<line class="grid" x1="${left}" y1="${y.toFixed(1)}" x2="${W - right}" y2="${y.toFixed(1)}"/>`);
+    o.push(`<text class="mut" x="${left - 6}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end">${+(maxL * k / 5).toFixed(2)}</text>`);
+    if (R.length) o.push(`<text class="mut ax2" x="${W - right + 6}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="start">${+(maxR * k / 5).toFixed(2)}</text>`);
+  }
+  o.push(`<text class="mut" x="4" y="${top - 6}" font-size="11">${esc(cfg.uL)}</text>`);
+  if (R.length) o.push(`<text class="mut" x="${W - 4}" y="${top - 6}" font-size="11" text-anchor="end">${esc(cfg.uR)}</text>`);
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) {
+    const x = X(i);
+    o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + ph}"/>`);
+    if ((n - i) / n * pw > 40) o.push(`<text class="mut" x="${(x + 3).toFixed(1)}" y="${H - 8}" font-size="11">${dayLabel(d)}</text>`);
+  }
+  const late = [];
+  const limite = (l, Y, lado) => {
+    o.push(`<line class="dlim" x1="${left}" y1="${Y(l.v).toFixed(1)}" x2="${W - right}" y2="${Y(l.v).toFixed(1)}" stroke="${l.color}" stroke-width="${l.w || 2.2}" stroke-dasharray="${l.dash}" stroke-linecap="round"/>`);
+    const txt = `limite ${l.label} ${l.v} ${l.unit}${R.length ? (lado === 'L' ? ' (eixo esq.)' : ' (eixo dir.)') : ''}`, w = txt.length * 6.4 + 10, x = lado === 'L' ? left + 8 : W - right - 8, rx = lado === 'L' ? x - 5 : x - w + 5;
+    late.push(`<rect class="lbg" x="${rx.toFixed(1)}" y="${(Y(l.v) - 18).toFixed(1)}" width="${w.toFixed(1)}" height="16" rx="4" fill="var(--surface)" fill-opacity="0.92"/><text x="${x}" y="${(Y(l.v) - 6).toFixed(1)}" font-size="11.5" font-weight="600" text-anchor="${lado === 'L' ? 'start' : 'end'}" style="fill:${l.color}">${esc(txt)}</text>`);
+  };
+  limL.forEach(l => limite(l, YL, 'L')); limR.forEach(l => limite(l, YR, 'R'));
+  const serie = (sr, Y, max) => {
+    if (sr.mode === 'ramp') {
+      for (let i = 1; i < n; i++) { const a = sr.vals[i - 1], b = sr.vals[i]; if (okv(a) && okv(b)) o.push(`<line class="sr" x1="${X(i - 1).toFixed(1)}" y1="${Y(a).toFixed(1)}" x2="${X(i).toFixed(1)}" y2="${Y(b).toFixed(1)}" stroke="${coldWarm((a + b) / 2 / max)}" stroke-width="2.6" stroke-linecap="round"/>`); }
+      return;
+    }
+    let run = []; const flush = () => { if (run.length > 1) o.push(sr.mode === 'dash'
+      ? `<polyline class="sd" points="${run.join(' ')}" fill="none" stroke="${sr.color || 'var(--mut)'}" stroke-width="1.6" stroke-dasharray="5 4"/>`
+      : `<polyline class="ss" points="${run.join(' ')}" fill="none" stroke="${sr.color}" stroke-width="2.2" stroke-linejoin="round"/>`); run = []; };
+    sr.vals.forEach((v, i) => { if (okv(v)) run.push(`${X(i).toFixed(1)},${Y(v).toFixed(1)}`); else flush(); }); flush();
+  };
+  R.forEach(sr => serie(sr, YR, maxR)); L.forEach(sr => serie(sr, YL, maxL));
+  const step = Math.max(1, Math.ceil(14 / (pw / Math.max(n - 1, 1))));
+  if (hasDir) {
+    const cy = top + ph + 18, cv = cfg.dir.color ? cfg.dir.color.vals : null;
+    for (let i = 0; i < n; i += step) {
+      const d = cfg.dir.vals[i]; if (!okv(d)) continue;
+      const c = cv && okv(cv[i]) ? coldWarm(cv[i] / maxL) : 'var(--mut)';
+      o.push(`<path class="sa" transform="translate(${X(i).toFixed(1)} ${cy}) rotate(${Math.round((((d + cfg.dir.add) % 360) + 360) % 360)})" d="${ARROW_D}" fill="${c}" stroke="#13232b" stroke-width="0.9" stroke-linejoin="round"/>`);
+    }
+    o.push(compassSvg(left + 70, 28, 12, cfg.dir.note));
+  }
+  o.push(...late);
+  o.push('</svg>');
+  const bar = `<i class="bar" style="background:${coldWarmCss()}"></i>`;
+  const leg = [];
+  [[L, maxL, cfg.uLeg || cfg.uL, 'esquerdo'], [R, maxR, cfg.uRleg || cfg.uR, 'direito']].forEach(([arr, max, un, lado]) => arr.forEach(sr => {
+    if (sr.mode === 'ramp') leg.push(`<span class="dl"><span class="t"><b>${esc(sr.label)}</b> (linha, eixo ${lado})</span><span class="sc">0 ${bar} ${max} ${esc(un)}</span></span>`);
+    else leg.push(`<span class="dl"><span class="sc"><i class="lsw" style="border-top:2px ${sr.mode === 'dash' ? 'dashed' : 'solid'} ${sr.color || 'var(--mut)'}"></i>${esc(sr.label)}${R.length ? ` (eixo ${lado})` : ''}</span></span>`);
+  }));
+  for (const l of limL.concat(limR)) leg.push(`<span class="dl"><span class="sc"><i class="lsw" style="border-top:2.4px ${l.dash.startsWith('1') ? 'dotted' : 'dashed'} ${l.color}"></i>limite de ${esc(l.label)} ${l.v} ${esc(l.unit)}</span></span>`);
+  if (hasDir) leg.push(`<span class="dl sub">${esc(cfg.dir.legend)}${step > 1 ? ` (uma seta a cada ${step} h)` : ''}</span>`);
+  leg.push('<span class="dl sub">azul = baixo, vermelho = alto</span>');
+  return `<div class="dualscroll">${o.join('')}</div><div class="dualleg">${leg.join('')}</div>`;
+}
+function twoAxisHtml(cfg) {
+  return `<div class="axchart"><div class="dualsrc"><span>Fonte: ${esc(cfg.src)}</span></div>${twoAxisBody(cfg)}</div>`;
+}
+const LIM_VENTO = { color: 'var(--ink)', dash: '9 5', w: 2.2 }, LIM_RAJADA = { color: 'var(--c2)', dash: '4 3', w: 2.2 }, LIM_HS = { color: 'var(--c3)', dash: '1.5 5', w: 2.6 }, LIM_TP = { color: 'var(--c5)', dash: '1.5 5', w: 2.4 }, LIM_COR = { color: 'var(--ink)', dash: '9 5', w: 2.2 };
+function windCfg(res, tz, lm) {
+  const s = res.sources.find(x => x.wind && x.wind.some(v => v !== null && v !== undefined)) || res.sources[0];
+  return ({ grid: res.grid, tz, src: s.label, uL: 'vento (kn)', uLeg: 'kn', aria: 'Vento: intensidade em linha, rajada tracejada e direção em setas',
+    left: [{ vals: s.wind, mode: 'ramp', label: 'Intensidade do vento' }, { vals: s.gust || [], mode: 'dash', label: 'Rajada', color: 'var(--mut)' }],
+    limL: [{ ...LIM_VENTO, v: lm.wind_max, label: 'vento', unit: 'kn' }, { ...LIM_RAJADA, v: lm.gust_max, label: 'rajada', unit: 'kn' }],
+    dir: { vals: s.wdir || [], add: 180, color: { vals: s.wind }, legend: 'Setas: direção do vento; cada seta aponta para onde o vento vai', note: 'Norte para cima: a seta do vento aponta para onde ele vai (seta para cima = vento indo para o norte)' } });
+}
+const windBlockHtml = (res, tz, lm) => twoAxisHtml(windCfg(res, tz, lm));
+function waveCfg(res, tz, lm) {
+  const s = res.sources.find(x => x.hs && x.hs.some(v => v !== null && v !== undefined)) || res.sources[0];
+  return ({ grid: res.grid, tz, src: s.label, uL: 'Hs (m)', uLeg: 'm', uR: 'Tp (s)', uRleg: 's', aria: 'Onda: Hs em linha, período de pico em linha no eixo direito e direção em setas',
+    left: [{ vals: s.hs, mode: 'ramp', label: 'Altura significativa (Hs)' }],
+    right: [{ vals: s.tp || [], mode: 'solid', label: 'Período de pico (Tp)', color: 'var(--c5)' }],
+    limL: [{ ...LIM_HS, v: lm.hs_max, label: 'Hs', unit: 'm' }], limR: [{ ...LIM_TP, v: lm.tp_min, label: 'Tp mínimo', unit: 's' }],
+    dir: { vals: s.wvdir || [], add: 180, color: { vals: s.hs }, legend: 'Setas: direção da onda; cada seta aponta para onde a onda vai', note: 'Norte para cima: a seta da onda aponta para onde ela vai (seta para cima = onda indo para o norte)' } });
+}
+const waveBlockHtml = (res, tz, lm) => twoAxisHtml(waveCfg(res, tz, lm));
+function curCfg(res, tz, lm, c) {
+  return ({ grid: res.grid, tz, src: c.src, uL: 'corrente (kn)', uLeg: 'kn', aria: 'Corrente: velocidade em linha e direção em setas',
+    left: [{ vals: c.series, mode: 'ramp', label: 'Velocidade da corrente' }], limL: [{ ...LIM_COR, v: lm.cur_max, label: 'corrente', unit: 'kn' }],
+    dir: { vals: c.dirs, add: 0, color: { vals: c.series }, legend: 'Setas: direção da corrente; cada seta aponta para onde a corrente vai', note: 'Norte para cima: a seta da corrente aponta para onde ela vai (seta para cima = corrente indo para o norte)' } });
+}
+const curBlockHtml = (res, tz, lm, c) => twoAxisHtml(curCfg(res, tz, lm, c));
 function dualBody(res, tz, si, lm) {
   const s = res.sources[si], grid = res.grid, n = grid.length, okv = v => v !== null && v !== undefined;
   const wv = s.wind.filter(okv), hv = s.hs.filter(okv);
@@ -1113,14 +1310,7 @@ function dualBody(res, tz, si, lm) {
     o.push(`<text class="mut ax2" x="${W - right + 6}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="start">${+(hmax * k / 5).toFixed(2)}</text>`);
   }
   o.push(`<text class="mut" x="4" y="${top - 6}" font-size="11">vento (kn)</text><text class="mut" x="${W - 4}" y="${top - 6}" font-size="11" text-anchor="end">Hs (m)</text>`);
-  { // bússola: o Norte fica para cima; a seta do vento aponta para onde o vento vai
-    const cx = left + 70, cy = 28, r = 12;
-    o.push(`<g class="bussola"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--mut)" stroke-width="1"/><line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}" stroke="var(--mut)" stroke-width="1"/><line x1="${cx - r}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="var(--mut)" stroke-width="1"/>`
-      + `<path class="norte" d="M${cx},${cy - r} L${cx + 3.6},${cy} L${cx - 3.6},${cy} Z" fill="var(--nogo)"/>`
-      + `<text x="${cx}" y="${cy - r - 3}" font-size="12" font-weight="700" text-anchor="middle">N</text><text class="mut" x="${cx + r + 9}" y="${cy + 4}" font-size="10" text-anchor="middle">L</text>`
-      + `<text class="mut" x="${cx}" y="${cy + r + 12}" font-size="10" text-anchor="middle">S</text><text class="mut" x="${cx - r - 9}" y="${cy + 4}" font-size="10" text-anchor="middle">O</text>`
-      + `<text class="mut" x="${cx + r + 30}" y="${cy + 4}" font-size="11" text-anchor="start">Norte para cima: a seta do vento aponta para onde ele vai (seta para cima = vento indo para o norte)</text></g>`);
-  }
+  o.push(compassSvg(left + 70, 28, 12, 'Norte para cima: a seta do vento aponta para onde ele vai (seta para cima = vento indo para o norte)'));
   for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) {
     const x = X(i);
     o.push(`<line class="grid" x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${top + ph}"/>`);
@@ -1425,7 +1615,7 @@ function curSectionHtml(ctx, brief) {
   const dayRows = (() => { const days = new Map(); res.grid.forEach((ts, i) => { const d = localD(ts, tz), k = `${d.getUTCMonth()}-${d.getUTCDate()}`; if (!days.has(k)) days.set(k, { d, idx: [] }); days.get(k).idx.push(i); });
     return [...days.values()].map(o => { const w = curStats(res, o.idx); return w ? `<tr><td>${dayLabel(o.d)}</td><td class="n">${num(w.mean)}</td><td class="n">${num(w.max)}</td><td>${w.sector || '–'} (${Math.round(w.pct)}%)</td></tr>` : ''; }).join(''); })();
   const summary = `<p>Corrente ${c.sector ? `predominante para <b>${c.sector}</b> (${Math.round(c.pct)}% das horas; média ${num(c.meanInSector)} kn nesse setor)` : 'sem direção disponível'}. Velocidade média <b>${num(c.mean)} kn</b>, P95 ${num(c.p95)} kn, máxima <b>${num(c.max)} kn</b> em ${fmt(c.maxRec.ts, tz)}${c.maxRec.d !== null && c.maxRec.d !== undefined ? ` para ${compass(c.maxRec.d)}` : ''}${lm.cur_max !== null && lm.cur_max !== undefined ? ` (limite ${lm.cur_max} kn: ${c.series.filter(v => v !== null && v > lm.cur_max).length} h acima)` : ''}. Direção na convenção de correntes: <b>para onde a corrente vai</b> (o oposto da convenção de vento e onda).</p>`;
-  if (brief) return `${summary}${stickPlotSvg(res, tz, c, lm.cur_max)}`;
+  if (brief) return `${summary}${curBlockHtml(res, tz, lm, c)}<h3 style="font:600 14px var(--font-body);margin:10px 0 2px">Stick plot (vetores hora a hora)</h3>${stickPlotSvg(res, tz, c, lm.cur_max)}`;
   return `${summary}
 <div class="charts"><div><h3 style="font:600 14px var(--font-body);margin:10px 0 2px">Velocidade da corrente</h3>
 ${lineChartSvg({ grid: res.grid, sources: [{ label: c.src, cur: c.series }] }, tz, 'cur', 'Corrente', 'kn', lm.cur_max, 'Velocidade da corrente com o limite operacional')}</div>
@@ -1500,11 +1690,11 @@ function buildReport(ctx) {
   const hdrItems = [['Cliente', H.client], ['Embarcação / unidade', H.vessel], ['Responsável', H.resp], ['Documento', H.doc], ['Observações', H.obs]].filter(([, v]) => v);
   const hdr = hdrItems.length ? `<div class="hdr">${hdrItems.map(([k, v]) => `<span>${k}: <b>${esc(v)}</b></span>`).join('')}</div>` : '';
   const scope = [A.wind ? 'vento' : null, A.wave ? 'ondas' : null, A.tide ? 'maré' : null, A.cur ? 'corrente' : null].filter(Boolean).join(', ');
-  const foot = `<p class="foot">Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.</p>`;
+  const foot = `<p class="foot">Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.<br>Desenvolvido por <b>${esc(DEV.nome)}</b> · ${esc(DEV.papel)} · © ${DEV.ano} · <a href="mailto:${DEV.email}">${DEV.email}</a> · WhatsApp <a href="https://wa.me/${DEV.wa}">${DEV.fone}</a></p>`;
   const proj = ctx.location.project || H.project;
   const head = `
-<h1>Relatório MetOcean${proj ? ' — ' + esc(proj) : ''}</h1>
-<p class="sub">${brief ? 'Resumo operacional' : 'Análise de janelas operacionais'} · ${scope}</p>
+<div class="rphead"><img class="rplogo" src="${LOGO_WEBP}" alt="MetOcean Previsão"><div><h1>Relatório MetOcean${proj ? ' — ' + esc(proj) : ''}</h1>
+<p class="sub">${brief ? 'Resumo operacional' : 'Análise de janelas operacionais'} · ${scope}</p></div></div>
 <div class="hdr main"><span>Local: <b>${esc(ctx.location.name)}</b> (${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°)</span><span>Período: <b>${startL} → ${endL}</b> (${tzlabel(tz)})</span>${proj ? `<span>Projeto: <b>${esc(proj)}</b></span>` : ''}</div>
 ${hdr}
 <div class="meta">
@@ -1517,8 +1707,6 @@ ${hdr}
   if (brief) {
     const charts = [];
     if (A.wind && A.wave) charts.push(chart('Vento e onda juntos', dualChartHtml(res, tz, 0, lm)));
-    else if (A.wind) charts.push(chart('Vento a 10 m', lineChartSvg(res, tz, 'wind', 'Vento', 'kn', lm.wind_max, 'Vento por fonte com o limite operacional')));
-    else if (A.wave) charts.push(chart('Altura significativa (Hs)', lineChartSvg(res, tz, 'hs', 'Hs', 'm', lm.hs_max, 'Hs por fonte com o limite operacional')));
     const roses = [A.wind ? chart('Rosa dos ventos', windRoseSvg(res)) : '', A.wave ? chart('Rosa de ondas', waveRoseSvg(res, tz)) : ''].filter(Boolean);
     const t = A.tide ? tideStats(res, tz, ctx.generatedTs) : null;
     return `${head}
@@ -1529,8 +1717,10 @@ ${hasLim ? verdict : ''}
 ${hasLim ? `<h2>Janelas — cenário conservador</h2>${windowsTable(cw, grid, tz, true)}<h2>Linha do tempo por fonte</h2>${legend}${timelineSvg(res, tz, rows)}` : ''}
 ${charts.length ? `<div class="charts">${charts.join('')}</div>` : ''}
 ${roses.length ? `<div class="roses">${roses.join('')}</div>` : ''}
-${A.cur ? `<h2>Corrente</h2>${curSectionHtml(ctx, true)}` : ''}
-${A.tide ? `<h2>Maré</h2>${t ? `<p>Agora: maré <b>${t.state || '–'}</b> · amplitude <b>${{ crescendo: 'crescendo (rumo à sizígia)', diminuindo: 'diminuindo (rumo à quadratura)', 'estável': 'estável' }[t.trend]}</b>${t.nextSyz ? ` · próxima sizígia ${fmt(t.nextSyz.ts, tz)}` : ''}. Próximas: ${t.next.map(e => `${e.kind === 'HW' ? 'PM' : 'BM'} ${fmt(e.ts, tz)} (${fm(e.h)})`).join('; ')}.</p>${tideChartSvg(res, tz, t)}` : '<p class="sub">Sem previsão de nível do mar para este ponto.</p>'}` : ''}
+${A.wind ? `<div class="blk"><h2>Vento: intensidade, rajada e direção</h2>${windBlockHtml(res, tz, lm)}</div>` : ''}
+${A.wave ? `<div class="blk"><h2>Onda: Hs, Tp e direção</h2>${waveBlockHtml(res, tz, lm)}</div>` : ''}
+${A.cur ? `<div class="blk"><h2>Corrente: velocidade e direção</h2>${curSectionHtml(ctx, true)}</div>` : ''}
+${A.tide ? `<div class="blk"><h2>Maré: nível do mar</h2>${t ? `<p>Agora: maré <b>${t.state || '–'}</b> · amplitude <b>${{ crescendo: 'crescendo (rumo à sizígia)', diminuindo: 'diminuindo (rumo à quadratura)', 'estável': 'estável' }[t.trend]}</b>${t.nextSyz ? ` · próxima sizígia ${fmt(t.nextSyz.ts, tz)}` : ''}. Próximas: ${t.next.map(e => `${e.kind === 'HW' ? 'PM' : 'BM'} ${fmt(e.ts, tz)} (${fm(e.h)})`).join('; ')}.</p>${tideChartSvg(res, tz, t)}` : '<p class="sub">Sem previsão de nível do mar para este ponto.</p>'}</div>` : ''}
 ${hasLim ? `<h2>Limites aplicados</h2>${limitsTable(lm, ctx.equipments)}` : ''}
 ${foot}`;
   }
@@ -1625,6 +1815,10 @@ class Pdf {
     for (const ln of this.wrap(str, w, size, o.bold)) { this.ensure(lh); this.text(x, this.y + size, ln, size, o); this.y += lh; }
     this.y += o.gap ?? 3;
   }
+  image(x, y, w, h) {   // logotipo JPEG (DCT) em coordenadas de página, y para baixo
+    if (!this.img) { const bin = atob(LOGO_JPG_B64); this.img = { bin, w: 112, h: 112 }; }
+    this.cur.push(`q ${w} 0 0 ${h} ${x.toFixed(2)} ${(PDF_H - y - h).toFixed(2)} cm /Im1 Do Q`);
+  }
   rect(x, y, w, h, o = {}) {
     const ops = [];
     if (o.fill) ops.push(`${hexRgb(o.fill)} rg`);
@@ -1666,6 +1860,7 @@ class Pdf {
       pg.push(`${hexRgb(PDF_COL.line)} RG 0.5 w [] 0 d ${PDF_M} ${this.py(y - 8)} m ${PDF_W - PDF_M} ${this.py(y - 8)} l S`);
       const foot = pdfBytes(meta.footer).replace(/[\\()]/g, m => '\\' + m);
       pg.push(`BT /F1 7.5 Tf ${hexRgb(PDF_COL.mut)} rg ${PDF_M} ${this.py(y + 2)} Td (${foot}) Tj ET`);
+      pg.push(`BT /F1 6.5 Tf ${hexRgb(PDF_COL.mut)} rg ${PDF_M} ${this.py(y + 12)} Td (${pdfBytes(devTexto()).replace(/[\\()]/g, m => '\\' + m)}) Tj ET`);
       const pn = `página ${i + 1} de ${N}`;
       pg.push(`BT /F1 7.5 Tf ${hexRgb(PDF_COL.mut)} rg ${(PDF_W - PDF_M - this.width(pn, 7.5)).toFixed(2)} ${this.py(y + 2)} Td (${pn}) Tj ET`);
     });
@@ -1673,12 +1868,13 @@ class Pdf {
     const add = s => { objs.push(s); return objs.length; };
     const fontN = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
     const fontB = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    const imN = this.img ? add(`<< /Type /XObject /Subtype /Image /Width ${this.img.w} /Height ${this.img.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${this.img.bin.length} >>\nstream\n${this.img.bin}\nendstream`) : 0;
     const pagesIdx = objs.length + 1 + this.pages.length * 2;
     const pageIds = [];
     for (const pg of this.pages) {
       const content = pg.join('\n');
       const cid = add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
-      pageIds.push(add(`<< /Type /Page /Parent ${pagesIdx} 0 R /MediaBox [0 0 ${PDF_W} ${PDF_H}] /Resources << /Font << /F1 ${fontN} 0 R /F2 ${fontB} 0 R >> >> /Contents ${cid} 0 R >>`));
+      pageIds.push(add(`<< /Type /Page /Parent ${pagesIdx} 0 R /MediaBox [0 0 ${PDF_W} ${PDF_H}] /Resources << /Font << /F1 ${fontN} 0 R /F2 ${fontB} 0 R >>${imN ? ` /XObject << /Im1 ${imN} 0 R >>` : ''} >> /Contents ${cid} 0 R >>`));
     }
     const pagesId = add(`<< /Type /Pages /Kids [${pageIds.map(i => i + ' 0 R').join(' ')}] /Count ${pageIds.length} >>`);
     const info = add(`<< /Title (${pdfBytes(meta.title).replace(/[\\()]/g, m => '\\' + m)}) /Producer (MetOcean OP) /CreationDate (D:${meta.date}) >>`);
@@ -1694,6 +1890,65 @@ class Pdf {
   }
 }
 
+function pdfCompass(pdf, cx, cy, r, note) {
+  pdf.line(cx, cy - r, cx, cy + r, { color: PDF_COL.mut, lw: 0.6 }); pdf.line(cx - r, cy, cx + r, cy, { color: PDF_COL.mut, lw: 0.6 });
+  pdf.cur.push(`${hexRgb(PDF_COL.nogo)} rg ${cx.toFixed(2)} ${pdf.py(cy - r)} m ${(cx + 2.6).toFixed(2)} ${pdf.py(cy)} l ${(cx - 2.6).toFixed(2)} ${pdf.py(cy)} l h f`);
+  pdf.text(cx, cy - r - 2, 'N', 8, { bold: true, align: 'center' }); pdf.text(cx + r + 6, cy + 2.5, 'L', 6.5, { color: PDF_COL.mut, align: 'center' });
+  pdf.text(cx, cy + r + 8, 'S', 6.5, { color: PDF_COL.mut, align: 'center' }); pdf.text(cx - r - 6, cy + 2.5, 'O', 6.5, { color: PDF_COL.mut, align: 'center' });
+  pdf.text(cx + r + 20, cy + 2.5, note, 7, { color: PDF_COL.mut });
+}
+function pdfArrow(pdf, x, y, deg, color) {
+  const a = deg * Math.PI / 180, rot = (px, py) => [x + px * Math.cos(a) - py * Math.sin(a), y + px * Math.sin(a) + py * Math.cos(a)];
+  const pts = [[-0.6, 3.8], [-0.6, -0.6], [-2.4, -0.6], [0, -4.6], [2.4, -0.6], [0.6, -0.6], [0.6, 3.8]].map(([px, py]) => rot(px, py));
+  pdf.cur.push(`${hexRgb(color)} rg ${hexRgb(PDF_COL.ink)} RG 0.4 w ` + pts.map(([px, py], q) => `${px.toFixed(2)} ${pdf.py(py)} ${q ? 'l' : 'm'}`).join(' ') + ' h B');
+}
+/* versão em PDF do gráfico de dois eixos com faixa de direção (mesma cfg da tela); title vazio = sem título */
+function pdfTwoAxis(pdf, title, cfg) {
+  const grid = cfg.grid, tz = cfg.tz, n = grid.length, okv = v => v !== null && v !== undefined && Number.isFinite(v);
+  const L = cfg.left || [], R = cfg.right || [], limL = (cfg.limL || []).filter(l => okv(l.v)), limR = (cfg.limR || []).filter(l => okv(l.v));
+  const vl = L.flatMap(x => x.vals).filter(okv), vr = R.flatMap(x => x.vals).filter(okv);
+  const hasDir = !!cfg.dir && cfg.dir.vals.some(okv), bandH = hasDir ? 20 : 0, H = 135 + bandH;
+  pdf.ensure(H + 90); if (title) pdf.h2(title);
+  if (!vl.length && !vr.length) { pdf.para('Sem dados neste ponto.', 9, { color: PDF_COL.mut }); return; }
+  const mx = (vals, lims) => niceMax(Math.max(0, ...vals, ...lims.map(l => l.v)) * 1.08), maxL = mx(vl, limL), maxR = R.length ? mx(vr, limR) : 0;
+  const left = PDF_M + 30, right = PDF_W - PDF_M - (R.length ? 30 : 4), pw = right - left, ph = H - 40 - bandH, top = pdf.y + 36;
+  const X = i => left + (i / Math.max(n - 1, 1)) * pw, YL = v => top + ph - (Math.min(v, maxL) / maxL) * ph, YR = v => top + ph - (Math.min(v, maxR) / maxR) * ph;
+  for (let k = 0; k <= 4; k++) {
+    const y = top + ph - ph * k / 4; pdf.line(left, y, right, y);
+    pdf.text(left - 4, y + 3, String(+(maxL * k / 4).toFixed(2)), 7, { color: PDF_COL.mut, align: 'right' });
+    if (R.length) pdf.text(right + 4, y + 3, String(+(maxR * k / 4).toFixed(2)), 7, { color: PDF_COL.mut });
+  }
+  pdf.text(left, top - 6, cfg.uL, 7, { color: PDF_COL.mut, align: 'right' }); if (R.length) pdf.text(right, top - 6, cfg.uR, 7, { color: PDF_COL.mut });
+  for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(i); pdf.line(x, top, x, top + ph); if ((n - i) / n * pw > 30) pdf.text(x + 2, top + ph + bandH + 10, dayLabel(d), 7, { color: PDF_COL.mut }); }
+  const late = [], corPdf = c => ({ 'var(--ink)': PDF_COL.ink, 'var(--c2)': PDF_COL.c[1], 'var(--c3)': PDF_COL.c[2], 'var(--c5)': PDF_COL.c[4], 'var(--mut)': PDF_COL.mut }[c] || PDF_COL.ink);
+  const pill = (x, y, txt, color, align) => { const w = pdf.width(txt, 7.5, true) + 6, rx = align === 'right' ? x - w + 2 : x - 2; pdf.rect(rx, y - 8.5, w, 11, { fill: PDF_COL.surface }); pdf.text(x, y, txt, 7.5, { color, align, bold: true }); };
+  const limite = (l, Y, lado) => {
+    pdf.line(left, Y(l.v), right, Y(l.v), { color: corPdf(l.color), dash: l.dash.startsWith('1') ? '[1.2 3] 0 d' : '[5 3] 0 d', lw: 1.4 });
+    const txt = `limite ${l.label} ${l.v} ${l.unit}${R.length ? (lado === 'L' ? ' (eixo esq.)' : ' (eixo dir.)') : ''}`;
+    late.push(() => pill(lado === 'L' ? left + 4 : right - 4, Y(l.v) - 4, txt, corPdf(l.color), lado === 'L' ? 'left' : 'right'));
+  };
+  limL.forEach(l => limite(l, YL, 'L')); limR.forEach(l => limite(l, YR, 'R'));
+  const serie = (sr, Y, max) => {
+    if (sr.mode === 'ramp') { for (let i = 1; i < n; i++) { const a = sr.vals[i - 1], b = sr.vals[i]; if (okv(a) && okv(b)) pdf.line(X(i - 1), Y(a), X(i), Y(b), { color: coldWarm((a + b) / 2 / max), lw: 1.8 }); } return; }
+    let run = []; const flush = () => { if (run.length > 1) { if (sr.mode === 'dash') for (let q = 1; q < run.length; q++) pdf.line(run[q - 1][0], run[q - 1][1], run[q][0], run[q][1], { color: corPdf(sr.color), dash: '[3 2] 0 d', lw: 0.9 }); else pdf.poly(run, { color: corPdf(sr.color), lw: 1.3 }); } run = []; };
+    sr.vals.forEach((v, i) => { if (okv(v)) run.push([X(i), Y(v)]); else flush(); }); flush();
+  };
+  R.forEach(sr => serie(sr, YR, maxR)); L.forEach(sr => serie(sr, YL, maxL));
+  let step = 1;
+  if (hasDir) {
+    step = Math.max(1, Math.ceil(10 / (pw / Math.max(n - 1, 1))));
+    const cv = cfg.dir.color ? cfg.dir.color.vals : null;
+    for (let i = 0; i < n; i += step) { const d = cfg.dir.vals[i]; if (!okv(d)) continue; pdfArrow(pdf, X(i), top + ph + 11, (((d + cfg.dir.add) % 360) + 360) % 360, cv && okv(cv[i]) ? coldWarm(cv[i] / maxL) : PDF_COL.mut); }
+    pdfCompass(pdf, left + 40, top - 20, 8, cfg.dir.note);
+  }
+  late.forEach(f => f());
+  pdf.y = top + H - 24;
+  let x = left; const strip = (label, max) => { const lw = pdf.width(label, 7.5) + 6, w = 60; pdf.text(x, pdf.y + 5.5, label, 7.5, { color: PDF_COL.mut }); for (let k = 0; k < 20; k++) pdf.rect(x + lw + (w / 20) * k, pdf.y, w / 20 + 0.4, 6, { fill: coldWarm(k / 19) }); pdf.text(x + lw + w + 4, pdf.y + 5.5, `0 a ${max}`, 7.5, { color: PDF_COL.mut }); x += lw + w + 4 + pdf.width(`0 a ${max}`, 7.5) + 22; };
+  L.filter(sr => sr.mode === 'ramp').forEach(sr => strip(sr.label, `${maxL} ${cfg.uLeg}`));
+  pdf.text(x, pdf.y + 5.5, 'azul = baixo, vermelho = alto', 7.5, { color: PDF_COL.mut });
+  pdf.text(left, pdf.y + 17, `${hasDir ? cfg.dir.legend + (step > 1 ? ` (uma seta a cada ${step} h)` : '') + '. ' : ''}${[...L, ...R].filter(sr => sr.mode !== 'ramp').map(sr => sr.label + (sr.mode === 'dash' ? ' tracejada' : ' em linha')).join('; ')}`.slice(0, 150), 7.5, { color: PDF_COL.mut });
+  pdf.y += 28;
+}
 function pdfDualChart(pdf, res, tz, lm) {
   const s = res.sources[0], grid = res.grid, n = grid.length, okv = v => v !== null && v !== undefined;
   const wv = s.wind.filter(okv), hv = s.hs.filter(okv);
@@ -1710,14 +1965,7 @@ function pdfDualChart(pdf, res, tz, lm) {
     pdf.text(right + 4, y + 3, String(+(hmax * k / 4).toFixed(2)), 7, { color: PDF_COL.mut });
   }
   pdf.text(left, top - 6, 'vento (kn)', 7, { color: PDF_COL.mut, align: 'right' }); pdf.text(right, top - 6, 'Hs (m)', 7, { color: PDF_COL.mut });
-  { // bússola: o Norte fica para cima
-    const cx = left + 40, cy = top - 20, r = 8;
-    pdf.line(cx, cy - r, cx, cy + r, { color: PDF_COL.mut, lw: 0.6 }); pdf.line(cx - r, cy, cx + r, cy, { color: PDF_COL.mut, lw: 0.6 });
-    pdf.cur.push(`${hexRgb(PDF_COL.nogo)} rg ${cx.toFixed(2)} ${pdf.py(cy - r)} m ${(cx + 2.6).toFixed(2)} ${pdf.py(cy)} l ${(cx - 2.6).toFixed(2)} ${pdf.py(cy)} l h f`);
-    pdf.text(cx, cy - r - 2, 'N', 8, { bold: true, align: 'center' }); pdf.text(cx + r + 6, cy + 2.5, 'L', 6.5, { color: PDF_COL.mut, align: 'center' });
-    pdf.text(cx, cy + r + 8, 'S', 6.5, { color: PDF_COL.mut, align: 'center' }); pdf.text(cx - r - 6, cy + 2.5, 'O', 6.5, { color: PDF_COL.mut, align: 'center' });
-    pdf.text(cx + r + 20, cy + 2.5, 'Norte para cima: a seta do vento aponta para onde ele vai (seta para cima = vento indo para o norte)', 7, { color: PDF_COL.mut });
-  }
+  pdfCompass(pdf, left + 40, top - 20, 8, 'Norte para cima: a seta do vento aponta para onde ele vai (seta para cima = vento indo para o norte)');
   for (const [i, d, mid] of dayTicks(grid, tz)) if (mid) { const x = X(i); pdf.line(x, top, x, top + ph); if ((n - i) / n * pw > 30) pdf.text(x + 2, top + ph + 10, dayLabel(d), 7, { color: PDF_COL.mut }); }
   const pill = (x, y, txt, color, align) => { const w = pdf.width(txt, 7.5, true) + 6, rx = align === 'right' ? x - w + 2 : x - 2; pdf.rect(rx, y - 8.5, w, 11, { fill: PDF_COL.surface }); pdf.text(x, y, txt, 7.5, { color, align, bold: true }); };
   const late = [];
@@ -1946,6 +2194,7 @@ function pdfCurSection(pdf, ctx, brief) {
   pdf.ensure(140); pdf.h2('Corrente marinha');
   if (!c) { pdf.para('Sem previsão de corrente para este ponto nas fontes carregadas.', 9, { color: PDF_COL.mut }); return; }
   pdf.para(`Corrente ${c.sector ? `predominante para ${c.sector} (${Math.round(c.pct)}% das horas; média ${num(c.meanInSector)} kn nesse setor)` : 'sem direção disponível'}. Velocidade média ${num(c.mean)} kn, P95 ${num(c.p95)} kn, máxima ${num(c.max)} kn em ${fmt(c.maxRec.ts, tz)}${c.maxRec.d !== null && c.maxRec.d !== undefined ? ` para ${compass(c.maxRec.d)}` : ''}${lm.cur_max !== null && lm.cur_max !== undefined ? ` (limite ${lm.cur_max} kn: ${c.series.filter(v => v !== null && v > lm.cur_max).length} h acima)` : ''}. Direção = para onde a corrente vai.`, 8.5);
+  if (brief) pdfTwoAxis(pdf, '', curCfg(res, tz, lm, c));
   // stick plot
   const grid = res.grid, n = grid.length, H = 110, left = PDF_M + 24, right = PDF_W - PDF_M, pw = right - left, ph = H - 20;
   pdf.ensure(H + 24);
@@ -1968,10 +2217,12 @@ function buildPdf(ctx) {
   const pdf = new Pdf();
   // cabeçalho
   pdf.rect(0, 0, PDF_W, 62, { fill: PDF_COL.accent });
-  pdf.text(PDF_M, 30, 'RELATÓRIO METOCEAN', 17, { bold: true, color: '#ffffff' });
+  pdf.image(PDF_M, 8, 46, 46);
+  const tx = PDF_M + 56;
+  pdf.text(tx, 30, 'RELATÓRIO METOCEAN', 17, { bold: true, color: '#ffffff' });
   const coords = `${ctx.location.lat.toFixed(4)}°, ${ctx.location.lon.toFixed(4)}°`;
   const projP = ctx.location.project || (ctx.header || {}).project;
-  pdf.text(PDF_M, 48, `${projP ? projP + '  ·  ' : ''}${ctx.location.name === coords ? coords : ctx.location.name + '  ·  ' + coords}`.slice(0, 95), 10, { color: '#dcebf1' });
+  pdf.text(tx, 48, `${projP ? projP + '  ·  ' : ''}${ctx.location.name === coords ? coords : ctx.location.name + '  ·  ' + coords}`.slice(0, 95), 10, { color: '#dcebf1' });
   pdf.text(PDF_W - PDF_M, 30, 'MetOcean OP', 9, { color: '#dcebf1', align: 'right' });
   pdf.text(PDF_W - PDF_M, 46, `gerado ${fmtUtcFull(ctx.generatedTs)}`, 8.5, { color: '#dcebf1', align: 'right' });
   pdf.y = 76;
@@ -2027,9 +2278,9 @@ function buildPdf(ctx) {
     pdfTimeline(pdf, res, tz, [['Conservador', res.conservative.status], ['Otimista', res.optimistic.status], ...res.sources.map(s => [s.label, s.status])]); }
   if (brief) {
     if (A.wind && A.wave) pdfDualChart(pdf, res, tz, lm);
-    else if (A.wind) pdfLineChart(pdf, res, tz, 'wind', 'Vento a 10 m', 'kn', lm.wind_max);
-    else if (A.wave) pdfLineChart(pdf, res, tz, 'hs', 'Altura significativa (Hs)', 'm', lm.hs_max);
     pdfRosesBrief(pdf, ctx);
+    if (A.wind) pdfTwoAxis(pdf, 'Vento: intensidade, rajada e direção', windCfg(res, tz, lm));
+    if (A.wave) pdfTwoAxis(pdf, 'Onda: Hs, Tp e direção', waveCfg(res, tz, lm));
     if (A.cur) pdfCurSection(pdf, ctx, true);
     if (A.tide) pdfTideSection(pdf, ctx, true);
   } else {
@@ -2216,7 +2467,7 @@ const setIdx = (sel, v) => { $(sel).value = (v === null || v === undefined) ? ''
 function initDirFields() {
   document.querySelectorAll('.dirpair').forEach(box => {
     const p = box.dataset.p, w = box.dataset.k === 'w', k = w ? 'w' : 'd', nome = w ? 'onda' : 'vento', opts = () => [el('option', { value: '' }, '—'), ...PONTOS16.map((n, i) => el('option', { value: String(i) }, n))];
-    box.replaceChildren(el('label', {}, `Direção ${w ? 'da' : 'do'} ${nome} bloqueada (opcional)`,
+    box.replaceChildren(el('label', {}, `Direção ${w ? 'da' : 'do'} ${nome} bloqueada (opcional)`, el('button', { type: 'button', class: 'help', 'data-help': 'aj-direcao', 'aria-label': 'Ajuda: direção bloqueada' }, '?'),
       el('div', { class: 'row', style: 'flex-wrap:nowrap;gap:6px;margin-top:3px' },
         el('select', { id: `${p}-${k}from`, class: 'f', 'aria-label': `Direção ${w ? 'da' : 'do'} ${nome} bloqueada, de`, style: 'margin:0' }, ...opts()),
         el('span', { class: 'm' }, 'até'),
@@ -2612,7 +2863,7 @@ function mountRegionMap(ctx) {
   const box = el('div', { hidden: true });
   let state = null;   // { sel, hour } da última vez que o mapa foi desenhado
   const wrap = el('div', { class: 'rmwrap', style: 'margin:14px 0' },
-    el('h2', {}, 'Mapa da região: onda e vento'),
+    el('h2', {}, 'Mapa da região: onda e vento', ' ', helpBtn('aj-mapa', 'mapa da região')),
     el('p', { class: 'sub' }, 'Quadrado em volta do ponto (grade de 7×7). Cor = altura de onda; seta = para onde o vento vai. Buscado na hora, só na tela (não vai no HTML nem no PDF).'),
     el('div', { class: 'row' }, btn, el('label', { style: 'display:flex;align-items:center;gap:6px' }, 'Tamanho da região', size), msg), box);
   async function load() {
@@ -2898,6 +3149,7 @@ function showReport(ctx) {
   S.current = ctx;
   $('#report').innerHTML = buildReport(ctx);
   ageFill($('#report')); wireDual(ctx);
+  { const h = [...$('#report').querySelectorAll('h2')].find(x => /^Vento e onda juntos/.test(x.textContent.trim())); if (h) h.append(' ', helpBtn('aj-grafico', 'como ler os gráficos')); }
   { const v = $('#report .verdict'), m = mountRegionMap(ctx); if (v) v.after(m); else $('#report').append(m); }
   $('#report-wrap').classList.add('on');
   $('#report-wrap').scrollIntoView({ block: 'start' });
@@ -3026,8 +3278,30 @@ async function initDownloads() {
 }
 
 /* =============================== início =============================== */
+const AJUDA = { de: null };
+function openHelp(id) {
+  const ativa = document.querySelector('nav.tabs button[aria-selected="true"]');
+  if (ativa && ativa.dataset.tab !== 'ajuda') AJUDA.de = ativa.dataset.tab;
+  showTab('ajuda');
+  document.querySelectorAll('details.aj').forEach(d => { if (d.id !== id) d.open = false; });
+  const d = document.getElementById(id); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); }
+  $('#aj-voltar').hidden = !AJUDA.de;
+}
+function helpBtn(id, rotulo) { return el('button', { type: 'button', class: 'help', 'data-help': id, 'aria-label': 'Ajuda: ' + rotulo }, '?'); }
+function initAjuda() {
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button.help[data-help]'); if (b) { e.preventDefault(); openHelp(b.dataset.help); } });
+  $('#aj-voltar').addEventListener('click', () => { const t = AJUDA.de; AJUDA.de = null; if (t) showTab(t); window.scrollTo(0, 0); });
+  $('#aj-dev').append('Desenvolvido por ', el('b', {}, DEV.nome), ` · ${DEV.papel} · © ${DEV.ano} · `, el('a', { href: `mailto:${DEV.email}` }, DEV.email), ' · WhatsApp ', el('a', { href: `https://wa.me/${DEV.wa}`, target: '_blank', rel: 'noopener' }, DEV.fone));
+}
+function initIdentidade() {
+  $('#app-logo').src = LOGO_WEBP;
+  const f = $('#appfoot');
+  f.append('Desenvolvido por ', el('b', {}, DEV.nome), ` · ${DEV.papel} · © ${DEV.ano} · `,
+    el('a', { href: `mailto:${DEV.email}` }, DEV.email), ' · WhatsApp ',
+    el('a', { href: `https://wa.me/${DEV.wa}`, target: '_blank', rel: 'noopener' }, DEV.fone));
+}
 async function init() {
-  injectReportCss();
+  injectReportCss(); initIdentidade(); initAjuda();
   initDirFields();
   document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
   locTags = TagInput($('#l-tags')); anTags = TagInput($('#a-tags'));
@@ -3126,7 +3400,7 @@ async function init() {
 
   renderAll();
   let tab = 'analise'; try { tab = sessionStorage.getItem('mco:tab') || 'analise'; } catch (e) { /* padrão */ }
-  showTab(['analise', 'locais', 'limites', 'equip', 'historico', 'avisos'].includes(tab) ? tab : 'analise');
+  showTab(['analise', 'locais', 'limites', 'equip', 'historico', 'avisos', 'ajuda'].includes(tab) ? tab : 'analise');
   await Store.init();
   renderStoreBadge();
   initDownloads();
