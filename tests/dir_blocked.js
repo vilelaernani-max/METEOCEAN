@@ -6,6 +6,7 @@ const code = [
   grab(/const PONTOS16 = [^\n]*\n/),
   grab(/const pontoDe = [^\n]*\n/),
   grab(/function dirBlocked\(dir, fromIdx, toIdx\) \{[\s\S]*?\n\}\n/),
+  grab(/const rangesOf = [^\n]*\n/),
   grab(/function normalizeLimits\(raw\) \{[\s\S]*?\n\}\n/),
   grab(/function evaluateHour\(row, L, day\) \{[\s\S]*?\n\}\n/),
   grab(/const isDaylight = [^\n]*\n/),

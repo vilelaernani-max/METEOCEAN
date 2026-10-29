@@ -76,8 +76,13 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 ---
 
 # Plano 4: equipamentos (spec 4)
-- [ ] E1 Combinação e várias faixas de direção: `combineEquipLimits` (puro), `dir_ranges`/`wdir_ranges` em `normalizeLimits` e `evaluateHour`, `dirTxt` com todas as faixas. Teste: `tests/equipamentos.js` (parte pura).
-- [ ] E2 Cadastro: aba Equipamentos (formulário, lista, validação, excluir com confirmação), coleção `equipments`, backup. Teste: navegador.
-- [ ] E3 Seleção na análise rápida: caixas de marcar, preenchimento dos campos, seletores de direção com várias faixas, geração com `dir_ranges`.
-- [ ] E4 Relatório: cabeçalho e tabela de limites (tela, HTML, PDF).
-- [ ] E5 Artefato: capacidade `db` com a coleção `equipments`; fechamento (todos os testes).
+- [x] E1 Combinação e várias faixas de direção: `combineEquipLimits` (puro), `dir_ranges`/`wdir_ranges` em `normalizeLimits` e `evaluateHour`, `dirTxt` com todas as faixas. Teste: `tests/equipamentos.js` (parte pura).
+- [x] E2 Cadastro: aba Equipamentos (formulário, lista, validação, excluir com confirmação), coleção `equipments`, backup. Teste: navegador.
+- [x] E3 Seleção na análise rápida: caixas de marcar, preenchimento dos campos, seletores de direção com várias faixas, geração com `dir_ranges`.
+- [x] E4 Relatório: cabeçalho e tabela de limites (tela, HTML, PDF).
+- [x] E5 Artefato: capacidade `db` com a coleção `equipments`; fechamento (todos os testes).
+
+## Registro do plano 4 (29/10/2026)
+- E1 a E5 concluídas. Testes: `tests/equipamentos.js` (parte pura e de navegador, desktop, celular, backup, PDF e HTML). Todos os testes e a paridade Python × JavaScript passam.
+- Correção fora do plano: o rótulo "Direção dao vento bloqueada" (erro de gramática de uma revisão anterior) virou "Direção do vento bloqueada"; teste em `tests/dir_forms.js` impede a volta.
+- Decisão de construção: ao desmarcar todos os equipamentos, os campos de limite voltam ao que estavam antes da primeira marcação (nada de limite "preso").

@@ -133,6 +133,7 @@ details>summary{cursor:pointer}
   <button role="tab" id="t-analise" data-tab="analise" aria-selected="true" aria-controls="p-analise">Análise</button>
   <button role="tab" id="t-locais" data-tab="locais" aria-selected="false" aria-controls="p-locais">Locais</button>
   <button role="tab" id="t-limites" data-tab="limites" aria-selected="false" aria-controls="p-limites">Limites</button>
+  <button role="tab" id="t-equip" data-tab="equip" aria-selected="false" aria-controls="p-equip">Equipamentos</button>
   <button role="tab" id="t-historico" data-tab="historico" aria-selected="false" aria-controls="p-historico">Histórico</button>
   <button role="tab" id="t-avisos" data-tab="avisos" aria-selected="false" aria-controls="p-avisos">Avisos da Marinha</button>
 </nav>
@@ -177,6 +178,10 @@ details>summary{cursor:pointer}
       </div>
       <label style="margin-top:8px">Observações<input id="h-obs" class="f" maxlength="200" autocomplete="off"></label>
     </details>
+    <fieldset class="fs" id="q-equip-box" style="display:block"><legend>Equipamentos (opcional)</legend>
+      <div id="q-equips" class="row" style="gap:6px 18px"></div>
+      <p class="note" id="q-equip-note" style="margin:6px 0 0"></p>
+    </fieldset>
     <div class="grid" style="margin-top:8px">
       <label>Hs máxima (m)<input id="q-hs" class="f" type="number" step="0.1" min="0" value="1.5"></label>
       <label>Vento máximo (nós)<input id="q-wind" class="f" type="number" step="1" min="0" value="20"></label>
@@ -324,6 +329,33 @@ details>summary{cursor:pointer}
   </div>
 </section>
 
+<!-- EQUIPAMENTOS -->
+<section class="panel" id="p-equip" role="tabpanel" aria-labelledby="t-equip" hidden>
+  <div class="card">
+    <h2>Equipamento</h2>
+    <p class="note">Cadastre cada equipamento com os limites do ambiente que ele suporta. Na análise rápida, marque um ou mais: vale o limite mais restritivo entre eles. Campo vazio = o equipamento não limita aquele parâmetro.</p>
+    <div class="grid">
+      <label>Nome <input id="e-name" class="f" maxlength="80" autocomplete="off" placeholder="ex.: Guindaste de popa"></label>
+      <label>Tipo <input id="e-type" class="f" maxlength="40" autocomplete="off" placeholder="ex.: ROV, guindaste, lançamento"></label>
+      <label>Hs máxima (m) <input id="e-hs" class="f" type="number" step="0.1" min="0" placeholder="não usar"></label>
+      <label>Tp mínimo (s) <input id="e-tp" class="f" type="number" step="0.5" min="0" placeholder="não usar"></label>
+      <label>Vento máximo (nós) <input id="e-wind" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
+      <label>Rajada máxima (nós) <input id="e-gust" class="f" type="number" step="1" min="0" placeholder="não usar"></label>
+      <label>Corrente máxima (nós) <input id="e-cur" class="f" type="number" step="0.1" min="0" placeholder="não usar"></label>
+      <div class="dirpair" data-p="e"></div>
+      <div class="dirpair" data-p="e" data-k="w"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="e-save" class="primary" type="button">Salvar equipamento</button>
+      <button id="e-new" type="button">Novo</button>
+      <button id="e-del" type="button" class="danger" hidden>Excluir</button>
+      <span id="e-del-ask" class="msg" hidden>Excluir mesmo? <button id="e-del-yes" type="button" class="lnk">Sim, excluir</button> · <button id="e-del-no" type="button" class="lnk">Cancelar</button></span>
+    </div>
+    <div id="e-msg" class="msg" aria-live="polite"></div>
+  </div>
+  <div class="card"><h2>Equipamentos cadastrados</h2><ul id="e-list" class="list"></ul></div>
+</section>
+
 <!-- HISTÓRICO -->
 <section class="panel" id="p-historico" role="tabpanel" aria-labelledby="t-historico" hidden>
   <div class="card">
@@ -463,8 +495,18 @@ function dirBlocked(dir, fromIdx, toIdx) {
   return start < end ? (d >= start && d < end) : (d >= start || d < end);
 }
 
+/* faixas bloqueadas de uma análise: a lista (equipamentos) e o par único (formulário), sem repetir; p = 'dir' (vento) ou 'wdir' (onda) */
+const rangesOf = (L, w = false) => { const p = w ? 'wdir' : 'dir', out = (L[p + '_ranges'] || []).map(r => [r[0], r[1]]), a = L[p + '_from'], b = L[p + '_to']; if (a !== null && a !== undefined && b !== null && b !== undefined && !out.some(r => r[0] === a && r[1] === b)) out.push([a, b]); return out; };
+/* limite combinado de vários equipamentos (o mais restritivo): menor máximo, maior Tp mínimo, união das faixas bloqueadas */
+function combineEquipLimits(list) {
+  const has = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
+  const pick = (key, fn) => { const v = list.map(e => (e.limits || {})[key]).filter(has).map(Number); return v.length ? fn(...v) : null; };
+  const faixas = (a, b) => { const out = []; for (const e of list) { const L = e.limits || {}; if (has(L[a]) && has(L[b]) && !out.some(r => r[0] === Number(L[a]) && r[1] === Number(L[b]))) out.push([Number(L[a]), Number(L[b])]); } return out; };
+  return { hs_max: pick('hs_max', Math.min), tp_min: pick('tp_min', Math.max), wind_max: pick('wind_max', Math.min), gust_max: pick('gust_max', Math.min), cur_max: pick('cur_max', Math.min),
+    dir_ranges: faixas('dir_from', 'dir_to'), wdir_ranges: faixas('wdir_from', 'wdir_to') };
+}
 function normalizeLimits(raw) {
-  const out = { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: null, cur_max: null, dir_from: null, dir_to: null, wdir_from: null, wdir_to: null, daylight_only: false, min_window_h: 4 };
+  const out = { hs_max: 1.5, tp_min: null, wind_max: 20, gust_max: null, cur_max: null, dir_from: null, dir_to: null, wdir_from: null, wdir_to: null, dir_ranges: [], wdir_ranges: [], daylight_only: false, min_window_h: 4 };
   raw = raw || {};
   for (const k of ['hs_max', 'tp_min', 'wind_max', 'gust_max', 'cur_max']) {
     if (k in raw) {
@@ -485,6 +527,16 @@ function normalizeLimits(raw) {
       if (!Number.isInteger(f) || f < 0 || f > 15) throw new Error(`Valor inválido em ${k}`);
       out[k] = f;
     }
+  }
+  for (const k of ['dir_ranges', 'wdir_ranges']) if (k in raw) {
+    const lista = raw[k] === null || raw[k] === undefined ? [] : raw[k];
+    if (!Array.isArray(lista)) throw new Error(`Valor inválido em ${k}`);
+    out[k] = lista.map(r => {
+      if (!Array.isArray(r) || r.length !== 2) throw new Error(`Faixa inválida em ${k}`);
+      const [a, b] = r.map(Number);
+      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || a > 15 || b < 0 || b > 15) throw new Error(`Faixa inválida em ${k}`);
+      return [a, b];
+    });
   }
   if ((out.dir_from === null) !== (out.dir_to === null)) throw new Error('Direção do vento bloqueada: informe os dois pontos (de e até) ou nenhum.');
   if ((out.wdir_from === null) !== (out.wdir_to === null)) throw new Error('Direção da onda bloqueada: informe os dois pontos (de e até) ou nenhum.');
@@ -538,15 +590,14 @@ function evaluateHour(row, L, day) {
   check(row.wind_kn, L.wind_max, 'vento', 'kn', 'max');
   check(row.gust_kn, L.gust_max, 'rajada', 'kn', 'max');
   check(row.cur_kn, L.cur_max, 'corrente', 'kn', 'max');
-  if (L.dir_from !== null && L.dir_from !== undefined && L.dir_to !== null && L.dir_to !== undefined) {
-    const b = dirBlocked(row.wind_dir, L.dir_from, L.dir_to);
-    if (b === null) missing.push('direção do vento');
-    else if (b) reasons.push(`direção ${pontoDe(row.wind_dir)} (${Math.round(row.wind_dir)}°) na faixa bloqueada ${PONTOS16[L.dir_from]}–${PONTOS16[L.dir_to]}`);
+  const rv = rangesOf(L), ro = rangesOf(L, true);
+  if (rv.length) {
+    if (dirBlocked(row.wind_dir, rv[0][0], rv[0][1]) === null) missing.push('direção do vento');
+    else for (const [a, b] of rv) if (dirBlocked(row.wind_dir, a, b)) reasons.push(`direção ${pontoDe(row.wind_dir)} (${Math.round(row.wind_dir)}°) na faixa bloqueada ${PONTOS16[a]}–${PONTOS16[b]}`);
   }
-  if (L.wdir_from !== null && L.wdir_from !== undefined && L.wdir_to !== null && L.wdir_to !== undefined) {
-    const b = dirBlocked(row.wave_dir, L.wdir_from, L.wdir_to);
-    if (b === null) missing.push('direção da onda');
-    else if (b) reasons.push(`onda vindo de ${pontoDe(row.wave_dir)} (${Math.round(row.wave_dir)}°) na faixa bloqueada ${PONTOS16[L.wdir_from]}–${PONTOS16[L.wdir_to]}`);
+  if (ro.length) {
+    if (dirBlocked(row.wave_dir, ro[0][0], ro[0][1]) === null) missing.push('direção da onda');
+    else for (const [a, b] of ro) if (dirBlocked(row.wave_dir, a, b)) reasons.push(`onda vindo de ${pontoDe(row.wave_dir)} (${Math.round(row.wave_dir)}°) na faixa bloqueada ${PONTOS16[a]}–${PONTOS16[b]}`);
   }
   if (L.daylight_only && day && !isDaylight(row.ts, day)) reasons.push('fora do período diurno');
   if (reasons.length) return ['nogo', reasons];
@@ -1134,10 +1185,10 @@ function windowsTable(wins, grid, tz, showSources) {
   const rows = wins.map(w => `<tr><td>${fmt(grid[w.i0], tz)}</td><td>${fmt(grid[w.i1 - 1] + HOUR, tz)}</td><td class="n">${w.hours} h</td><td class="n">${num(w.max_hs)}</td><td class="n">${num(w.max_wind, 0)}</td><td class="n">${num(w.max_gust, 0)}</td><td class="n">${num(w.max_cur)}</td>${showSources ? `<td class="n">${w.min_sources}</td>` : ''}</tr>`).join('');
   return `<div class="tw"><table>${head}${rows}</table></div>`;
 }
-const dirTxt = (L, w = false) => { const a = L[w ? 'wdir_from' : 'dir_from'], b = L[w ? 'wdir_to' : 'dir_to']; return (a === null || a === undefined || b === null || b === undefined) ? 'não usado' : `${PONTOS16[a]} a ${PONTOS16[b]}`; };
-function limitsTable(L) {
+const dirTxt = (L, w = false) => { const r = rangesOf(L, w); return r.length ? r.map(([a, b]) => `${PONTOS16[a]} a ${PONTOS16[b]}`).join('; ') : 'não usado'; };
+function limitsTable(L, equipamentos) {
   const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
-  const rows = [['Hs máxima', v(L.hs_max, 'm')], ['Tp mínima', v(L.tp_min, 's')], ['Vento máximo (10 m)', v(L.wind_max, 'kn')], ['Rajada máxima', v(L.gust_max, 'kn')], ['Corrente máxima', v(L.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(L)], ['Direção da onda bloqueada', dirTxt(L, true)],
+  const rows = [...(equipamentos && equipamentos.length ? [['Equipamentos usados', equipamentos.join(', ')]] : []), ['Hs máxima', v(L.hs_max, 'm')], ['Tp mínima', v(L.tp_min, 's')], ['Vento máximo (10 m)', v(L.wind_max, 'kn')], ['Rajada máxima', v(L.gust_max, 'kn')], ['Corrente máxima', v(L.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(L)], ['Direção da onda bloqueada', dirTxt(L, true)],
     ['Somente diurno', L.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${L.min_window_h} h seguidas`]];
   return `<table>${rows.map(([a, b]) => `<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')}</table>`;
 }
@@ -1458,6 +1509,7 @@ function buildReport(ctx) {
 ${hdr}
 <div class="meta">
  ${hasLim ? `<span>Limites: <b>${esc(ctx.profileName)}</b></span>` : ''}
+ ${(ctx.equipments || []).length ? `<span>Equipamentos: <b>${esc(ctx.equipments.join(', '))}</b></span>` : ''}
  ${ctx.tags.length ? `<span>Tags: ${tags}</span>` : ''}
  <span>Gerado: <b>${fmtUtcFull(ctx.generatedTs)}</b></span>
 </div>`;
@@ -1479,7 +1531,7 @@ ${charts.length ? `<div class="charts">${charts.join('')}</div>` : ''}
 ${roses.length ? `<div class="roses">${roses.join('')}</div>` : ''}
 ${A.cur ? `<h2>Corrente</h2>${curSectionHtml(ctx, true)}` : ''}
 ${A.tide ? `<h2>Maré</h2>${t ? `<p>Agora: maré <b>${t.state || '–'}</b> · amplitude <b>${{ crescendo: 'crescendo (rumo à sizígia)', diminuindo: 'diminuindo (rumo à quadratura)', 'estável': 'estável' }[t.trend]}</b>${t.nextSyz ? ` · próxima sizígia ${fmt(t.nextSyz.ts, tz)}` : ''}. Próximas: ${t.next.map(e => `${e.kind === 'HW' ? 'PM' : 'BM'} ${fmt(e.ts, tz)} (${fm(e.h)})`).join('; ')}.</p>${tideChartSvg(res, tz, t)}` : '<p class="sub">Sem previsão de nível do mar para este ponto.</p>'}` : ''}
-${hasLim ? `<h2>Limites aplicados</h2>${limitsTable(lm)}` : ''}
+${hasLim ? `<h2>Limites aplicados</h2>${limitsTable(lm, ctx.equipments)}` : ''}
 ${foot}`;
   }
   return `${head}
@@ -1517,7 +1569,7 @@ ${srcTable}
 <h2>Avisos de Mau Tempo da Marinha</h2>
 ${navySection(ctx, tz)}
 ${hasLim ? `<h2>Limites aplicados</h2>
-${limitsTable(lm)}` : ''}
+${limitsTable(lm, ctx.equipments)}` : ''}
 ${foot}`;
 }
 
@@ -2013,7 +2065,7 @@ function buildPdf(ctx) {
   if (hasLim) {
   pdf.h2('Limites aplicados');
   const v = (x, u = '') => (x === null || x === undefined) ? 'não usado' : `${x} ${u}`.trim();
-  pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Corrente máxima', v(lm.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(lm)], ['Direção da onda bloqueada', dirTxt(lm, true)], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
+  pdf.table([{ h: 'Parâmetro', w: 0.5 }, { h: 'Limite', w: 0.5 }], [...(ctx.equipments && ctx.equipments.length ? [['Equipamentos usados', ctx.equipments.join(', ')]] : []), ['Hs máxima', v(lm.hs_max, 'm')], ['Tp mínima', v(lm.tp_min, 's')], ['Vento máximo (10 m)', v(lm.wind_max, 'kn')], ['Rajada máxima', v(lm.gust_max, 'kn')], ['Corrente máxima', v(lm.cur_max, 'kn')], ['Direção do vento bloqueada', dirTxt(lm)], ['Direção da onda bloqueada', dirTxt(lm, true)], ['Somente diurno', lm.daylight_only ? 'sim' : 'não'], ['Janela mínima', `${lm.min_window_h} h seguidas`]]);
   }
   pdf.y += 6;
   if (!brief || pdf.y < PDF_H - 120) pdf.para(`Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em ${tzlabel(tz)}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.`, 7.5, { color: PDF_COL.mut });
@@ -2025,7 +2077,7 @@ function buildPdf(ctx) {
 /* ===PDF:end=== */
 
 /* =============================== estado e telas =============================== */
-const S = { locs: [], profs: [], analyses: [], navy: { warnings: [], fetched_at: null, status: null }, tags: [],
+const S = { locs: [], profs: [], equips: [], selEquip: null, eqSel: new Set(), eqSnap: null, eqRanges: null, eqSig: '[]', analyses: [], navy: { warnings: [], fetched_at: null, status: null }, tags: [],
   selLoc: null, selProf: null, rows: [], wind: null, wave: null, current: null };
 
 /* ---- tags ---- */
@@ -2066,9 +2118,10 @@ function showTab(name) {
 /* ---- carregar tudo ---- */
 async function loadAll() {
   try {
-    const [locs, profs, an, navy] = await Promise.all([Store.list('locations'), Store.list('profiles'), Store.list('analyses'), Store.get('navy', 'latest')]);
+    const [locs, profs, an, navy, equips] = await Promise.all([Store.list('locations'), Store.list('profiles'), Store.list('analyses'), Store.get('navy', 'latest'), Store.list('equipments')]);
     S.locs = locs.sort((a, b) => a.name.localeCompare(b.name, 'pt'));
     S.profs = profs.sort((a, b) => a.name.localeCompare(b.name, 'pt'));
+    S.equips = equips.sort((a, b) => a.name.localeCompare(b.name, 'pt'));
     S.analyses = an.sort((a, b) => b.created_at - a.created_at);
     S.navy = navy || { warnings: [], fetched_at: null, status: null };
     S.tags = [...new Map([...S.locs, ...S.analyses].flatMap(x => x.tags || []).map(t => [t.toLowerCase(), t])).values()].sort((a, b) => a.localeCompare(b, 'pt'));
@@ -2078,7 +2131,7 @@ async function loadAll() {
   }
   renderAll();
 }
-function renderAll() { renderLocs(); renderProfs(); renderHistory(); renderNavy(); renderSources(); updateLinks(); renderStoreBadge(); }
+function renderAll() { renderLocs(); renderProfs(); renderEquips(); renderQEquips(); renderHistory(); renderNavy(); renderSources(); updateLinks(); renderStoreBadge(); }
 
 function renderStoreBadge() {
   const b = $('#store');
@@ -2163,11 +2216,11 @@ const setIdx = (sel, v) => { $(sel).value = (v === null || v === undefined) ? ''
 function initDirFields() {
   document.querySelectorAll('.dirpair').forEach(box => {
     const p = box.dataset.p, w = box.dataset.k === 'w', k = w ? 'w' : 'd', nome = w ? 'onda' : 'vento', opts = () => [el('option', { value: '' }, '—'), ...PONTOS16.map((n, i) => el('option', { value: String(i) }, n))];
-    box.replaceChildren(el('label', {}, `Direção da${w ? '' : 'o'} ${nome} bloqueada (opcional)`,
+    box.replaceChildren(el('label', {}, `Direção ${w ? 'da' : 'do'} ${nome} bloqueada (opcional)`,
       el('div', { class: 'row', style: 'flex-wrap:nowrap;gap:6px;margin-top:3px' },
-        el('select', { id: `${p}-${k}from`, class: 'f', 'aria-label': `Direção da${w ? '' : 'o'} ${nome} bloqueada, de`, style: 'margin:0' }, ...opts()),
+        el('select', { id: `${p}-${k}from`, class: 'f', 'aria-label': `Direção ${w ? 'da' : 'do'} ${nome} bloqueada, de`, style: 'margin:0' }, ...opts()),
         el('span', { class: 'm' }, 'até'),
-        el('select', { id: `${p}-${k}to`, class: 'f', 'aria-label': `Direção da${w ? '' : 'o'} ${nome} bloqueada, até`, style: 'margin:0' }, ...opts()))));
+        el('select', { id: `${p}-${k}to`, class: 'f', 'aria-label': `Direção ${w ? 'da' : 'do'} ${nome} bloqueada, até`, style: 'margin:0' }, ...opts()))));
   });
 }
 function renderProfs() {
@@ -2208,6 +2261,83 @@ async function delProf() {
 async function seedProfs() {
   try { for (const p of DEFAULT_PROFILES) await Store.set('profiles', newId(), { ...p, created_at: now() }); await loadAll(); toast('Perfis de exemplo adicionados. Ajuste aos seus limites reais.'); }
   catch (e) { setMsg('#p-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
+}
+
+/* ---- equipamentos ---- */
+const EQ_CAMPOS = ['hs_max', 'tp_min', 'wind_max', 'gust_max', 'cur_max', 'dir_from', 'dir_to', 'wdir_from', 'wdir_to'];
+function renderEquips() {
+  const ul = $('#e-list'); if (!ul) return;
+  ul.replaceChildren(...(S.equips.length ? S.equips.map(e => {
+    const L = e.limits || {}, txt = limitsLabel(L);
+    return el('li', { class: e.id === S.selEquip ? 'sel' : '' },
+      el('div', { class: 't' }, e.name + (e.type ? ' · ' + e.type : '')),
+      el('div', { class: 'm' }, txt || 'sem limites (não restringe nada)'),
+      el('div', { class: 'row', style: 'margin-top:4px' }, el('button', { type: 'button', class: 'lnk', onclick: () => fillEquip(e.id) }, 'Abrir para editar')));
+  }) : [el('li', { class: 'empty' }, 'Nenhum equipamento cadastrado.')]));
+  $('#e-del').hidden = !S.selEquip || !S.equips.some(e => e.id === S.selEquip);
+}
+function fillEquip(id) {
+  const e = S.equips.find(x => x.id === id); if (!e) return;
+  S.selEquip = id; const L = e.limits || {};
+  $('#e-name').value = e.name; $('#e-type').value = e.type || '';
+  $('#e-hs').value = L.hs_max ?? ''; $('#e-tp').value = L.tp_min ?? ''; $('#e-wind').value = L.wind_max ?? ''; $('#e-gust').value = L.gust_max ?? ''; $('#e-cur').value = L.cur_max ?? '';
+  setIdx('#e-dfrom', L.dir_from); setIdx('#e-dto', L.dir_to); setIdx('#e-wfrom', L.wdir_from); setIdx('#e-wto', L.wdir_to);
+  setMsg('#e-msg', ''); renderEquips();
+}
+function newEquip() {
+  S.selEquip = null;
+  for (const id of ['#e-name', '#e-type', '#e-hs', '#e-tp', '#e-wind', '#e-gust', '#e-cur', '#e-dfrom', '#e-dto', '#e-wfrom', '#e-wto']) $(id).value = '';
+  $('#e-del-ask').hidden = true; setMsg('#e-msg', ''); renderEquips();
+}
+async function saveEquip() {
+  const name = $('#e-name').value.trim();
+  if (!name) return setMsg('#e-msg', 'Dê um nome ao equipamento.', 'bad');
+  let n;
+  try {
+    n = normalizeLimits({ hs_max: nOrNull('#e-hs'), tp_min: nOrNull('#e-tp'), wind_max: nOrNull('#e-wind'), gust_max: nOrNull('#e-gust'), cur_max: nOrNull('#e-cur'),
+      dir_from: selIdx('#e-dfrom'), dir_to: selIdx('#e-dto'), wdir_from: selIdx('#e-wfrom'), wdir_to: selIdx('#e-wto') });
+  } catch (e) { return setMsg('#e-msg', e.message, 'bad'); }
+  const limits = Object.fromEntries(EQ_CAMPOS.map(k => [k, n[k]]));
+  const id = S.selEquip || newId();
+  try {
+    await Store.set('equipments', id, { name, type: $('#e-type').value.trim(), limits, created_at: (S.equips.find(e => e.id === id) || {}).created_at || now() });
+    S.selEquip = id; await loadAll(); setMsg('#e-msg', 'Equipamento salvo.', 'ok');
+  } catch (e) { setMsg('#e-msg', 'Não foi possível salvar: ' + (e.message || e), 'bad'); }
+}
+async function delEquip() {
+  try { await Store.del('equipments', S.selEquip); S.eqSel.delete(S.selEquip); newEquip(); await loadAll(); toast('Equipamento excluído.'); }
+  catch (e) { setMsg('#e-msg', 'Não foi possível excluir: ' + (e.message || e), 'bad'); }
+}
+/* caixas de marcar na análise rápida; o limite combinado (o mais restritivo) preenche os campos */
+const Q_EQ_CAMPOS = ['#q-hs', '#q-tp', '#q-wind', '#q-gust', '#q-cur', '#q-dfrom', '#q-dto', '#q-wfrom', '#q-wto'];
+function renderQEquips() {
+  const box = $('#q-equips'); if (!box) return;
+  S.eqSel = new Set([...S.eqSel].filter(id => S.equips.some(e => e.id === id)));
+  box.replaceChildren(...(S.equips.length ? S.equips.map(e => el('label', { class: 'check' },
+    el('input', { type: 'checkbox', checked: S.eqSel.has(e.id), onchange: ev => { if (ev.target.checked) S.eqSel.add(e.id); else S.eqSel.delete(e.id); S.eqSig = eqSignature(); applyEquipSelection(); } }),
+    e.name + (e.type ? ` (${e.type})` : ''))) : [el('span', { class: 'empty' }, 'Nenhum equipamento cadastrado. Cadastre na aba Equipamentos para usar os limites deles aqui.')]));
+  if (eqSignature() !== S.eqSig) { S.eqSig = eqSignature(); applyEquipSelection(); }   // exclusão ou edição de equipamento marcado
+}
+const eqSignature = () => JSON.stringify(S.equips.filter(e => S.eqSel.has(e.id)).map(e => [e.id, e.limits]));
+function applyEquipSelection() {
+  const sel = S.equips.filter(e => S.eqSel.has(e.id)), note = $('#q-equip-note');
+  const dirs = (a, b, faixas, nome) => {
+    const fa = $(a), fb = $(b);
+    fa.disabled = fb.disabled = faixas.length > 1;
+    setIdx(a, faixas.length === 1 ? faixas[0][0] : null); setIdx(b, faixas.length === 1 ? faixas[0][1] : null);
+    return faixas.length > 1 ? `${faixas.length} faixas de direção do ${nome} bloqueadas vêm dos equipamentos (${faixas.map(([x, y]) => PONTOS16[x] + ' a ' + PONTOS16[y]).join('; ')}); desmarque equipamentos para editar.` : '';
+  };
+  if (!sel.length) {
+    if (S.eqSnap) { for (const [id, v] of Object.entries(S.eqSnap)) $(id).value = v; S.eqSnap = null; }
+    for (const id of ['#q-dfrom', '#q-dto', '#q-wfrom', '#q-wto']) $(id).disabled = false;
+    S.eqRanges = null; note.textContent = ''; return;
+  }
+  if (!S.eqSnap) S.eqSnap = Object.fromEntries(Q_EQ_CAMPOS.map(id => [id, $(id).value]));
+  const c = combineEquipLimits(sel);
+  $('#q-hs').value = c.hs_max ?? ''; $('#q-tp').value = c.tp_min ?? ''; $('#q-wind').value = c.wind_max ?? ''; $('#q-gust').value = c.gust_max ?? ''; $('#q-cur').value = c.cur_max ?? '';
+  const nv = dirs('#q-dfrom', '#q-dto', c.dir_ranges, 'vento'), no = dirs('#q-wfrom', '#q-wto', c.wdir_ranges, 'onda');
+  S.eqRanges = { dir_ranges: c.dir_ranges.length > 1 ? c.dir_ranges : [], wdir_ranges: c.wdir_ranges.length > 1 ? c.wdir_ranges : [] };
+  note.textContent = [`Limite combinado (o mais restritivo) de: ${sel.map(e => e.name).join(', ')}. Você pode digitar por cima antes de gerar.`, nv, no].filter(Boolean).join(' ');
 }
 
 /* ---- fontes e links ---- */
@@ -2696,7 +2826,7 @@ async function quickRun() {
   const an = { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked, cur: $('#q-an-cur').checked };
   if (!an.wind && !an.wave && !an.tide && !an.cur) return msg('Marque pelo menos uma análise: vento, ondas, maré ou corrente.', 'bad');
   let limits;
-  try { limits = normalizeLimits({ hs_max: an.wave ? nOrNull('#q-hs') : null, tp_min: an.wave ? nOrNull('#q-tp') : null, wind_max: an.wind ? nOrNull('#q-wind') : null, gust_max: an.wind ? nOrNull('#q-gust') : null, cur_max: an.cur ? nOrNull('#q-cur') : null, dir_from: an.wind ? selIdx('#q-dfrom') : null, dir_to: an.wind ? selIdx('#q-dto') : null, wdir_from: an.wave ? selIdx('#q-wfrom') : null, wdir_to: an.wave ? selIdx('#q-wto') : null, min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
+  try { limits = normalizeLimits({ hs_max: an.wave ? nOrNull('#q-hs') : null, tp_min: an.wave ? nOrNull('#q-tp') : null, wind_max: an.wind ? nOrNull('#q-wind') : null, gust_max: an.wind ? nOrNull('#q-gust') : null, cur_max: an.cur ? nOrNull('#q-cur') : null, dir_from: an.wind ? selIdx('#q-dfrom') : null, dir_to: an.wind ? selIdx('#q-dto') : null, wdir_from: an.wave ? selIdx('#q-wfrom') : null, wdir_to: an.wave ? selIdx('#q-wto') : null, dir_ranges: an.wind && S.eqRanges ? S.eqRanges.dir_ranges : [], wdir_ranges: an.wave && S.eqRanges ? S.eqRanges.wdir_ranges : [], min_window_h: $('#q-win').value, daylight_only: $('#q-day').checked }); }
   catch (e) { return msg(e.message, 'bad'); }
   const days = Math.max(1, Math.min(16, parseInt($('#q-days').value, 10) || 5));
   quickSave();
@@ -2727,7 +2857,7 @@ async function quickRun() {
       $(`#paste-${k}`).value = raw; validatePaste(k);
     }
     if ((an.wind && !S.wind) || ((an.wave || an.tide || an.cur) && !S.wave)) return msg('A resposta veio sem dados horários. Confira as coordenadas (ponto em terra?).', 'bad');
-    await runAnalysis(loc, prof, days, loc.tags, msg, { analyses: an, mode, header, startTs: ini.startTs });
+    await runAnalysis(loc, prof, days, loc.tags, msg, { analyses: an, mode, header, startTs: ini.startTs, equipments: S.equips.filter(e => S.eqSel.has(e.id)).map(e => e.name) });
   } catch (e) {
     msg(`Não consegui buscar a previsão (${(e && e.message) || (e && e.code) || 'erro'}). Verifique a internet ou use o modo completo abaixo.`, 'bad');
   } finally { btn.disabled = false; }
@@ -2759,7 +2889,7 @@ async function runAnalysis(loc, prof, days, tags, msg, opts = {}) {
   const ctx = { result, errors, location: { name: loc.name, lat: loc.lat, lon: loc.lon, tz_offset: loc.tz_offset, areas: loc.areas || '', project: loc.project || '' }, profileName: prof.name, tags,
     analyses: opts.analyses || { wind: true, wave: true, tide: true, cur: true }, mode: opts.mode || 'completo', header: opts.header || {},
     navyWarnings: warningsFor(S.navy.warnings || [], startTs, endTs, S.navy.fetched_at || 0), navyInfo: { fetched_at: S.navy.fetched_at, status: S.navy.status },
-    navyStale: !S.navy.fetched_at || (now() - S.navy.fetched_at) > 7 * 86400, generatedTs: now(), startAheadDays: (startTs - Math.floor(now() / HOUR) * HOUR) / 86400 };
+    navyStale: !S.navy.fetched_at || (now() - S.navy.fetched_at) > 7 * 86400, equipments: opts.equipments || [], generatedTs: now(), startAheadDays: (startTs - Math.floor(now() / HOUR) * HOUR) / 86400 };
   showReport(ctx);
   msg(errors.length ? `Relatório gerado; ${errors.length} fonte(s) com problema (veja os alertas).` : 'Relatório gerado.', errors.length ? 'warn' : 'ok');
   await saveAnalysis(ctx, loc, prof);
@@ -2844,7 +2974,7 @@ function reportHtml(ctx) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}@media print{body{background:#fff;padding:0}}</style></head><body><div class="rp">${buildReport(ctx)}</div><script>(${ageFill.toString()})(document)<\/script></body></html>`;
 }
 /* ---- backup (exportar / importar) ---- */
-const BACKUP_COLLECTIONS = ['locations', 'profiles', 'analyses', 'results'];
+const BACKUP_COLLECTIONS = ['locations', 'profiles', 'equipments', 'analyses', 'results'];
 async function exportBackup() {
   try {
     const data = { app: 'metocean-op', version: 1, exported_at: now(), rows: S.rows, collections: {}, navy: S.navy };
@@ -2925,6 +3055,11 @@ async function init() {
   $('#p-del-no').addEventListener('click', () => { $('#p-del-ask').hidden = true; });
   $('#p-del-yes').addEventListener('click', () => { $('#p-del-ask').hidden = true; delProf(); });
   $('#p-seed').addEventListener('click', seedProfs);
+  $('#e-save').addEventListener('click', saveEquip);
+  $('#e-new').addEventListener('click', newEquip);
+  $('#e-del').addEventListener('click', () => { $('#e-del-ask').hidden = false; });
+  $('#e-del-no').addEventListener('click', () => { $('#e-del-ask').hidden = true; });
+  $('#e-del-yes').addEventListener('click', () => { $('#e-del-ask').hidden = true; delEquip(); });
 
   $('#a-loc').addEventListener('change', e => { const l = S.locs.find(x => x.id === e.target.value); if (l) { S.selLoc = l.id; anTags.set(l.tags); } updateLinks(); revalidatePastes(); });
   $('#a-days').addEventListener('input', updateLinks);
@@ -2991,7 +3126,7 @@ async function init() {
 
   renderAll();
   let tab = 'analise'; try { tab = sessionStorage.getItem('mco:tab') || 'analise'; } catch (e) { /* padrão */ }
-  showTab(['analise', 'locais', 'limites', 'historico', 'avisos'].includes(tab) ? tab : 'analise');
+  showTab(['analise', 'locais', 'limites', 'equip', 'historico', 'avisos'].includes(tab) ? tab : 'analise');
   await Store.init();
   renderStoreBadge();
   initDownloads();

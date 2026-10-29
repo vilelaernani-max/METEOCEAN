@@ -81,6 +81,11 @@ function openMeteo(dir) {
   const velho = await p.evaluate(() => { try { return JSON.parse(localStorage.getItem('mco:profiles') || '{}'); } catch (e) { return {}; } });
   ok('há perfis salvos no armazenamento', Object.keys(velho).length >= 1);
 
+  // textos dos rótulos de direção (um erro de gramática já escapou: "Direção dao vento")
+  const rotulos = await p.$$eval('.dirpair label', ls => ls.map(l => l.firstChild.textContent.trim()));
+  ok('rótulos de direção corretos nos formulários', rotulos.length >= 8 && rotulos.every(r => r === 'Direção do vento bloqueada (opcional)' || r === 'Direção da onda bloqueada (opcional)'), JSON.stringify([...new Set(rotulos)]));
+  const aria = await p.$$eval('.dirpair select', ss => ss.map(x => x.getAttribute('aria-label')));
+  ok('aria-labels de direção corretos', aria.every(a => /^Direção (do vento|da onda) bloqueada, (de|até)$/.test(a)), JSON.stringify([...new Set(aria)]));
   // ---- direção da onda nos formulários ----
   await p.click('#t-analise');
   await p.selectOption('#q-dfrom', ''); await p.selectOption('#q-dto', '');
