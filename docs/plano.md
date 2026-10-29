@@ -86,3 +86,12 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - E1 a E5 concluídas. Testes: `tests/equipamentos.js` (parte pura e de navegador, desktop, celular, backup, PDF e HTML). Todos os testes e a paridade Python × JavaScript passam.
 - Correção fora do plano: o rótulo "Direção dao vento bloqueada" (erro de gramática de uma revisão anterior) virou "Direção do vento bloqueada"; teste em `tests/dir_forms.js` impede a volta.
 - Decisão de construção: ao desmarcar todos os equipamentos, os campos de limite voltam ao que estavam antes da primeira marcação (nada de limite "preso").
+
+---
+
+# Plano 5: gráficos do resumido, corrente e maré, identidade e ajuda (spec 5)
+- [ ] I1 Gráfico genérico de dois eixos com faixa de direção (`twoAxisChart`) e bússola reaproveitada; gráficos de Vento (intensidade, rajada, direção) e de Onda (Hs, Tp, direção) no resumido, com testes.
+- [ ] I2 Corrente (velocidade + direção) e maré (curva) no resumido; conferir os do completo; testes.
+- [ ] I3 Logotipo embutido (WebP com transparência para a tela e HTML; JPEG com fundo branco para o PDF), cabeçalho do app e dos relatórios (tela, HTML, PDF) e "Desenvolvido por" no rodapé; testes.
+- [ ] I4 Aba Ajuda, pontos "?" e testes.
+- [ ] I5 Fechamento: todos os testes, republicar o artefato.
