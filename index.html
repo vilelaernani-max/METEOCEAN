@@ -1087,7 +1087,7 @@ function dualBody(res, tz, si, lm) {
     const v = s.wind[i], d = s.wdir ? s.wdir[i] : null;
     if (!okv(v)) continue;
     const c = coldWarm(v / wmax);
-    if (okv(d)) o.push(`<path class="wa" transform="translate(${X(i).toFixed(1)} ${YW(v).toFixed(1)}) rotate(${Math.round(((d + 180) % 360 + 360) % 360)})" d="M0,-6.6 L4.1,5 L0,2.9 L-4.1,5 Z" fill="${c}" stroke="#fff" stroke-width="1" stroke-linejoin="round"/>`);
+    if (okv(d)) o.push(`<path class="wa" transform="translate(${X(i).toFixed(1)} ${YW(v).toFixed(1)}) rotate(${Math.round(((d + 180) % 360 + 360) % 360)})" d="M-1,6.4 L-1,-1 L-4,-1 L0,-7.6 L4,-1 L1,-1 L1,6.4 Z" fill="${c}" stroke="#13232b" stroke-width="0.9" stroke-linejoin="round"/>`);
     else o.push(`<circle class="wd" cx="${X(i).toFixed(1)}" cy="${YW(v).toFixed(1)}" r="2.4" fill="${c}" stroke="#fff" stroke-width="0.7"/>`);
   }
   o.push(...late);
@@ -1656,8 +1656,8 @@ function pdfDualChart(pdf, res, tz, lm) {
     const c = coldWarm(v / wmax), x = X(i), y = YW(v);
     if (!okv(d)) { pdf.dot(x, y, 1.8, c); continue; }
     const a = ((d + 180) % 360) * Math.PI / 180, rot = (px, py) => [x + px * Math.cos(a) - py * Math.sin(a), y + px * Math.sin(a) + py * Math.cos(a)];   // seta apontando para onde o vento vai (0° = norte = para cima)
-    const pts = [[0, -4.2], [2.5, 3.1], [0, 1.8], [-2.5, 3.1]].map(([px, py]) => rot(px, py));
-    pdf.cur.push(`${hexRgb(c)} rg ${hexRgb(PDF_COL.surface)} RG 0.5 w ` + pts.map(([px, py], q) => `${px.toFixed(2)} ${pdf.py(py)} ${q ? 'l' : 'm'}`).join(' ') + ' h B');
+    const pts = [[-0.6, 3.8], [-0.6, -0.6], [-2.4, -0.6], [0, -4.6], [2.4, -0.6], [0.6, -0.6], [0.6, 3.8]].map(([px, py]) => rot(px, py));
+    pdf.cur.push(`${hexRgb(c)} rg ${hexRgb(PDF_COL.ink)} RG 0.4 w ` + pts.map(([px, py], q) => `${px.toFixed(2)} ${pdf.py(py)} ${q ? 'l' : 'm'}`).join(' ') + ' h B');
   }
   late.forEach(f => f());
   pdf.y = top + H - 14;

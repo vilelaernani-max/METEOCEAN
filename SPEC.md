@@ -153,3 +153,6 @@ Pedido do Ernani: "seta pode ser menor, coloque uma linha suave e as setas por c
 - **Setas menores** (altura de cerca de 11 px no desenho, antes 15,5), desenhadas **depois** da linha (por cima), uma a cada N h (N para dar pelo menos ~11 px de espaço).
 - A linha da onda (sólida, mais grossa) e os limites seguem como antes. PDF acompanha (linha suave e setas menores).
 - Testes: `tests/grafico.js` confere curvas, linha fina e translúcida, ordem (setas depois da linha) e tamanho das setas.
+
+## Revisão 3 (29/10/2026): a seta tem de mostrar a direção
+Pedido do Ernani: "Seta tem q mostrar direção". A seta menor da revisão 2 virou um triângulo pequeno, sem direção legível. Passa a ser uma **seta com haste e ponta**, estreita e alongada (cerca de 14 px de altura por 8 px de largura, ainda menor que a primeira, de 15,5 × 11), com **contorno escuro** para se destacar da linha de mesma cor. Aceite: altura entre 12 e 15 px, altura pelo menos 1,6 vez a largura, formato com haste e ponta, contorno #13232b; rotação segue sendo "de onde vem + 180°". PDF acompanha. Teste: `tests/grafico.js`.

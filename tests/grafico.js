@@ -69,7 +69,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('linha de vento é suave: fina, translúcida e sólida', lv.every(x => x.w <= 2 && x.w >= 1 && x.o < 1 && !x.traco), JSON.stringify(lv[0]));
   ok('linha de vento também vai do frio ao quente', new Set(lv.map(x => x.cor)).size > 8);
   ok('setas desenhadas por cima da linha de vento', await p.evaluate(g => { const svg = document.querySelector(g), ls = [...svg.querySelectorAll('path.wl2')], as = [...svg.querySelectorAll('path.wa')]; return ls.length && as.length && ls.every(l => as.every(a => !!(l.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING))); }, g));
-  ok('setas menores que as anteriores (de 15,5 para até 13 px no desenho)', await p.$$eval(g + ' path.wa', ps => ps.every(x => x.getBBox().height <= 13)));
+  ok('setas menores que as primeiras (15,5 px) mas com haste: altura entre 12 e 15 px', await p.$$eval(g + ' path.wa', ps => ps.every(x => { const h = x.getBBox().height; return h >= 12 && h <= 15; })));
+  ok('seta alongada, com haste (altura pelo menos 1,6 vez a largura), para a direção ser inequívoca', await p.$$eval(g + ' path.wa', ps => ps.every(x => { const b = x.getBBox(); return b.height / b.width >= 1.6; })));
+  ok('seta tem haste e ponta (formato de seta, não triângulo)', await p.$$eval(g + ' path.wa', ps => ps.every(x => (x.getAttribute('d').match(/L/g) || []).length >= 6)));
+  ok('contorno escuro para destacar a seta da linha de mesma cor', await p.$$eval(g + ' path.wa', ps => ps.every(x => /#13232b/i.test(x.getAttribute('stroke')))));
   const eixos = await p.$$eval(g + ' text', ts => ts.map(t => t.textContent));
   ok('eixo principal identificado (vento, kn)', eixos.some(t => /kn/.test(t)));
   ok('eixo secundário identificado (Hs, m) à direita', await p.$$eval(g + ' text.ax2', ts => ts.length >= 5));

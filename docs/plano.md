@@ -69,3 +69,4 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - [x] G4 (29/10/2026) Limites do gráfico mais visíveis: linha preta tracejada (vento, eixo esq.) e roxa pontilhada (Hs, eixo dir.), rótulos com fundo por cima dos dados, legenda dos limites, aviso quando não há limite; PDF com o mesmo destaque. Testes em `tests/grafico.js`.
 - [x] G5 (29/10/2026) Revisão do gráfico: onda em linha (eixo direito) e vento em setas de direção (eixo esquerdo, uma a cada N h), tela, HTML e PDF; testes atualizados em `tests/grafico.js`.
 - [x] G6 (29/10/2026) Linha suave de vento (curva por todas as horas, colorida) sob setas menores desenhadas por cima; PDF acompanha; testes atualizados.
+- [x] G7 (29/10/2026) Seta do vento com haste e ponta, estreita, com contorno escuro, para a direção ficar legível (tela e PDF); testes de formato e tamanho.
