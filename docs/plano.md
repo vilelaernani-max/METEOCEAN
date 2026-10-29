@@ -72,3 +72,12 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - [x] G7 (29/10/2026) Seta do vento com haste e ponta, estreita, com contorno escuro, para a direção ficar legível (tela e PDF); testes de formato e tamanho.
 - [x] G8 (29/10/2026) Bússola com o Norte no topo do gráfico (tela e PDF) e nota explicando a seta do vento; testes atualizados.
 - [x] G9 (29/10/2026) Relatório resumido com o gráfico combinado e as rosas de vento e de ondas (tela, HTML e PDF); completo inalterado. Teste `tests/resumido.js`.
+
+---
+
+# Plano 4: equipamentos (spec 4)
+- [ ] E1 Combinação e várias faixas de direção: `combineEquipLimits` (puro), `dir_ranges`/`wdir_ranges` em `normalizeLimits` e `evaluateHour`, `dirTxt` com todas as faixas. Teste: `tests/equipamentos.js` (parte pura).
+- [ ] E2 Cadastro: aba Equipamentos (formulário, lista, validação, excluir com confirmação), coleção `equipments`, backup. Teste: navegador.
+- [ ] E3 Seleção na análise rápida: caixas de marcar, preenchimento dos campos, seletores de direção com várias faixas, geração com `dir_ranges`.
+- [ ] E4 Relatório: cabeçalho e tabela de limites (tela, HTML, PDF).
+- [ ] E5 Artefato: capacidade `db` com a coleção `equipments`; fechamento (todos os testes).

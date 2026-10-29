@@ -162,3 +162,25 @@ Pedido do Ernani: representar o Norte no gráfico. Faixa nova no alto do gráfic
 
 ## Revisão 5 (29/10/2026): relatório resumido com o gráfico e as rosas
 Pedido do Ernani: no relatório resumido, usar este gráfico e a rosa. O resumido passa a trazer, depois das janelas e da linha do tempo: (1) **"Vento e onda juntos"** (quando vento e ondas estão na análise; se só um estiver, o gráfico simples daquele parâmetro); (2) **rosa dos ventos** (quando há vento) e **rosa de ondas** (quando há ondas), lado a lado no desktop e empilhadas no celular. Saem do resumido os gráficos separados de Hs e de vento (o combinado os substitui). O relatório **completo** não muda. No PDF do resumido: o gráfico combinado e as duas rosas lado a lado. Teste: `tests/resumido.js`.
+
+---
+
+# Spec 4: cadastro de equipamentos
+
+Pedido do Ernani (29/10/2026): "cadastrar equipamentos; na previsão usar o limite do equipamento mais alto selecionado". Decisões dele: regra **mais restritiva** (não a mais alta), cadastro **só com limites do ambiente**, campos de limite da análise **preenchem sozinhos** com o limite combinado.
+
+## Objetivo e aceite
+- Aba **Equipamentos**: cadastro (nome, tipo, limites). Limites: Hs máxima (m), Tp mínimo (s), vento máximo (nós), rajada máxima (nós), corrente máxima (nós), direção do vento bloqueada (de, até) e direção da onda bloqueada (de, até), cada par com os 16 pontos cardeais. Campo vazio = o equipamento não limita aquele parâmetro. Salvar, novo, excluir (com confirmação) e lista.
+- Na **análise rápida**: caixas de marcar com os equipamentos cadastrados ("Equipamentos (opcional)"). Marcar ou desmarcar recalcula o limite combinado e **preenche os campos de limite**; o usuário pode digitar por cima antes de gerar, e vale o que estiver nos campos.
+- **Combinação** (mais restritivo): Hs máxima, vento máximo, rajada máxima e corrente máxima = **menor** valor entre os equipamentos que têm o limite; Tp mínimo = **maior** valor; parâmetro que nenhum equipamento limita fica vazio. **Direção bloqueada = união das faixas**: hora bloqueada se qualquer equipamento bloquear aquela direção.
+- A análise passa a aceitar **várias faixas bloqueadas** (`dir_ranges`, `wdir_ranges`) além do par `dir_from/dir_to`. Com uma única faixa, os seletores de direção do formulário mostram a faixa. Com mais de uma, os seletores ficam desabilitados e uma nota diz quantas faixas vêm dos equipamentos; as faixas valem na geração.
+- **Relatório** (tela, HTML e PDF): "Equipamentos: A, B" no cabeçalho e linha "Equipamentos usados" na tabela de limites; a linha de direção bloqueada mostra todas as faixas ("SSE a SSO; NO a NE"). O motivo NO-GO cita a faixa que bloqueou.
+- Sem equipamento selecionado, nada muda (campos manuais, relatório como hoje).
+- **Backup** exporta e restaura os equipamentos. **Artefato:** nova coleção `equipments` com as mesmas regras de acesso das outras (republicar com a capacidade `db` atualizada).
+- Excluir equipamento que está marcado na análise o desmarca. Equipamento sem nenhum limite é aceito (não limita nada).
+
+## Testes
+`tests/equipamentos.js`: combinação (função pura: menor, maior, vazios, união de faixas), várias faixas na avaliação hora a hora, cadastro e validação (só um lado da direção), seleção preenchendo os campos, digitar por cima, relatório (cabeçalho, tabela, motivo), backup, exclusão, e ausência de mudança sem seleção.
+
+## Fora do escopo
+Fabricante, modelo, número de série, limites de operação (diurno, janela mínima) dentro do equipamento, a regra "limite mais alto", seleção de equipamento no modo completo (colagem manual).
