@@ -74,15 +74,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('seta tem haste e ponta (formato de seta, não triângulo)', await p.$$eval(g + ' path.wa', ps => ps.every(x => (x.getAttribute('d').match(/L/g) || []).length >= 6)));
   ok('contorno escuro para destacar a seta da linha de mesma cor', await p.$$eval(g + ' path.wa', ps => ps.every(x => /#13232b/i.test(x.getAttribute('stroke')))));
   const eixos = await p.$$eval(g + ' text', ts => ts.map(t => t.textContent));
-  ok('eixo principal identificado (vento, kn)', eixos.some(t => /kn/.test(t)));
+  ok('eixo principal identificado (vento, kn)', eixos.some(t => /nós/.test(t)));
   ok('eixo secundário identificado (Hs, m) à direita', await p.$$eval(g + ' text.ax2', ts => ts.length >= 5));
   ok('limites desenhados (vento e Hs)', (await p.$$eval(g + ' line.dlim', ls => ls.length)) === 2);
   const lims = await p.$$eval(g + ' line.dlim', ls => ls.map(l => ({ cor: l.getAttribute('stroke'), traco: l.getAttribute('stroke-dasharray'), larg: +l.getAttribute('stroke-width') })));
   ok('linhas de limite espessas (>= 2)', lims.length === 2 && lims.every(l => l.larg >= 2), JSON.stringify(lims));
   ok('limites com cor e tracejado diferentes entre si', lims.length === 2 && lims[0].cor !== lims[1].cor && lims[0].traco !== lims[1].traco, JSON.stringify(lims));
   ok('rótulos dos limites com fundo para ficarem legíveis', (await p.$$eval(g + ' rect.lbg', r => r.length)) === 2);
-  ok('rótulos dizem em qual eixo está cada limite', /limite vento 20 kn \(eixo esq\.\)/.test(eixos.join('|')) && /limite Hs 2 m \(eixo dir\.\)/.test(eixos.join('|')), eixos.join('|'));
-  ok('legenda mostra as duas linhas de limite', (await p.$$eval('#report .dualleg .lsw', e => e.length)) === 2 && /limite de vento 20 kn/.test(await p.textContent('#report .dualleg')) && /limite de Hs 2 m/.test(await p.textContent('#report .dualleg')));
+  ok('rótulos dizem em qual eixo está cada limite', /limite vento 20 nós \(eixo esq\.\)/.test(eixos.join('|')) && /limite Hs 2 m \(eixo dir\.\)/.test(eixos.join('|')), eixos.join('|'));
+  ok('legenda mostra as duas linhas de limite', (await p.$$eval('#report .dualleg .lsw', e => e.length)) === 2 && /limite de vento 20 nós/.test(await p.textContent('#report .dualleg')) && /limite de Hs 2 m/.test(await p.textContent('#report .dualleg')));
   // ---- bússola: o Norte no gráfico ----
   const bus = await p.$$eval(g + ' g.bussola text', ts => ts.map(x => ({ t: x.textContent, x: +x.getAttribute('x'), y: +x.getAttribute('y'), w: x.getAttribute('font-weight') })));
   const letra = l => bus.find(b => b.t === l);

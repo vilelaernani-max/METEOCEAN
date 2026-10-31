@@ -143,9 +143,9 @@ const PT_WORDS = /\b(janelas?|previs[ãa]o|vento|ondas?|mar[ée]|corrente|relat[
   const h = await p.innerText('#h-list');
   ok('histórico em inglês (com o nome automático do perfil)', /generated \d{2} [A-Z][a-z]{2} \d{2}:\d{2} · \d+ conservative window\(s\)/.test(h) && /Hs ≤ 2 m, wind ≤ 20 kn/.test(h) && /Open report/.test(h) && !PT_WORDS.test(h), h);
   await p.click('button.flag[data-lang="pt"]');
-  ok('histórico: nome automático do perfil muda de idioma', /vento ≤ 20 kn/.test(await p.innerText('#h-list')) && /gerado/.test(await p.innerText('#h-list')), await p.innerText('#h-list'));
+  ok('histórico: nome automático do perfil muda de idioma', /vento ≤ 20 nós/.test(await p.innerText('#h-list')) && /gerado/.test(await p.innerText('#h-list')), await p.innerText('#h-list'));
   await p.click('#h-list button.lnk >> nth=0');
-  ok('abrir relatório do histórico em português', /Janelas — cenário conservador/i.test(await p.innerText('#report')) && /Limites: Hs ≤ 2 m, vento ≤ 20 kn/.test(await p.innerText('#report')), (await p.innerText('#report')).slice(0, 300));
+  ok('abrir relatório do histórico em português', /Janelas — cenário conservador/i.test(await p.innerText('#report')) && /Limites: Hs ≤ 2 m, vento ≤ 20 nós/.test(await p.innerText('#report')), (await p.innerText('#report')).slice(0, 300));
   ok('sem textos sem tradução (resumido)', (await faltaTraducao(p)).length === 0, JSON.stringify(await faltaTraducao(p)));
   ok('sem erros de página (resumido)', errs.length === 0, JSON.stringify(errs));
   await ctx.close();

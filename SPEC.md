@@ -280,4 +280,5 @@ Nenhuma que bloqueie. Suposições a corrigir: (1) idioma inicial pelo navegador
 - **Avisos da Marinha:** continuam em português (texto da fonte); a linha de fonte do relatório em inglês diz "(in Portuguese)".
 - **Idioma dos relatórios salvos:** o histórico guarda os dados, não o texto; ao abrir, o relatório sai no idioma escolhido na hora. O nome automático do perfil da análise rápida ("Hs ≤ 2 m, vento ≤ 20 kn") também troca de idioma.
 - **Rótulos padrão** (fontes, perfis de exemplo, fases da Lua, estado da maré) trocam de idioma na tela e no relatório; nomes digitados pelo usuário não.
+- **Revisão de consistência (31/10/2026):** em português a unidade de vento e corrente é **nós** em todo o app (formulários, relatórios, gráficos, PDF); em inglês, **kn**. "Tp mínima" virou "Tp mínimo" na tabela de limites. O cálculo não mudou.
 

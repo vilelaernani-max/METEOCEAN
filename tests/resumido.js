@@ -37,7 +37,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   const bloco = i => p.evaluate(i => [...document.querySelectorAll('#report h2')][i].parentElement.innerHTML, i);
   const bV = await bloco(iV);
   ok('vento: intensidade em linha (segmentos), rajada tracejada e direção em setas', (bV.match(/class="sr"/g) || []).length > 60 && /class="sd"/.test(bV) && (bV.match(/class="sa"/g) || []).length > 20, '');
-  ok('vento: limites de vento e de rajada não usados não aparecem; o limite de vento aparece', (bV.match(/class="dlim"/g) || []).length === 1 && /limite vento 20 kn/.test(bV));
+  ok('vento: limites de vento e de rajada não usados não aparecem; o limite de vento aparece', (bV.match(/class="dlim"/g) || []).length === 1 && /limite vento 20 nós/.test(bV));
   ok('vento: bússola do Norte e legenda das setas', /class="bussola"/.test(bV) && /seta[^<]*para onde o vento vai/.test(bV));
   const bO = await bloco(iO);
   ok('onda: Hs em linha, Tp em linha no eixo direito e direção em setas', (bO.match(/class="sr"/g) || []).length > 60 && /class="ss"/.test(bO) && (bO.match(/class="sa"/g) || []).length > 20 && /class="mut ax2"/.test(bO), '');

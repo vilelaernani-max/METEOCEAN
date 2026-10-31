@@ -58,7 +58,7 @@ function resp(u) {
   await p.click('button[aria-label="Próxima hora"]'); ok('botão próxima hora move a barra', (await p.inputValue('#rm-hour')) === '31');
   ok('legenda relativa ao limite', /70% do limite/.test(await p.textContent('.rmleg')));
   ok('cores variam (mais de uma classe)', new Set(await p.$$eval('.rmap rect.cell', r => r.map(x => x.getAttribute('class')))).size >= 2);
-  ok('painel já mostra a célula central', /Célula selecionada[\s\S]*Vento: \d+ kn vindo de/.test(await p.textContent('#rm-info')), await p.textContent('#rm-info'));
+  ok('painel já mostra a célula central', /Célula selecionada[\s\S]*Vento: \d+ nós vindo de/.test(await p.textContent('#rm-info')), await p.textContent('#rm-info'));
   const cels = await p.$$('.rmap svg g');
   await cels[10].dispatchEvent('pointerdown', { pointerType: 'touch' });
   const apos = await p.textContent('#rm-info');

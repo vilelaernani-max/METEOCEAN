@@ -101,7 +101,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   await cadastra(p, { nome: 'Guindaste A', tipo: 'Guindaste', hs: 2, tp: 6, wind: 25, gust: 30, df: 7, dt: 9 });
   ok('salvou Guindaste A', /Guindaste A/.test(await p.textContent('#e-list')) && /Hs ≤ 2 m/.test(await p.textContent('#e-list')), await p.textContent('#e-list'));
   await cadastra(p, { nome: 'ROV B', tipo: 'ROV', hs: 1.5, tp: 8, wind: 30, cur: 1.5, df: 14, dt: 2, wf: 4, wt: 8 });
-  ok('salvou ROV B', /ROV B/.test(await p.textContent('#e-list')) && /corrente ≤ 1.5 kn/.test(await p.textContent('#e-list')), await p.textContent('#e-list'));
+  ok('salvou ROV B', /ROV B/.test(await p.textContent('#e-list')) && /corrente ≤ 1.5 nós/.test(await p.textContent('#e-list')), await p.textContent('#e-list'));
   await cadastra(p, { nome: 'Sem limites', tipo: 'Teste' }); ok('equipamento sem limite é aceito', /Sem limites/.test(await p.textContent('#e-list')));
   // editar: clicar no item carrega no formulário
   await p.click('#e-list li:has-text("Guindaste A") button.lnk'); await p.waitForTimeout(150);
