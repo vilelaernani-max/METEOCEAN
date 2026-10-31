@@ -30,6 +30,7 @@ function resp(u) {
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.route('**/tile.openstreetmap.org/**', r => r.fulfill({ body: PNG, contentType: 'image/png' }));
     await p.route('**/*open-meteo.com/**', r => {
+      if (/static\/meta\.json/.test(r.request().url())) return r.fulfill({ json: {} });   // rodada do modelo: não é o assunto deste teste
       if (modo === '429' && new URL(r.request().url()).searchParams.get('latitude').includes(',')) return r.fulfill({ status: 429, json: { error: true, reason: 'limit' } });
       if (modo === 'curta' && new URL(r.request().url()).searchParams.get('latitude').includes(',')) return r.fulfill({ json: [resp(r.request().url())[0]] });
       r.fulfill({ json: resp(r.request().url()) });

@@ -32,7 +32,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
   let pedidos = [];
   await p.route('**/*open-meteo.com/**', r => {
-    const u = new URL(r.request().url()); pedidos.push(u.searchParams.get('forecast_days'));
+    const u = new URL(r.request().url()); if (/static\/meta\.json/.test(u.pathname)) return r.fulfill({ json: {} });   // rodada do modelo: fora deste teste
+    pedidos.push(u.searchParams.get('forecast_days'));
     const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(16 * 24 + 24)].map((_, i) => t0 + i * 3600), marine = u.pathname.includes('marine');
     const h = marine ? { time, wave_height: time.map(() => 1), wave_period: time.map(() => 8), wave_direction: time.map(() => 90) } : { time, wind_speed_10m: time.map(() => 10), wind_gusts_10m: time.map(() => 14), wind_direction_10m: time.map(() => 120) };
     r.fulfill({ json: { latitude: -22.9, longitude: -43.1, hourly: h, hourly_units: {} } });

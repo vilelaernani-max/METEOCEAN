@@ -118,3 +118,16 @@ Ordem: T1 → (T2 e T3 em paralelo, sem arquivo em comum além do `index.html`: 
 - Testes: `tests/idiomas.js` (dicionário, telas fixas, cadastros, relatórios completo e resumido em tela/HTML/PDF, histórico, fontes, backup, avisos, mapa da região, celular). Os testes antigos agora abrem com `locale: 'pt-BR'`. Todos passam, mais a paridade Python × JavaScript.
 - Salvaguarda: `window.__missing` lista os textos sem tradução vistos em inglês; o teste exige lista vazia.
 - Fora do plano: `limitsLabel` virou `limitsParts`/`autoName`; o histórico guarda `profile_limits` para o nome automático do perfil trocar de idioma.
+
+---
+
+# Plano 7: revisão crítica (spec 7)
+- [x] R2 Histórico compacto: `packResult`/`unpackResult`, `HIST_MAX = 20`.
+- [x] R3 Fuso do ponto: campo `#q-tz`, `lonTz`/`autoTz`, guardado em `mco:quick`, parâmetro `?fuso=`; seleção de equipamentos guardada.
+- [x] R1 Rodada do modelo: `fetchModelRuns`, `runsText`, `oldestRunH`; linha no relatório (tela, HTML, PDF) e na idade.
+- [x] Fechamento: `tests/revisao.js`; todos os testes e a paridade passam; GitHub e artefato.
+
+## Registro do plano 7 (31/10/2026)
+- Pendente de confirmação no navegador do Ernani: a linha "Rodadas dos modelos" com dados reais (o ambiente de construção não alcança a Open-Meteo).
+- Ficou de fora (menor): no cenário conservador, hora sem dado em uma fonte continua sendo decidida pelas outras; há alerta no relatório.
+

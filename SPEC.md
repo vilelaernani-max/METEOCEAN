@@ -283,3 +283,24 @@ Nenhuma que bloqueie. Suposições a corrigir: (1) idioma inicial pelo navegador
 - **Revisão de consistência (31/10/2026):** em português a unidade de vento e corrente é **nós** em todo o app (formulários, relatórios, gráficos, PDF); em inglês, **kn**. "Tp mínima" virou "Tp mínimo" na tabela de limites. O cálculo não mudou.
 - **Crédito à Open-Meteo (31/10/2026):** o app, os relatórios (tela, HTML e PDF) e a Ajuda > Sobre passam a dar o crédito com link (open-meteo.com), a licença (CC BY 4.0) e o aviso de uso não comercial, com a nota de que uso comercial exige o plano pago da Open-Meteo. Rodapé do app também cita a Marinha do Brasil e o © OpenStreetMap. Testes em `tests/identidade.js`.
 
+---
+
+# Spec 7: revisão crítica (31/10/2026)
+Três correções apontadas na revisão, aprovadas pelo Ernani ("Aplique todas").
+
+## R1 Rodada do modelo
+- A "idade da previsão" media só o tempo desde o download. Agora o app pede à Open-Meteo a hora da rodada de cada modelo nomeado (`/data/<modelo>/static/meta.json`, campo `last_run_initialisation_time`, vento em api.open-meteo.com e onda em marine-api.open-meteo.com).
+- Relatório (tela, HTML, PDF): linha "Rodadas dos modelos: NOAA GFS / GFS-Wave: vento 29/10 06:00Z, onda …" e, na linha de idade, "A rodada mais antiga dos modelos é de N h antes deste relatório." O "melhor modelo" (nome vazio) não tem rodada única e fica de fora. Sem resposta: "Rodada do modelo: não informada pela fonte", sem travar o relatório (6 s de espera no máximo).
+- A regra de idade (3 h / 12 h) continua contando do download, como decidido antes; a rodada é informação a mais.
+- **A verificar no navegador:** o endereço do meta.json não pôde ser testado deste ambiente (sem acesso à Open-Meteo). Se a linha vier "não informada", o endereço ou o nome do modelo precisam de ajuste.
+
+## R2 Histórico compacto
+- Guarda 20 relatórios (antes 40). Cada um salvo compactado: status em uma letra por hora (G/N/X), séries arredondadas à precisão da fonte, grade como início + quantidade. Relatório de 16 dias com 3 fontes: ~49 KB (antes ~61 KB); histórico cheio fica abaixo de 1 MB (antes 2,4 MB). Relatórios salvos antes abrem como estão.
+
+## R3 Fuso do ponto
+- Campo "Fuso do ponto (horas de UTC)" na análise rápida, preenchido pela longitude (15° por hora) e refeito quando o ponto muda; local salvo usa o fuso do cadastro. Quem digita por cima tira o automático; apagar volta ao automático. Guardado ao recarregar; `?fuso=` no link.
+- Extra: a seleção de equipamentos também fica guardada ao recarregar.
+
+## Testes
+`tests/revisao.js` (histórico, fuso, rodada com meta.json simulado e com falha). `tests/map.js` e `tests/inicio.js` passaram a ignorar o pedido de meta.json.
+

@@ -209,6 +209,7 @@ details>summary{cursor:pointer}
       <div class="dirpair" data-p="q" data-k="w"></div>
       <label>Dias à frente<input id="q-days" class="f" type="number" min="1" max="16" value="5"></label>
       <label>Início da análise (opcional)<input id="q-start" class="f" type="datetime-local"></label>
+      <label>Fuso do ponto (horas de UTC)<input id="q-tz" class="f" type="number" step="0.5" min="-12" max="14" placeholder="pela longitude" data-auto="1"></label>
     </div>
     <label class="check" style="margin-top:8px"><input id="q-day" type="checkbox"> Somente período diurno</label>
     <div class="row" style="margin-top:12px;align-items:center"><button id="q-go" type="button" class="primary">Gerar previsão</button><span id="q-msg" class="msg" aria-live="polite"></span></div>
@@ -1073,6 +1074,9 @@ Object.assign(EN, {
   "a busca falhou (sem conexão, bloqueio do navegador/anúncios ou limite de uso da Open-Meteo): tente de novo em 1 minuto": "the request failed (no connection, browser/ad blocker, or Open-Meteo usage limit): try again in 1 minute",
   "nós": "kn",
   "Previsões: {0} (CC BY 4.0) · uso não comercial · Avisos: Marinha do Brasil · Mapa: © OpenStreetMap": "Forecasts: {0} (CC BY 4.0) · non-commercial use · Warnings: Brazilian Navy · Map: © OpenStreetMap",
+  "Rodadas dos modelos: {0}": "Model runs: {0}",
+  "Rodada do modelo: não informada pela fonte": "Model run: not reported by the source",
+  "A rodada mais antiga dos modelos é de {0} h antes deste relatório.": "The oldest model run is from {0} h before this report.",
   "MetOcean OP": "MetOcean OP",
   "janelas operacionais de vento e onda · uso pessoal": "wind and wave operational windows · personal use",
   "Seções": "Sections",
@@ -1237,7 +1241,9 @@ Object.assign(EN, {
   "carregando…": "loading…",
   "O idioma (português ou inglês) troca pelas bandeiras no alto da página. A escolha fica salva no navegador, e os relatórios saem no idioma escolhido.": "The language (Portuguese or English) is switched with the flags at the top of the page. The choice is saved in the browser, and reports come out in the chosen language.",
   "<b>Dados:</b> as previsões vêm da <a href=\"https://open-meteo.com/\" target=\"_blank\" rel=\"noopener\">Open-Meteo</a> (modelos NOAA GFS, ECMWF e outros), sob licença CC BY 4.0. A API gratuita da Open-Meteo é para <b>uso não comercial</b>; para usar em trabalho comercial, é preciso o plano pago da Open-Meteo. Os avisos de mau tempo vêm da Marinha do Brasil (CHM). O mapa é do © OpenStreetMap.": "<b>Data:</b> forecasts come from <a href=\"https://open-meteo.com/\" target=\"_blank\" rel=\"noopener\">Open-Meteo</a> (NOAA GFS, ECMWF and other models), under the CC BY 4.0 licence. The free Open-Meteo API is for <b>non-commercial use</b>; to use it in commercial work, the paid Open-Meteo plan is required. Bad-weather warnings come from the Brazilian Navy (CHM). The map is © OpenStreetMap.",
-  "© <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>": "© <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>"
+  "© <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>": "© <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>",
+  "Fuso do ponto (horas de UTC)": "Point time zone (hours from UTC)",
+  "pela longitude": "from longitude"
 });
 /*EN:end*/
 
@@ -2423,12 +2429,13 @@ function ageFill(root) {
     var m = Math.max(0, Math.round((Date.now() / 1000 - Number(n.getAttribute('data-ts'))) / 60));
     var t = m < 90 ? m + ' min' : (m < 2880 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' ' + n.getAttribute('data-d')), g = function (k) { return n.getAttribute(k).replace('{0}', t); };
     n.className = 'age alert' + (m >= 720 ? ' stale' : '');
-    if (m < 180) { n.className = 'age'; n.textContent = g('data-a'); }
-    else if (m < 720) n.textContent = g('data-b');
-    else n.textContent = g('data-c');
+    var extra = n.getAttribute('data-extra') || '';
+    if (m < 180) { n.className = 'age'; n.textContent = g('data-a') + extra; }
+    else if (m < 720) n.textContent = g('data-b') + extra;
+    else n.textContent = g('data-c') + extra;
   });
 }
-function ageBanner(ts) { return `<div class="age" data-ts="${ts}" data-d="${esc(tt('dias'))}" data-a="${esc(tt('Previsão gerada há {0}. Gere de novo perto da operação.'))}" data-b="${esc(tt('Previsão gerada há {0}: pode ter mudado. Gere de novo antes de decidir.'))}" data-c="${esc(tt('PREVISÃO ANTIGA (gerada há {0}). Não use para decidir: gere uma nova análise.'))}">${tt('Previsão gerada em {0}. Gere de novo perto da operação.', fmtUtcFull(ts))}</div>`; }
+function ageBanner(ts, runH) { const extra = runH !== null && runH !== undefined ? ' ' + tt('A rodada mais antiga dos modelos é de {0} h antes deste relatório.', runH) : ''; return `<div class="age" data-ts="${ts}" data-extra="${esc(extra)}" data-d="${esc(tt('dias'))}" data-a="${esc(tt('Previsão gerada há {0}. Gere de novo perto da operação.'))}" data-b="${esc(tt('Previsão gerada há {0}: pode ter mudado. Gere de novo antes de decidir.'))}" data-c="${esc(tt('PREVISÃO ANTIGA (gerada há {0}). Não use para decidir: gere uma nova análise.'))}">${tt('Previsão gerada em {0}. Gere de novo perto da operação.', fmtUtcFull(ts))}${extra}</div>`; }
 
 function buildReport(ctx) {
   ctx = langCtx(ctx);
@@ -2494,6 +2501,7 @@ ${hdr}
  ${(ctx.equipments || []).length ? `<span>${tt('Equipamentos')}: <b>${esc(ctx.equipments.join(', '))}</b></span>` : ''}
  ${ctx.tags.length ? `<span>Tags: ${tags}</span>` : ''}
  <span>${tt('Gerado')}: <b>${fmtUtcFull(ctx.generatedTs)}</b></span>
+ <span>${runsText(res) ? tt('Rodadas dos modelos: {0}', esc(runsText(res))) : tt('Rodada do modelo: não informada pela fonte')}</span>
 </div>`;
   const chart = (title, body) => `<div><h2>${title}</h2>${body}</div>`;
   if (brief) {
@@ -2503,7 +2511,7 @@ ${hdr}
     const t = A.tide ? tideStats(res, tz, ctx.generatedTs) : null;
     return `${head}
 ${hasLim ? kpis(res, tz) : ''}
-${ageBanner(ctx.generatedTs)}
+${ageBanner(ctx.generatedTs, oldestRunH(res, ctx.generatedTs))}
 ${alertHtml}
 ${hasLim ? verdict : ''}
 ${hasLim ? `<h2>${tt('Janelas — cenário conservador')}</h2>${windowsTable(cw, grid, tz, true)}<h2>${tt('Linha do tempo por fonte')}</h2>${legend}${timelineSvg(res, tz, rows)}` : ''}
@@ -2518,7 +2526,7 @@ ${foot}`;
   }
   return `${head}
 ${hasLim ? kpis(res, tz) : ''}
-${ageBanner(ctx.generatedTs)}
+${ageBanner(ctx.generatedTs, oldestRunH(res, ctx.generatedTs))}
 ${alertHtml}
 ${hasLim ? verdict : ''}
 ${hasLim ? `<h2>${tt('Janelas — cenário conservador')}</h2>
@@ -3024,6 +3032,7 @@ function buildPdf(ctx) {
   const startL = fmt(grid[0], tz), endL = fmt(grid[grid.length - 1] + HOUR, tz);
   const scope = [A.wind ? tt('vento') : null, A.wave ? tt('ondas') : null, A.tide ? tt('maré') : null, A.cur ? tt('corrente') : null].filter(Boolean).join(', ');
   pdf.para(tt('{0} ({1}){2}{3}    ·    Período: {4} → {5} ({6}){7}', brief ? tt('Resumo operacional') : tt('Análise de janelas operacionais'), scope, '', hasLim ? tt('    ·    Operação: ') + ctx.profileName : '', startL, endL, tzlabel(tz), ctx.tags.length ? tt('    ·    Tags: ') + ctx.tags.join(', ') : ''), 9, { color: PDF_COL.mut, gap: 6 });
+  pdf.para(runsText(res) ? tt('Rodadas dos modelos: {0}', runsText(res)) : tt('Rodada do modelo: não informada pela fonte'), 8, { color: PDF_COL.mut, gap: 6 });
   const hdrItems = [[tt('Projeto'), projP], [tt('Local'), ctx.location.name], [tt('Cliente'), Hd.client], [tt('Embarcação / unidade'), Hd.vessel], [tt('Responsável'), Hd.resp], [tt('Documento'), Hd.doc], [tt('Observações'), Hd.obs]].filter(([, v]) => v);
   if (hdrItems.length) {
     const colW = (PDF_W - 2 * PDF_M) / 2, rowsN = Math.ceil(hdrItems.length / 2), hh = rowsN * 13 + 10;
@@ -3359,7 +3368,7 @@ function renderQEquips() {
   const box = $('#q-equips'); if (!box) return;
   S.eqSel = new Set([...S.eqSel].filter(id => S.equips.some(e => e.id === id)));
   box.replaceChildren(...(S.equips.length ? S.equips.map(e => el('label', { class: 'check' },
-    el('input', { type: 'checkbox', checked: S.eqSel.has(e.id), onchange: ev => { if (ev.target.checked) S.eqSel.add(e.id); else S.eqSel.delete(e.id); S.eqSig = eqSignature(); applyEquipSelection(); } }),
+    el('input', { type: 'checkbox', checked: S.eqSel.has(e.id), onchange: ev => { if (ev.target.checked) S.eqSel.add(e.id); else S.eqSel.delete(e.id); S.eqSig = eqSignature(); applyEquipSelection(); quickSave(); } }),
     e.name + (e.type ? ` (${e.type})` : ''))) : [el('span', { class: 'empty' }, tt('Nenhum equipamento cadastrado. Cadastre na aba Equipamentos para usar os limites deles aqui.'))]));
   if (eqSignature() !== S.eqSig) { S.eqSig = eqSignature(); applyEquipSelection(); }   // exclusão ou edição de equipamento marcado
 }
@@ -3839,14 +3848,16 @@ const MapView = (() => {
 const QKEY = 'mco:quick';
 function quickLoad() {
   try { const q = JSON.parse(localStorage.getItem(QKEY) || 'null'); if (!q) return;
-    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['cur', '#q-cur'], ['dfrom', '#q-dfrom'], ['dto', '#q-dto'], ['wfrom', '#q-wfrom'], ['wto', '#q-wto'], ['win', '#q-win'], ['days', '#q-days'], ['name', '#q-name'], ['proj', '#q-proj'], ['client', '#h-client'], ['vessel', '#h-vessel'], ['resp', '#h-resp'], ['doc', '#h-doc'], ['obs', '#h-obs']]) if (q[k] !== undefined) $(id).value = q[k];
+    for (const [k, id] of [['coords', '#q-coords'], ['hs', '#q-hs'], ['wind', '#q-wind'], ['gust', '#q-gust'], ['tp', '#q-tp'], ['cur', '#q-cur'], ['dfrom', '#q-dfrom'], ['dto', '#q-dto'], ['wfrom', '#q-wfrom'], ['wto', '#q-wto'], ['win', '#q-win'], ['days', '#q-days'], ['tz', '#q-tz'], ['name', '#q-name'], ['proj', '#q-proj'], ['client', '#h-client'], ['vessel', '#h-vessel'], ['resp', '#h-resp'], ['doc', '#h-doc'], ['obs', '#h-obs']]) if (q[k] !== undefined) $(id).value = q[k];
     $('#q-day').checked = !!q.day;
+    if (q.tzAuto === false) delete $('#q-tz').dataset.auto;
+    if (Array.isArray(q.eq)) S.eqSel = new Set(q.eq);   // equipamentos marcados voltam ao recarregar
     if (q.an) { $('#q-an-wind').checked = !!q.an.wind; $('#q-an-wave').checked = !!q.an.wave; $('#q-an-tide').checked = !!q.an.tide; $('#q-an-cur').checked = q.an.cur !== false; }
     if (q.mode) { const r = document.querySelector(`input[name="q-mode"][value="${q.mode}"]`); if (r) r.checked = true; }
   } catch (e) { /* opcional */ }
 }
 function quickSave() {
-  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, cur: $('#q-cur').value, dfrom: $('#q-dfrom').value, dto: $('#q-dto').value, wfrom: $('#q-wfrom').value, wto: $('#q-wto').value, win: $('#q-win').value, days: $('#q-days').value, day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
+  try { localStorage.setItem(QKEY, JSON.stringify({ coords: $('#q-coords').value, hs: $('#q-hs').value, wind: $('#q-wind').value, gust: $('#q-gust').value, tp: $('#q-tp').value, cur: $('#q-cur').value, dfrom: $('#q-dfrom').value, dto: $('#q-dto').value, wfrom: $('#q-wfrom').value, wto: $('#q-wto').value, win: $('#q-win').value, days: $('#q-days').value, tz: $('#q-tz').value, tzAuto: !!$('#q-tz').dataset.auto, eq: [...S.eqSel], day: $('#q-day').checked, name: $('#q-name').value, proj: $('#q-proj').value, client: $('#h-client').value, vessel: $('#h-vessel').value, resp: $('#h-resp').value, doc: $('#h-doc').value, obs: $('#h-obs').value,
     an: { wind: $('#q-an-wind').checked, wave: $('#q-an-wave').checked, tide: $('#q-an-tide').checked, cur: $('#q-an-cur').checked }, mode: (document.querySelector('input[name="q-mode"]:checked') || {}).value })); } catch (e) { /* opcional */ }
 }
 /* texto curto dos limites; o nome automático do perfil da análise rápida usa só a parte de valores */
@@ -3876,6 +3887,13 @@ function applyLocToQuick(l) {
     setMsg('#q-coordsmsg', tt('Local salvo "{0}": limites do local aplicados ({1}).', l.name, limitsLabel(L)), 'ok');
   } else setMsg('#q-coordsmsg', tt('Local salvo "{0}".', l.name), 'ok');
 }
+/* fuso pela longitude (15° por hora); o campo preenchido assim fica marcado como automático e muda junto com o ponto. Quem digita por cima tira a marca. */
+const lonTz = lon => Math.max(-12, Math.min(14, Math.round(lon / 15)));
+function autoTz(lon, saved) {
+  const f = $('#q-tz'); if (!f) return;
+  if (f.value !== '' && !f.dataset.auto) return;   // digitado pelo usuário: respeita
+  f.value = saved ? saved.tz_offset : lonTz(lon); f.dataset.auto = '1';
+}
 function matchLoc(lat, lon) { return S.locs.find(l => Math.abs(l.lat - lat) < 1e-4 && Math.abs(l.lon - lon) < 1e-4) || null; }
 function runFromLoc(id) {
   const l = S.locs.find(x => x.id === id); if (!l) return;
@@ -3893,9 +3911,11 @@ async function quickRun() {
   catch (e) { return msg(e.message, 'bad'); }
   const days = Math.max(1, Math.min(16, parseInt($('#q-days').value, 10) || 5));
   quickSave();
-  const tz = -new Date().getTimezoneOffset() / 60;
-  const nm = $('#q-name').value.trim(), saved = matchLoc(c.lat, c.lon);
-  const loc = { id: saved ? saved.id : null, name: nm || (saved ? saved.name : `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`), lat: c.lat, lon: c.lon, tz_offset: saved ? saved.tz_offset : tz, areas: saved ? saved.areas || '' : '', tags: saved ? saved.tags || [] : [], project: $('#q-proj').value.trim() || (saved ? saved.project || '' : '') };
+  const saved = matchLoc(c.lat, c.lon);
+  autoTz(c.lon, saved);
+  const tzTyped = parseFloat($('#q-tz').value), tz = Number.isFinite(tzTyped) && tzTyped >= -12 && tzTyped <= 14 ? tzTyped : lonTz(c.lon);
+  const nm = $('#q-name').value.trim();
+  const loc = { id: saved ? saved.id : null, name: nm || (saved ? saved.name : `${c.lat.toFixed(4)}°, ${c.lon.toFixed(4)}°`), lat: c.lat, lon: c.lon, tz_offset: tz, areas: saved ? saved.areas || '' : '', tags: saved ? saved.tags || [] : [], project: $('#q-proj').value.trim() || (saved ? saved.project || '' : '') };
   const ini = parseStart($('#q-start').value, loc.tz_offset, now(), days);
   if (ini.error) return msg(ini.error, 'bad');
   const header = { client: $('#h-client').value.trim(), vessel: $('#h-vessel').value.trim(), resp: $('#h-resp').value.trim(), doc: $('#h-doc').value.trim(), obs: $('#h-obs').value.trim(), project: loc.project };
@@ -3933,11 +3953,32 @@ function parseStart(value, tz, nowTs, days) {
   if (days > maxDays) return { error: tt('Início e duração passam de 16 dias à frente. Com esse início, use no máximo {0} dia(s).', maxDays) };
   return { startTs, aheadDays: ahead / 86400 };
 }
+/* hora da rodada de cada modelo nomeado (meta.json da Open-Meteo: last_run_initialisation_time). "Melhor modelo" (vazio) não tem rodada única; falha vira null, sem travar o relatório. */
+const META_HOST = { wind: 'https://api.open-meteo.com', wave: 'https://marine-api.open-meteo.com' };
+async function fetchModelRuns(rows) {
+  const out = {};
+  const one = async (kind, model) => {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+    try { const r = await fetch(`${META_HOST[kind]}/data/${model}/static/meta.json`, { signal: ctl.signal }); if (!r.ok) return; const j = await r.json(); const v = Number(j.last_run_initialisation_time); if (Number.isFinite(v) && v > 0) out[kind + ':' + model] = v; }
+    catch (e) { /* sem informação de rodada */ } finally { clearTimeout(t); }
+  };
+  const jobs = [];
+  for (const row of rows) { const w = (row.wind || '').trim(), v = (row.wave || '').trim(); if (w) jobs.push(one('wind', w)); if (v) jobs.push(one('wave', v)); }
+  await Promise.all(jobs);
+  return out;
+}
+/* texto das rodadas para o relatório: "NOAA GFS: vento 29/10 06Z, onda 29/10 00Z · ECMWF: …"; null quando nenhuma fonte informou */
+function runsText(res) {
+  const parts = res.sources.map(s => { const m = s.meta || {}, p = []; if (m.run_wind) p.push(tt('vento') + ' ' + fmtUtc(m.run_wind)); if (m.run_wave) p.push(tt('onda') + ' ' + fmtUtc(m.run_wave)); return p.length ? `${s.label}: ${p.join(', ')}` : null; }).filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+function oldestRunH(res, ts) { const v = res.sources.flatMap(s => [s.meta && s.meta.run_wind, s.meta && s.meta.run_wave]).filter(x => x); return v.length ? Math.round((ts - Math.min(...v)) / 3600) : null; }
 async function runAnalysis(loc, prof, days, tags, msg, opts = {}) {
   const startTs = opts.startTs || Math.floor(now() / HOUR) * HOUR, endTs = startTs + days * 86400;
   const ok = [], errors = [];
+  const runs = await fetchModelRuns(S.rows);
   for (const row of S.rows) {
-    try { const r = buildSeries(opts.analyses && !opts.analyses.wind ? null : S.wind, opts.analyses && !(opts.analyses.wave || opts.analyses.tide || opts.analyses.cur) ? null : S.wave, row, startTs, endTs); ok.push({ id: row.label, label: row.label || tt('Fonte'), fetched_at: now(), ...r }); }
+    try { const r = buildSeries(opts.analyses && !opts.analyses.wind ? null : S.wind, opts.analyses && !(opts.analyses.wave || opts.analyses.tide || opts.analyses.cur) ? null : S.wave, row, startTs, endTs); ok.push({ id: row.label, label: row.label || tt('Fonte'), fetched_at: now(), ...r, meta: { ...r.meta, run_wind: runs['wind:' + (row.wind || '').trim()] || null, run_wave: runs['wave:' + (row.wave || '').trim()] || null } }); }
     catch (e) { errors.push({ label: row.label || tt('Fonte'), error: e.message }); }
   }
   if (!ok.length) return msg(tt('Nenhuma fonte pôde ser montada: ') + errors.map(e => `${e.label}: ${e.error}`).join('; '), 'bad');
@@ -3964,19 +4005,38 @@ async function saveAnalysis(ctx, loc, prof) {
   const id = newId(), res = ctx.result, cw = res.conservative.windows;
   const longest = cw.length ? cw.reduce((a, b) => b.hours > a.hours ? b : a) : null;
   const summary = { windows: cw.length, longest_h: longest ? longest.hours : 0, agreement_pct: res.agreement.pct, sources_ok: res.sources.length, sources_failed: ctx.errors.length };
-  const slim = { ...ctx, result: { ...res, sources: res.sources.map(s => ({ ...s })) } };
   try {
-    await Store.set('results', id, slim);
+    await Store.set('results', id, packResult(ctx));
     await Store.set('analyses', id, { location_name: loc.name, profile_name: prof.name, profile_limits: prof.auto ? prof.limits : null, start_ts: res.start_ts, end_ts: res.end_ts, tags: ctx.tags, summary, created_at: now() });
     S.analyses.unshift({ id, location_name: loc.name, profile_name: prof.name, profile_limits: prof.auto ? prof.limits : null, start_ts: res.start_ts, end_ts: res.end_ts, tags: ctx.tags, summary, created_at: now() });
     for (const t of ctx.tags) if (!S.tags.some(x => x.toLowerCase() === t.toLowerCase())) S.tags.push(t);
     refreshTagList(); renderHistory(); setMsg('#rp-saved', tt('Salvo no histórico.'), 'ok');
-    // mantém só os 40 mais recentes
-    for (const old of S.analyses.splice(40)) { await Store.del('analyses', old.id); await Store.del('results', old.id); }
+    // mantém só os 20 mais recentes (cada um compactado; veja packResult)
+    for (const old of S.analyses.splice(HIST_MAX)) { await Store.del('analyses', old.id); await Store.del('results', old.id); }
   } catch (e) { setMsg('#rp-saved', tt('Relatório gerado, mas não foi possível salvar no histórico: ') + (e.message || e), 'warn'); }
 }
 
 /* ---- histórico ---- */
+const HIST_MAX = 20;
+/* o relatório salvo guarda só o necessário, compacto: status em uma letra por hora (G/N/X), números com 3 casas e a grade como início + quantidade.
+   unpackResult desfaz; relatórios salvos antes desta versão (sem `packed`) abrem como estão. */
+const ST_CH = { go: 'G', nogo: 'N', nodata: 'X' }, CH_ST = { G: 'go', N: 'nogo', X: 'nodata' };
+/* casas decimais por série = precisão com que a Open-Meteo entrega (a corrente é convertida de km/h, por isso 3) */
+const SER_DEC = { hs: 2, tp: 2, wind: 1, gust: 1, wdir: 0, wvdir: 0, tide: 2, cur: 3, cdir: 0 }, SER_KEYS = Object.keys(SER_DEC);
+const rnd = (v, d) => (v === null || v === undefined) ? null : Math.round(v * 10 ** d) / 10 ** d;
+function packResult(ctx) {
+  const res = ctx.result;
+  const src = s => { const o = { ...s }; o.status = s.status.map(x => ST_CH[x] || 'X').join(''); for (const k of SER_KEYS) if (Array.isArray(s[k])) o[k] = s[k].map(v => rnd(v, SER_DEC[k])); return o; };
+  return { ...ctx, packed: 2, result: { ...res, grid: { t0: res.grid[0], n: res.grid.length }, sources: res.sources.map(src),
+    conservative: { ...res.conservative, status: res.conservative.status.map(x => ST_CH[x] || 'X').join('') },
+    optimistic: { ...res.optimistic, status: res.optimistic.status.map(x => ST_CH[x] || 'X').join('') } } };
+}
+function unpackResult(r) {
+  if (!r || !r.packed) return r;
+  const res = r.result, grid = Array.from({ length: res.grid.n }, (_, i) => res.grid.t0 + i * HOUR), st = s => [...s].map(c => CH_ST[c] || 'nodata');
+  return { ...r, packed: undefined, result: { ...res, grid, sources: res.sources.map(s => ({ ...s, status: st(s.status) })),
+    conservative: { ...res.conservative, status: st(res.conservative.status) }, optimistic: { ...res.optimistic, status: st(res.optimistic.status) } } };
+}
 function renderHistory() {
   const sel = $('#h-tag'), keep = sel.value;
   sel.replaceChildren(el('option', { value: '' }, tt('todas')), ...S.tags.map(t => el('option', { value: t }, t)));
@@ -3998,7 +4058,7 @@ function renderHistory() {
 }
 async function openAnalysis(id) {
   try {
-    const r = await Store.get('results', id);
+    const r = unpackResult(await Store.get('results', id));
     if (!r) return toast(tt('Esse relatório não está mais disponível.'));
     showTab('analise'); showReport(r); setMsg('#rp-saved', tt('Relatório do histórico.'), '');
   } catch (e) { toast(tt('Não foi possível abrir: ') + (e.message || e)); }
@@ -4218,11 +4278,13 @@ async function init() {
   }
   $('#auto').addEventListener('click', autoFetch);
   $('#q-go').addEventListener('click', quickRun);
+  $('#q-tz').addEventListener('input', () => { delete $('#q-tz').dataset.auto; if ($('#q-tz').value === '') { const c = parseCoords($('#q-coords').value); if (c) autoTz(c.lon, matchLoc(c.lat, c.lon)); } quickSave(); });
   $('#q-coords').addEventListener('keydown', e => { if (e.key === 'Enter') quickRun(); });
   quickLoad();
   const toLocais = (lat, lon) => { if (!S.selLoc) { $('#l-lat').value = +lat.toFixed(5); $('#l-lon').value = +lon.toFixed(5); updateSeeLink(); } };
   const afterPick = (lat, lon) => {
     const m = matchLoc(lat, lon);
+    autoTz(lon, m);
     if (m) { applyLocToQuick(m); return; }
     toLocais(lat, lon);
     const n = $('#q-coordsmsg'); n.className = 'msg ok';
@@ -4235,14 +4297,14 @@ async function init() {
     S.selLoc = null; $('#l-name').value = name; $('#l-lat').value = +c.lat.toFixed(5); $('#l-lon').value = +c.lon.toFixed(5); $('#l-proj').value = $('#q-proj').value.trim(); $('#l-areas').value = ''; locTags.set([]);
     await saveLoc(); setMsg('#q-savemsg', $('#l-msg').textContent, $('#l-msg').className.includes('bad') ? 'bad' : 'ok');
   });
-  $('#q-coords').addEventListener('input', () => { const c = parseCoords($('#q-coords').value); if (c) { MapView.setPin(c.lat, c.lon, true); afterPick(c.lat, c.lon); } });
+  $('#q-coords').addEventListener('input', () => { const c = parseCoords($('#q-coords').value); if (c) { MapView.setPin(c.lat, c.lon, true); afterPick(c.lat, c.lon); } quickSave(); });
   { const c = parseCoords($('#q-coords').value); if (c) MapView.setPin(c.lat, c.lon, true); }
   // link com parâmetros: ?lat=-22.1&lon=-41.1&hs=1.5&vento=20&dias=5&gerar=1
   try {
     const q = new URLSearchParams(location.search);
     if (q.get('lat') && q.get('lon')) {
       $('#q-coords').value = `${q.get('lat')}, ${q.get('lon')}`;
-      for (const [k, id] of [['hs', '#q-hs'], ['vento', '#q-wind'], ['rajada', '#q-gust'], ['tp', '#q-tp'], ['janela', '#q-win'], ['dias', '#q-days']]) if (q.get(k) !== null) $(id).value = q.get(k);
+      for (const [k, id] of [['hs', '#q-hs'], ['vento', '#q-wind'], ['rajada', '#q-gust'], ['tp', '#q-tp'], ['janela', '#q-win'], ['dias', '#q-days'], ['fuso', '#q-tz']]) if (q.get(k) !== null) { $(id).value = q.get(k); if (k === 'fuso') delete $(id).dataset.auto; }
       if (q.get('diurno') === '1') $('#q-day').checked = true;
       { const c = parseCoords($('#q-coords').value); if (c) MapView.setPin(c.lat, c.lon, true); }
       if (q.get('gerar') === '1') setTimeout(quickRun, 300);
