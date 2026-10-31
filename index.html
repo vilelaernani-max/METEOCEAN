@@ -412,7 +412,7 @@ details>summary{cursor:pointer}
     <p class="note">Toque num assunto para abrir. Os botões <b>?</b> espalhados pelo app trazem você direto ao trecho certo.</p>
     <details id="aj-gerar" class="aj"><summary>Como gerar uma análise</summary>
       <ol>
-        <li>Na aba <b>Análise</b>, digite as coordenadas do ponto (ex.: -22.9519, -43.1859) ou toque no mapa. No celular, toque no ponto e use o botão de posição se estiver no local.</li>
+        <li>Na aba <b>Análise</b>, digite as coordenadas do ponto (ex.: -22.9519, -43.1859) ou toque no mapa. No celular, arraste com um dedo, faça a pinça com dois dedos para o zoom, toque no ponto e use o botão de posição se estiver no local.</li>
         <li>Marque o que quer analisar: vento, ondas, maré e corrente.</li>
         <li>Escolha o relatório <b>resumido</b> (o essencial) ou <b>completo</b> (com todos os detalhes).</li>
         <li>Preencha os limites da operação, ou marque um ou mais equipamentos cadastrados. Campo vazio é limite que não será usado.</li>
@@ -1197,7 +1197,7 @@ Object.assign(EN, {
   "← Voltar": "← Back",
   "Toque num assunto para abrir. Os botões <b>?</b> espalhados pelo app trazem você direto ao trecho certo.": "Tap a topic to open it. The <b>?</b> buttons around the app take you straight to the right section.",
   "Como gerar uma análise": "How to generate an analysis",
-  "Na aba <b>Análise</b>, digite as coordenadas do ponto (ex.: -22.9519, -43.1859) ou toque no mapa. No celular, toque no ponto e use o botão de posição se estiver no local.": "In the <b>Analysis</b> tab, type the point coordinates (e.g. -22.9519, -43.1859) or tap the map. On a phone, tap the point and use the position button if you are on site.",
+  "Na aba <b>Análise</b>, digite as coordenadas do ponto (ex.: -22.9519, -43.1859) ou toque no mapa. No celular, arraste com um dedo, faça a pinça com dois dedos para o zoom, toque no ponto e use o botão de posição se estiver no local.": "In the <b>Analysis</b> tab, type the point coordinates (e.g. -22.9519, -43.1859) or tap the map. On a phone, drag with one finger, pinch with two fingers to zoom, tap the point and use the position button if you are on site.",
   "Marque o que quer analisar: vento, ondas, maré e corrente.": "Tick what you want to analyse: wind, waves, tide and current.",
   "Escolha o relatório <b>resumido</b> (o essencial) ou <b>completo</b> (com todos os detalhes).": "Choose the <b>summary</b> report (the essentials) or the <b>full</b> report (with every detail).",
   "Preencha os limites da operação, ou marque um ou mais equipamentos cadastrados. Campo vazio é limite que não será usado.": "Fill in the operation limits, or tick one or more registered pieces of equipment. An empty field is a limit that will not be used.",
@@ -3817,10 +3817,37 @@ const MapView = (() => {
   function init(cb) {
     const m = el_(); if (!m) return; onPick = cb;
     const pos = e => { const r = m.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
-    m.addEventListener('pointerdown', e => { if (e.target.closest('button,a')) return; drag = { x: e.clientX, y: e.clientY, cx, cy }; moved = false; m.setPointerCapture(e.pointerId); });
-    m.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 4) moved = true; cx = drag.cx - dx / TILE; cy = drag.cy - dy / TILE; render(); });
-    m.addEventListener('pointerup', e => { if (!drag) return; drag = null; if (!moved) { const [px, py] = pos(e); pick(px, py); } });
-    m.addEventListener('pointercancel', () => { drag = null; });
+    /* um dedo (ou mouse): arrasta e, sem mover, marca o ponto. Dois dedos: pinça para o zoom (um nível a cada 2× de afastamento, em volta do meio dos dedos) e arrasto do mapa junto. */
+    const fingers = new Map(); let pinch = null;
+    const two = () => { const [a, b] = [...fingers.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; };
+    m.addEventListener('pointerdown', e => {
+      if (e.target.closest('button,a')) return;
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { m.setPointerCapture(e.pointerId); } catch (err) { /* ponteiro sintético ou já capturado */ }
+      if (fingers.size === 2) { const t = two(); pinch = { d0: t.d, mx: t.mx, my: t.my, cx, cy }; drag = null; moved = true; return; }
+      if (fingers.size > 2) return;
+      drag = { x: e.clientX, y: e.clientY, cx, cy }; moved = false;
+    });
+    m.addEventListener('pointermove', e => {
+      if (!fingers.has(e.pointerId)) return;
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && fingers.size >= 2) {
+        const t = two(), r = m.getBoundingClientRect(), ratio = t.d / pinch.d0;
+        cx = pinch.cx - (t.mx - pinch.mx) / TILE; cy = pinch.cy - (t.my - pinch.my) / TILE;   // arrasto pelo meio dos dedos
+        const niveis = Math.round(Math.log2(ratio));   // cada 2× de afastamento = um nível (os blocos do mapa dobram a cada nível)
+        if (niveis) { zoomBy(niveis, t.mx - r.left, t.my - r.top); pinch = { d0: pinch.d0 * 2 ** niveis, mx: t.mx, my: t.my, cx, cy }; }
+        else render();
+        return;
+      }
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 4) moved = true; cx = drag.cx - dx / TILE; cy = drag.cy - dy / TILE; render();
+    });
+    const lift = e => {
+      fingers.delete(e.pointerId);
+      if (pinch) { if (fingers.size < 2) { pinch = null; drag = null; } return; }   // depois da pinça, soltar não marca ponto
+      if (!drag) return; drag = null; if (!moved && e.type === 'pointerup') { const [px, py] = pos(e); pick(px, py); }
+    };
+    m.addEventListener('pointerup', lift);
+    m.addEventListener('pointercancel', lift);
     /* roda e touchpad disparam muitos eventos: acumula o giro e dá no máximo um nível de zoom a cada 700 ms */
     let acc = 0, lastWheel = 0;
     m.addEventListener('wheel', e => {

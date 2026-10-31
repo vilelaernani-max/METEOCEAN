@@ -145,6 +145,30 @@ function resp(u) {
     await p3.waitForTimeout(850); await p3.mouse.wheel(0, 100); await p3.waitForTimeout(100);
     ok('roda: giro para o outro lado afasta', (await zoomAtual()) === z0 + 1, String(await zoomAtual()));
     await ctx3.close(); }
+  // pinça com dois dedos no celular: afastar aproxima um nível por vez, juntar afasta; soltar depois da pinça não marca ponto
+  { const ctx5 = await b.newContext({ locale: 'pt-BR', viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true }); const p5 = await ctx5.newPage();
+    await p5.route('**/tile.openstreetmap.org/**', r => r.fulfill({ body: PNG, contentType: 'image/png' }));
+    await p5.goto('file://' + path.resolve(__dirname, '../index.html')); await p5.waitForTimeout(700);
+    const zoomAtual = () => p5.$eval('#map .map-tiles img', i => +i.dataset.k.split('/')[0]);
+    const z0 = await zoomAtual();
+    const pinca = (d0, d1, passos = 8) => p5.evaluate(([d0, d1, passos]) => {
+      const m = document.getElementById('map'), r = m.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const ev = (type, id, x, y) => m.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, isPrimary: id === 1 }));
+      ev('pointerdown', 1, cx - d0 / 2, cy); ev('pointerdown', 2, cx + d0 / 2, cy);
+      for (let i = 1; i <= passos; i++) { const d = d0 + (d1 - d0) * i / passos; ev('pointermove', 1, cx - d / 2, cy); ev('pointermove', 2, cx + d / 2, cy); }
+      ev('pointerup', 1, cx - d1 / 2, cy); ev('pointerup', 2, cx + d1 / 2, cy);
+    }, [d0, d1, passos]);
+    await pinca(80, 160); await p5.waitForTimeout(100);
+    ok('pinça abrindo 2× aproxima um nível', (await zoomAtual()) === z0 + 1, `${z0} → ${await zoomAtual()}`);
+    ok('soltar depois da pinça não marca ponto', await p5.$eval('#map .map-pin', e => e.hidden) && (await p5.inputValue('#q-coords')) === '');
+    await pinca(60, 240); await p5.waitForTimeout(100);
+    ok('pinça abrindo 4× aproxima dois níveis', (await zoomAtual()) === z0 + 3, String(await zoomAtual()));
+    await pinca(200, 100); await p5.waitForTimeout(100);
+    ok('pinça fechando afasta um nível', (await zoomAtual()) === z0 + 2, String(await zoomAtual()));
+    // um dedo continua marcando o ponto
+    await p5.evaluate(() => { const m = document.getElementById('map'), r = m.getBoundingClientRect(), ev = (t, x, y) => m.dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, isPrimary: true })); ev('pointerdown', r.left + 100, r.top + 100); ev('pointerup', r.left + 100, r.top + 100); });
+    ok('toque com um dedo marca o ponto', !(await p5.$eval('#map .map-pin', e => e.hidden)) && /-?\d+\.\d+, -?\d+\.\d+/.test(await p5.inputValue('#q-coords')), await p5.inputValue('#q-coords'));
+    await ctx5.close(); }
   console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes do mapa passaram');
   await b.close(); process.exit(fails ? 1 : 0);
 })();
