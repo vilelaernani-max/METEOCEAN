@@ -3807,13 +3807,13 @@ const MapView = (() => {
     m.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 4) moved = true; cx = drag.cx - dx / TILE; cy = drag.cy - dy / TILE; render(); });
     m.addEventListener('pointerup', e => { if (!drag) return; drag = null; if (!moved) { const [px, py] = pos(e); pick(px, py); } });
     m.addEventListener('pointercancel', () => { drag = null; });
-    /* roda e touchpad disparam muitos eventos: acumula o giro e dá no máximo um nível de zoom a cada 500 ms */
+    /* roda e touchpad disparam muitos eventos: acumula o giro e dá no máximo um nível de zoom a cada 700 ms */
     let acc = 0, lastWheel = 0;
     m.addEventListener('wheel', e => {
       e.preventDefault();
       acc += e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
       const t = performance.now();
-      if (Math.abs(acc) < 60 || t - lastWheel < 500) return;
+      if (Math.abs(acc) < 60 || t - lastWheel < 700) return;
       const [px, py] = pos(e); zoomBy(acc < 0 ? 1 : -1, px, py); acc = 0; lastWheel = t;
     }, { passive: false });
     m.addEventListener('dblclick', e => { const [px, py] = pos(e); zoomBy(1, px, py); });

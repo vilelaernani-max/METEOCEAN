@@ -139,9 +139,9 @@ function resp(u) {
     for (let i = 0; i < 12; i++) await p3.mouse.wheel(0, -100);
     await p3.waitForTimeout(100);
     ok('roda: muitos giros seguidos dão só um nível de zoom', (await zoomAtual()) === z0 + 1, `${z0} → ${await zoomAtual()}`);
-    await p3.waitForTimeout(650); await p3.mouse.wheel(0, -100); await p3.waitForTimeout(100);
+    await p3.waitForTimeout(850); await p3.mouse.wheel(0, -100); await p3.waitForTimeout(100);
     ok('roda: depois de uma pausa vem o próximo nível', (await zoomAtual()) === z0 + 2, String(await zoomAtual()));
-    await p3.waitForTimeout(650); await p3.mouse.wheel(0, 100); await p3.waitForTimeout(100);
+    await p3.waitForTimeout(850); await p3.mouse.wheel(0, 100); await p3.waitForTimeout(100);
     ok('roda: giro para o outro lado afasta', (await zoomAtual()) === z0 + 1, String(await zoomAtual()));
     await ctx3.close(); }
   console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes do mapa passaram');
