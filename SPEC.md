@@ -281,4 +281,5 @@ Nenhuma que bloqueie. Suposições a corrigir: (1) idioma inicial pelo navegador
 - **Idioma dos relatórios salvos:** o histórico guarda os dados, não o texto; ao abrir, o relatório sai no idioma escolhido na hora. O nome automático do perfil da análise rápida ("Hs ≤ 2 m, vento ≤ 20 kn") também troca de idioma.
 - **Rótulos padrão** (fontes, perfis de exemplo, fases da Lua, estado da maré) trocam de idioma na tela e no relatório; nomes digitados pelo usuário não.
 - **Revisão de consistência (31/10/2026):** em português a unidade de vento e corrente é **nós** em todo o app (formulários, relatórios, gráficos, PDF); em inglês, **kn**. "Tp mínima" virou "Tp mínimo" na tabela de limites. O cálculo não mudou.
+- **Crédito à Open-Meteo (31/10/2026):** o app, os relatórios (tela, HTML e PDF) e a Ajuda > Sobre passam a dar o crédito com link (open-meteo.com), a licença (CC BY 4.0) e o aviso de uso não comercial, com a nota de que uso comercial exige o plano pago da Open-Meteo. Rodapé do app também cita a Marinha do Brasil e o © OpenStreetMap. Testes em `tests/identidade.js`.
 

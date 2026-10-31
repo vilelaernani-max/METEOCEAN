@@ -469,6 +469,7 @@ details>summary{cursor:pointer}
       <p>O MetOcean OP é uma ferramenta de apoio à decisão. Ela não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local.</p>
       <p>O idioma (português ou inglês) troca pelas bandeiras no alto da página. A escolha fica salva no navegador, e os relatórios saem no idioma escolhido.</p>
       <p><span id="aj-dev"></span></p>
+      <p><b>Dados:</b> as previsões vêm da <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (modelos NOAA GFS, ECMWF e outros), sob licença CC BY 4.0. A API gratuita da Open-Meteo é para <b>uso não comercial</b>; para usar em trabalho comercial, é preciso o plano pago da Open-Meteo. Os avisos de mau tempo vêm da Marinha do Brasil (CHM). O mapa é do © OpenStreetMap.</p>
     </details>
   </div>
 </section>
@@ -777,7 +778,7 @@ Object.assign(EN, {
   "Documento": "Document",
   "Observações": "Notes",
   "maré": "tide",
-  "Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em {0}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.": "Decision support: it does not replace the judgement of the person responsible for the operation, the official bulletins or local observation. Times shown in {0}; original data in UTC. Forecasts: Open-Meteo (NOAA, ECMWF and other models). Forecasts age: generate again close to the operation.",
+  "Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em {0}; dados originais em UTC. Previsões: {1} (modelos NOAA, ECMWF e outros), dados sob licença CC BY 4.0 para uso não comercial. Previsão envelhece: gere de novo perto da operação.": "Decision support: it does not replace the judgement of the person responsible for the operation, the official bulletins or local observation. Times shown in {0}; original data in UTC. Forecasts: {1} (NOAA, ECMWF and other models), data under the CC BY 4.0 licence for non-commercial use. Forecasts age: generate again close to the operation.",
   "Desenvolvido por <b>{0}</b> · {1} · © {2} · {3} · WhatsApp {4}": "Developed by <b>{0}</b> · {1} · © {2} · {3} · WhatsApp {4}",
   "MetOcean Previsão": "MetOcean Previsão",
   "Relatório MetOcean": "MetOcean report",
@@ -872,7 +873,7 @@ Object.assign(EN, {
   "Avisos de Mau Tempo da Marinha (METAREA V)": "Navy bad-weather warnings (METAREA V)",
   "Aviso {0} — {1} · vigência {2} → {3} · áreas: {4}": "Warning {0} — {1} · valid {2} → {3} · areas: {4}",
   "Fonte: Marinha do Brasil / CHM · última importação: {0}": "Source: Brazilian Navy / CHM · last import: {0}",
-  "Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em {0}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.": "Decision support: it does not replace the judgement of the person responsible for the operation, the official bulletins or local observation. Times in {0}; original data in UTC. Forecasts: Open-Meteo (NOAA, ECMWF and other models). Forecasts age: generate again close to the operation.",
+  "Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em {0}; dados originais em UTC. Previsões: Open-Meteo, open-meteo.com (modelos NOAA, ECMWF e outros), dados sob licença CC BY 4.0 para uso não comercial. Previsão envelhece: gere de novo perto da operação.": "Decision support: it does not replace the judgement of the person responsible for the operation, the official bulletins or local observation. Times in {0}; original data in UTC. Forecasts: Open-Meteo, open-meteo.com (NOAA, ECMWF and other models), data under the CC BY 4.0 licence for non-commercial use. Forecasts age: generate again close to the operation.",
   "MetOcean OP · {0} · gerado {1} · apoio à decisão": "MetOcean OP · {0} · generated {1} · decision support",
   "MetOcean — {0}": "MetOcean — {0}",
   "adicionar tag e Enter": "add tag and Enter",
@@ -1071,6 +1072,7 @@ Object.assign(EN, {
   "página {0} de {1}": "page {0} of {1}",
   "a busca falhou (sem conexão, bloqueio do navegador/anúncios ou limite de uso da Open-Meteo): tente de novo em 1 minuto": "the request failed (no connection, browser/ad blocker, or Open-Meteo usage limit): try again in 1 minute",
   "nós": "kn",
+  "Previsões: {0} (CC BY 4.0) · uso não comercial · Avisos: Marinha do Brasil · Mapa: © OpenStreetMap": "Forecasts: {0} (CC BY 4.0) · non-commercial use · Warnings: Brazilian Navy · Map: © OpenStreetMap",
   "MetOcean OP": "MetOcean OP",
   "janelas operacionais de vento e onda · uso pessoal": "wind and wave operational windows · personal use",
   "Seções": "Sections",
@@ -1233,7 +1235,9 @@ Object.assign(EN, {
   "Sobre e contato": "About and contact",
   "O MetOcean OP é uma ferramenta de apoio à decisão. Ela não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local.": "MetOcean OP is a decision-support tool. It does not replace the judgement of the person responsible for the operation, the official bulletins or local observation.",
   "carregando…": "loading…",
-  "O idioma (português ou inglês) troca pelas bandeiras no alto da página. A escolha fica salva no navegador, e os relatórios saem no idioma escolhido.": "The language (Portuguese or English) is switched with the flags at the top of the page. The choice is saved in the browser, and reports come out in the chosen language."
+  "O idioma (português ou inglês) troca pelas bandeiras no alto da página. A escolha fica salva no navegador, e os relatórios saem no idioma escolhido.": "The language (Portuguese or English) is switched with the flags at the top of the page. The choice is saved in the browser, and reports come out in the chosen language.",
+  "<b>Dados:</b> as previsões vêm da <a href=\"https://open-meteo.com/\" target=\"_blank\" rel=\"noopener\">Open-Meteo</a> (modelos NOAA GFS, ECMWF e outros), sob licença CC BY 4.0. A API gratuita da Open-Meteo é para <b>uso não comercial</b>; para usar em trabalho comercial, é preciso o plano pago da Open-Meteo. Os avisos de mau tempo vêm da Marinha do Brasil (CHM). O mapa é do © OpenStreetMap.": "<b>Data:</b> forecasts come from <a href=\"https://open-meteo.com/\" target=\"_blank\" rel=\"noopener\">Open-Meteo</a> (NOAA GFS, ECMWF and other models), under the CC BY 4.0 licence. The free Open-Meteo API is for <b>non-commercial use</b>; to use it in commercial work, the paid Open-Meteo plan is required. Bad-weather warnings come from the Brazilian Navy (CHM). The map is © OpenStreetMap.",
+  "© <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>": "© <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>"
 });
 /*EN:end*/
 
@@ -2478,7 +2482,7 @@ function buildReport(ctx) {
   const hdrItems = [[tt('Cliente'), H.client], [tt('Embarcação / unidade'), H.vessel], [tt('Responsável'), H.resp], [tt('Documento'), H.doc], [tt('Observações'), H.obs]].filter(([, v]) => v);
   const hdr = hdrItems.length ? `<div class="hdr">${hdrItems.map(([k, v]) => `<span>${k}: <b>${esc(v)}</b></span>`).join('')}</div>` : '';
   const scope = [A.wind ? tt('vento') : null, A.wave ? tt('ondas') : null, A.tide ? tt('maré') : null, A.cur ? tt('corrente') : null].filter(Boolean).join(', ');
-  const foot = `<p class="foot">${tt('Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em {0}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.', tzlabel(tz))}<br>${tt('Desenvolvido por <b>{0}</b> · {1} · © {2} · {3} · WhatsApp {4}', esc(DEV.nome), esc(papelDev()), DEV.ano, `<a href="mailto:${DEV.email}">${DEV.email}</a>`, `<a href="https://wa.me/${DEV.wa}">${DEV.fone}</a>`)}</p>`;
+  const foot = `<p class="foot">${tt('Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários exibidos em {0}; dados originais em UTC. Previsões: {1} (modelos NOAA, ECMWF e outros), dados sob licença CC BY 4.0 para uso não comercial. Previsão envelhece: gere de novo perto da operação.', tzlabel(tz), '<a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>')}<br>${tt('Desenvolvido por <b>{0}</b> · {1} · © {2} · {3} · WhatsApp {4}', esc(DEV.nome), esc(papelDev()), DEV.ano, `<a href="mailto:${DEV.email}">${DEV.email}</a>`, `<a href="https://wa.me/${DEV.wa}">${DEV.fone}</a>`)}</p>`;
   const proj = ctx.location.project || H.project;
   const head = `
 <div class="rphead"><img class="rplogo" src="${LOGO_WEBP}" alt="MetOcean Previsão"><div><h1>${tt('Relatório MetOcean')}${proj ? ' — ' + esc(proj) : ''}</h1>
@@ -3109,7 +3113,7 @@ function buildPdf(ctx) {
   pdf.table([{ h: tt('Parâmetro'), w: 0.5 }, { h: tt('Limite'), w: 0.5 }], [...(ctx.equipments && ctx.equipments.length ? [[tt('Equipamentos usados'), ctx.equipments.join(', ')]] : []), [tt('Hs máxima'), v(lm.hs_max, 'm')], [tt('Tp mínimo'), v(lm.tp_min, 's')], [tt('Vento máximo (10 m)'), v(lm.wind_max, tt('nós'))], [tt('Rajada máxima'), v(lm.gust_max, tt('nós'))], [tt('Corrente máxima'), v(lm.cur_max, tt('nós'))], [tt('Direção do vento bloqueada'), dirTxt(lm)], [tt('Direção da onda bloqueada'), dirTxt(lm, true)], [tt('Somente diurno'), lm.daylight_only ? tt('sim') : tt('não')], [tt('Janela mínima'), tt('{0} h seguidas', lm.min_window_h)]]);
   }
   pdf.y += 6;
-  if (!brief || pdf.y < PDF_H - 120) pdf.para(tt('Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em {0}; dados originais em UTC. Previsões: Open-Meteo (modelos NOAA, ECMWF e outros). Previsão envelhece: gere de novo perto da operação.', tzlabel(tz)), 7.5, { color: PDF_COL.mut });
+  if (!brief || pdf.y < PDF_H - 120) pdf.para(tt('Apoio à decisão: não substitui o julgamento do responsável pela operação, os boletins oficiais nem a observação local. Horários em {0}; dados originais em UTC. Previsões: Open-Meteo, open-meteo.com (modelos NOAA, ECMWF e outros), dados sob licença CC BY 4.0 para uso não comercial. Previsão envelhece: gere de novo perto da operação.', tzlabel(tz)), 7.5, { color: PDF_COL.mut });
   const d = new Date(ctx.generatedTs * 1000);
   const stamp = `${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}00Z`;
   return pdf.build({ title: `MetOcean — ${ctx.location.name}`, date: stamp, footer: tt('MetOcean OP · {0} · gerado {1} · apoio à decisão', ctx.location.name, fmtUtcFull(ctx.generatedTs)) });
@@ -4081,7 +4085,7 @@ async function initDownloads() {
 
 /* =============================== início =============================== */
 /* ---- idioma: textos fixos do HTML (coletados uma vez, em português) e troca de idioma ---- */
-const UNITS = [], INLINE = new Set(['B', 'I', 'EM', 'STRONG', 'CODE', 'SMALL', 'BR']);
+const UNITS = [], INLINE = new Set(['B', 'I', 'EM', 'STRONG', 'CODE', 'SMALL', 'BR', 'A']);
 const normTxt = s => s.replace(/\s+/g, ' ').trim(), hasLetters = s => /[A-Za-zÀ-ÿ]/.test(s);
 window.__units = UNITS;
 function collectUnits(root) {
@@ -4091,7 +4095,8 @@ function collectUnits(root) {
       if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'SVG' || n.hasAttribute('data-i18n-skip') || n.classList.contains('dirpair') || n.id === 'report' || n.id === 'toast') return;
       for (const a of ['placeholder', 'title', 'aria-label', 'alt']) if (n.hasAttribute(a) && hasLetters(n.getAttribute(a))) UNITS.push({ el: n, attr: a, key: n.getAttribute(a) });
       const kids = [...n.children];
-      if (hasLetters(n.textContent) && kids.every(k => INLINE.has(k.tagName))) { if (tag !== 'TITLE') UNITS.push({ el: n, html: true, key: normTxt(n.innerHTML) }); return; }
+      /* links com id ou classe (botões) ficam fora: o código mexe neles */
+      if (hasLetters(n.textContent) && kids.every(k => INLINE.has(k.tagName) && !(k.tagName === 'A' && (k.id || k.className)))) { if (tag !== 'TITLE') UNITS.push({ el: n, html: true, key: normTxt(n.innerHTML) }); return; }
       n.childNodes.forEach(walk);
     } else if (n.nodeType === 3 && hasLetters(n.nodeValue)) {
       const v = n.nodeValue, m = /^(\s*)([\s\S]*?)(\s*)$/.exec(v);
@@ -4153,7 +4158,11 @@ function devNodes() {
   const [c, d, e] = b.split(/[\u0002\u0003]/);
   return [a, el('b', {}, DEV.nome), c, el('a', { href: `mailto:${DEV.email}` }, DEV.email), d, el('a', { href: `https://wa.me/${DEV.wa}`, target: '_blank', rel: 'noopener' }, DEV.fone), e];
 }
-function renderDev() { $('#aj-dev').replaceChildren(...devNodes()); $('#appfoot').replaceChildren(...devNodes()); }
+function creditNodes() {
+  const [a, b] = tt('Previsões: {0} (CC BY 4.0) · uso não comercial · Avisos: Marinha do Brasil · Mapa: © OpenStreetMap', '\u0001').split('\u0001');
+  return [a, el('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener' }, 'Open-Meteo'), b];
+}
+function renderDev() { $('#aj-dev').replaceChildren(...devNodes()); $('#appfoot').replaceChildren(...devNodes(), el('br'), ...creditNodes()); }
 function initIdentidade() {
   $('#app-logo').src = LOGO_WEBP;
 }

@@ -27,7 +27,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   };
   const gera = async (p, modo) => {
     await p.fill('#q-coords', '-22.9519, -43.1859'); await p.dispatchEvent('#q-coords', 'input'); await p.check(`input[name="q-mode"][value="${modo}"]`);
-    await p.click('#q-go'); await p.waitForSelector('#report .verdict', { timeout: 15000 });
+    await p.evaluate(() => document.querySelectorAll('#report .verdict').forEach(v => v.setAttribute('data-old', '1')));   // espera o relatório NOVO, não o anterior
+    await p.click('#q-go'); await p.waitForSelector('#report .verdict:not([data-old])', { timeout: 15000 });
   };
   const DEV = /Desenvolvido por\s+Ernani Vilela/;
 
@@ -76,6 +77,28 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('celular: rodapé visível e dentro da tela', await p.$eval('footer.appfoot', e => { const r = e.getBoundingClientRect(); return r.right <= window.innerWidth + 1 && r.height > 10; }));
   ok('celular: sem erros de página', errs.length === 0, JSON.stringify(errs)); await ctx.close();
 
+  // crédito à Open-Meteo (licença CC BY 4.0, uso não comercial) com link: app, relatório na tela, HTML e PDF
+  { const ctx4 = await b.newContext({ locale: 'pt-BR', viewport: { width: 1000, height: 800 }, acceptDownloads: true }); const p4 = await ctx4.newPage();
+    await p4.route('**/*open-meteo.com/**', r => { const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(72)].map((_, i) => t0 + i * 3600), m = r.request().url().includes('marine');
+      r.fulfill({ json: { latitude: -22.9, longitude: -43.1, hourly: m ? { time, wave_height: time.map(() => 1), wave_period: time.map(() => 8), wave_direction: time.map(() => 180) } : { time, wind_speed_10m: time.map(() => 10), wind_gusts_10m: time.map(() => 12), wind_direction_10m: time.map(() => 90) }, hourly_units: {} } }); });
+    await p4.goto('file://' + path.resolve(__dirname, '../index.html')); await p4.waitForTimeout(600);
+    const foot = await p4.$eval('#appfoot', f => ({ t: f.textContent, a: [...f.querySelectorAll('a')].map(x => x.href) }));
+    ok('rodapé do app: crédito à Open-Meteo com link, CC BY 4.0 e uso não comercial', /Open-Meteo \(CC BY 4\.0\) · uso não comercial/.test(foot.t) && foot.a.includes('https://open-meteo.com/') && /OpenStreetMap/.test(foot.t), JSON.stringify(foot));
+    const sobre = await p4.$eval('#aj-contato', d => ({ t: d.textContent, a: [...d.querySelectorAll('a')].map(x => x.href) }));
+    ok('Ajuda > Sobre: explica a licença e o uso comercial', /uso não comercial/.test(sobre.t) && /plano pago/.test(sobre.t) && sobre.a.includes('https://open-meteo.com/'), sobre.t.slice(0, 200));
+    await p4.fill('#q-coords', '-22.9519, -43.1859'); await p4.dispatchEvent('#q-coords', 'input'); await p4.uncheck('#q-an-tide'); await p4.uncheck('#q-an-cur');
+    await p4.click('#q-go'); await p4.waitForSelector('#report .verdict', { timeout: 15000 });
+    const rf = await p4.$eval('#report .foot', f => ({ t: f.textContent, a: [...f.querySelectorAll('a')].map(x => x.href) }));
+    ok('rodapé do relatório na tela: Open-Meteo com link e licença', /Previsões: Open-Meteo \(modelos NOAA, ECMWF e outros\), dados sob licença CC BY 4\.0 para uso não comercial/.test(rf.t) && rf.a.includes('https://open-meteo.com/'), rf.t.slice(0, 300));
+    const [dh] = await Promise.all([p4.waitForEvent('download'), p4.click('#rp-download')]);
+    const html = fs.readFileSync(await dh.path(), 'utf8');
+    ok('HTML baixado: crédito com link', /<a href="https:\/\/open-meteo\.com\/"[^>]*>Open-Meteo<\/a> \(modelos NOAA/.test(html) && /CC BY 4\.0 para uso não comercial/.test(html));
+    const [pd] = await Promise.all([p4.waitForEvent('download', { timeout: 20000 }), p4.click('#rp-pdf')]);
+    const pp = await pd.path(); let txt = ''; try { txt = execFileSync('pdftotext', ['-layout', pp, '-'], { encoding: 'utf8' }); } catch (e) { txt = fs.readFileSync(pp, 'latin1'); }
+    ok('PDF: crédito com endereço e licença', /Open-Meteo, open-meteo\.com/.test(txt) && /CC BY 4\.0/.test(txt) && /uso não comercial/.test(txt), txt.slice(-600));
+    await p4.click('button.flag[data-lang="en"]'); await p4.waitForTimeout(300);
+    ok('crédito em inglês no app e no relatório', /non-commercial use/.test(await p4.textContent('#appfoot')) && /CC BY 4\.0 licence for non-commercial use/.test(await p4.textContent('#report .foot')), await p4.textContent('#appfoot'));
+    await ctx4.close(); }
   console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes de identidade passaram');
   await b.close(); process.exit(fails ? 1 : 0);
 })();
