@@ -1,0 +1,64 @@
+MetOcean OP
+Copyright (c) 2026 Ernani Vilela — Oceanógrafo Surveyor — vilelaernani@gmail.com
+https://vilelaernani-max.github.io/METEOCEAN/
+
+Este software (código-fonte, interface, textos, logotipo e relatórios gerados) é
+licenciado sob a licença Creative Commons Atribuição-NãoComercial 4.0 Internacional
+(CC BY-NC 4.0).
+
+Resumo (não substitui o texto legal):
+- Você pode usar, copiar, compartilhar e adaptar o software, inclusive em trabalho
+  acadêmico, pessoal e em operações sem fim comercial.
+- Atribuição: mantenha o crédito "Desenvolvido por Ernani Vilela · Oceanógrafo
+  Surveyor" e o link acima, inclusive em versões adaptadas, e indique se houve
+  alterações.
+- Não comercial: não é permitido usar o software, nem partes dele, para fins
+  comerciais (venda, revenda, serviço pago, uso em produto comercial) sem
+  autorização por escrito do autor. Para licenciamento comercial, escreva para
+  vilelaernani@gmail.com.
+- Sem garantias: o software é fornecido "como está". É apoio à decisão e não
+  substitui o julgamento do responsável pela operação, os boletins oficiais nem a
+  observação local. O autor não responde por decisões tomadas com base nele.
+
+Texto legal completo da licença: https://creativecommons.org/licenses/by-nc/4.0/legalcode.pt
+
+Dados de terceiros (não cobertos por esta licença, cada um com os seus termos):
+- Previsões de vento, ondas, corrente e nível do mar: Open-Meteo (https://open-meteo.com/),
+  licença CC BY 4.0. A API gratuita da Open-Meteo é para uso não comercial; uso
+  comercial exige o plano pago da Open-Meteo.
+- Avisos de mau tempo: Marinha do Brasil / Centro de Hidrografia da Marinha (CHM).
+- Mapa de fundo: © OpenStreetMap contributors, licença ODbL (https://www.openstreetmap.org/copyright).
+
+----------------------------------------------------------------------------------
+
+MetOcean OP
+Copyright (c) 2026 Ernani Vilela — Surveyor Oceanographer — vilelaernani@gmail.com
+https://vilelaernani-max.github.io/METEOCEAN/
+
+This software (source code, interface, texts, logo and generated reports) is
+licensed under the Creative Commons Attribution-NonCommercial 4.0 International
+licence (CC BY-NC 4.0).
+
+Summary (not a substitute for the legal text):
+- You may use, copy, share and adapt the software, including for academic,
+  personal and non-commercial operational use.
+- Attribution: keep the credit "Developed by Ernani Vilela · Surveyor
+  Oceanographer" and the link above, including in adapted versions, and indicate
+  if changes were made.
+- NonCommercial: you may not use the software, or parts of it, for commercial
+  purposes (sale, resale, paid service, use in a commercial product) without the
+  author's written permission. For commercial licensing, write to
+  vilelaernani@gmail.com.
+- No warranty: the software is provided "as is". It is decision support and does
+  not replace the judgement of the person responsible for the operation, the
+  official bulletins or local observation. The author is not liable for decisions
+  made based on it.
+
+Full legal text: https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+Third-party data (not covered by this licence, each under its own terms):
+- Wind, wave, current and sea-level forecasts: Open-Meteo (https://open-meteo.com/),
+  CC BY 4.0. The free Open-Meteo API is for non-commercial use; commercial use
+  requires the paid Open-Meteo plan.
+- Bad-weather warnings: Brazilian Navy / Navy Hydrography Centre (CHM).
+- Background map: © OpenStreetMap contributors, ODbL (https://www.openstreetmap.org/copyright).
