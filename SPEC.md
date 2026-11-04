@@ -304,4 +304,5 @@ Três correções apontadas na revisão, aprovadas pelo Ernani ("Aplique todas")
 ## Testes
 `tests/revisao.js` (histórico, fuso, rodada com meta.json simulado e com falha). `tests/map.js` e `tests/inicio.js` passaram a ignorar o pedido de meta.json.
 - **Mapa no celular (31/10/2026):** pinça com dois dedos dá zoom (um nível a cada 2× de afastamento, em volta do meio dos dedos) e arrasta junto; soltar depois da pinça não marca ponto. Um dedo continua arrastando e marcando. Ajuda atualizada. Teste em `tests/map.js`.
+- **Assinatura de autoria (04/11/2026):** cabeçalho de autoria no início do `index.html` (quem abrir o código vê primeiro), `meta author/description/copyright` na página, `meta author/generator` no HTML baixado e `/Author` e `/Creator` nas propriedades do PDF. Junto com o "Desenvolvido por" já existente no app, na Ajuda e nos relatórios. Teste em `tests/identidade.js`.
 

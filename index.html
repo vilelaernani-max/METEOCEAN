@@ -1,8 +1,17 @@
 <!doctype html>
+<!--
+  MetOcean OP — janelas operacionais de vento, onda, corrente e maré para operações marítimas
+  Desenvolvido por Ernani Vilela · Oceanógrafo Surveyor · © 2026 · vilelaernani@gmail.com
+  https://vilelaernani-max.github.io/METEOCEAN/
+  Previsões: Open-Meteo (CC BY 4.0, uso não comercial) · Avisos: Marinha do Brasil (CHM) · Mapa: © OpenStreetMap
+-->
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="author" content="Ernani Vilela">
+<meta name="description" content="MetOcean OP: janelas operacionais de vento, onda, corrente e maré para operações marítimas. Desenvolvido por Ernani Vilela, Oceanógrafo Surveyor.">
+<meta name="copyright" content="© 2026 Ernani Vilela">
 <style>:root{color-scheme:light dark}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
@@ -2677,7 +2686,7 @@ class Pdf {
       pageIds.push(add(`<< /Type /Page /Parent ${pagesIdx} 0 R /MediaBox [0 0 ${PDF_W} ${PDF_H}] /Resources << /Font << /F1 ${fontN} 0 R /F2 ${fontB} 0 R >>${imN ? ` /XObject << /Im1 ${imN} 0 R >>` : ''} >> /Contents ${cid} 0 R >>`));
     }
     const pagesId = add(`<< /Type /Pages /Kids [${pageIds.map(i => i + ' 0 R').join(' ')}] /Count ${pageIds.length} >>`);
-    const info = add(`<< /Title (${pdfBytes(meta.title).replace(/[\\()]/g, m => '\\' + m)}) /Producer (MetOcean OP) /CreationDate (D:${meta.date}) >>`);
+    const info = add(`<< /Title (${pdfBytes(meta.title).replace(/[\\()]/g, m => '\\' + m)}) /Author (${pdfBytes(DEV.nome)}) /Creator (MetOcean OP - ${pdfBytes(DEV.nome)}, ${pdfBytes(papelDev())}) /Producer (MetOcean OP) /CreationDate (D:${meta.date}) >>`);
     const cat = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
     let out = '%PDF-1.4\n%âãÏÓ\n'; const offs = [];
     objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
@@ -4116,7 +4125,7 @@ async function saveFile(filename, data, mime) {
 }
 function reportHtml(ctx) {
   const tokens = $('#tokens').textContent;
-  return `<!doctype html><html lang="${isEn() ? 'en' : 'pt-BR'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}@media print{body{background:#fff;padding:0}}</style></head><body><div class="rp">${buildReport(ctx)}</div><script>(${ageFill.toString()})(document)<\/script></body></html>`;
+  return `<!doctype html><html lang="${isEn() ? 'en' : 'pt-BR'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="${esc(DEV.nome)}"><meta name="generator" content="MetOcean OP · ${esc(DEV.nome)} · ${esc(papelDev())}"><title>MetOcean — ${esc(ctx.location.name)}</title><style>${tokens}body{background:var(--bg);margin:0;padding:24px 16px}.rp{max-width:1000px;margin:0 auto}${REPORT_CSS}@media print{body{background:#fff;padding:0}}</style></head><body><div class="rp">${buildReport(ctx)}</div><script>(${ageFill.toString()})(document)<\/script></body></html>`;
 }
 /* ---- backup (exportar / importar) ---- */
 const BACKUP_COLLECTIONS = ['locations', 'profiles', 'equipments', 'analyses', 'results'];

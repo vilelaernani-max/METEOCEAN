@@ -99,6 +99,24 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
     await p4.click('button.flag[data-lang="en"]'); await p4.waitForTimeout(300);
     ok('crédito em inglês no app e no relatório', /non-commercial use/.test(await p4.textContent('#appfoot')) && /CC BY 4\.0 licence for non-commercial use/.test(await p4.textContent('#report .foot')), await p4.textContent('#appfoot'));
     await ctx4.close(); }
+  // assinatura de autoria: cabeçalho do código, metadados da página, do HTML baixado e do PDF
+  { ok('cabeçalho de autoria no início do código', /^<!doctype html>\n<!--\n  MetOcean OP[\s\S]*Desenvolvido por Ernani Vilela · Oceanógrafo Surveyor · © 2026[\s\S]*-->/.test(src));
+    ok('metadados de autor, descrição e copyright na página', /<meta name="author" content="Ernani Vilela">/.test(src) && /<meta name="copyright" content="© 2026 Ernani Vilela">/.test(src) && /<meta name="description" content="MetOcean OP:[^"]*Ernani Vilela/.test(src));
+    const ctx6 = await b.newContext({ locale: 'pt-BR', viewport: { width: 1000, height: 800 }, acceptDownloads: true }); const p6 = await ctx6.newPage();
+    await p6.route('**/*open-meteo.com/**', r => { const t0 = Math.floor(Date.now() / 3600000) * 3600, time = [...Array(72)].map((_, i) => t0 + i * 3600), m = r.request().url().includes('marine');
+      r.fulfill({ json: /meta\.json/.test(r.request().url()) ? {} : { latitude: -22.9, longitude: -43.1, hourly: m ? { time, wave_height: time.map(() => 1), wave_period: time.map(() => 8), wave_direction: time.map(() => 180) } : { time, wind_speed_10m: time.map(() => 10), wind_gusts_10m: time.map(() => 12), wind_direction_10m: time.map(() => 90) }, hourly_units: {} } }); });
+    await p6.goto('file://' + path.resolve(__dirname, '../index.html')); await p6.waitForTimeout(600);
+    await p6.fill('#q-coords', '-22.9519, -43.1859'); await p6.dispatchEvent('#q-coords', 'input'); await p6.uncheck('#q-an-tide'); await p6.uncheck('#q-an-cur');
+    await p6.click('#q-go'); await p6.waitForSelector('#report .verdict', { timeout: 15000 });
+    const [d6] = await Promise.all([p6.waitForEvent('download'), p6.click('#rp-download')]);
+    const html6 = fs.readFileSync(await d6.path(), 'utf8');
+    ok('HTML baixado: meta author e generator', /<meta name="author" content="Ernani Vilela">/.test(html6) && /<meta name="generator" content="MetOcean OP · Ernani Vilela · Oceanógrafo Surveyor">/.test(html6));
+    const [pd6] = await Promise.all([p6.waitForEvent('download', { timeout: 20000 }), p6.click('#rp-pdf')]);
+    const raw6 = fs.readFileSync(await pd6.path(), 'latin1');
+    ok('PDF: propriedades Author e Creator com o seu nome', /\/Author \(Ernani Vilela\)/.test(raw6) && /\/Creator \(MetOcean OP - Ernani Vilela, Oceanógrafo Surveyor\)/.test(raw6.normalize ? raw6 : raw6), (raw6.match(/\/Author[^\n]{0,80}/) || [''])[0]);
+    let info6 = ''; try { info6 = execFileSync('pdfinfo', [await pd6.path()], { encoding: 'utf8' }); } catch (e) { info6 = ''; }
+    ok('PDF: leitor mostra o autor', !info6 || /Author:\s+Ernani Vilela/.test(info6), info6.slice(0, 200));
+    await ctx6.close(); }
   console.log(fails ? `${fails} FALHA(S)` : 'ok: todos os testes de identidade passaram');
   await b.close(); process.exit(fails ? 1 : 0);
 })();
