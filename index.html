@@ -3991,12 +3991,16 @@ function parseStart(value, tz, nowTs, days) {
 }
 /* hora da rodada de cada modelo nomeado (meta.json da Open-Meteo: last_run_initialisation_time). "Melhor modelo" (vazio) não tem rodada única; falha vira null, sem travar o relatório. */
 const META_HOST = { wind: 'https://api.open-meteo.com', wave: 'https://marine-api.open-meteo.com' };
+/* modelos "seamless" são combinações: o meta.json existe só para os modelos de base; tenta-os na ordem, do mais fino ao mais grosso */
+const META_ALT = { gfs_seamless: ['ncep_gfs013', 'ncep_gfs025', 'ncep_gfs_global'], icon_seamless: ['dwd_icon', 'dwd_icon_eu', 'dwd_icon_d2'], ecmwf_seamless: ['ecmwf_ifs025', 'ecmwf_ifs04'], gem_seamless: ['cmc_gem_gdps', 'cmc_gem_rdps'], meteofrance_seamless: ['meteofrance_arpege_world', 'meteofrance_arome_france'], jma_seamless: ['jma_gsm', 'jma_msm'], ukmo_seamless: ['ukmo_global_deterministic_10km', 'ukmo_uk_deterministic_2km'] };
 async function fetchModelRuns(rows) {
   const out = {};
   const one = async (kind, model) => {
-    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
-    try { const r = await fetch(`${META_HOST[kind]}/data/${model}/static/meta.json`, { signal: ctl.signal }); if (!r.ok) return; const j = await r.json(); const v = Number(j.last_run_initialisation_time); if (Number.isFinite(v) && v > 0) out[kind + ':' + model] = v; }
-    catch (e) { /* sem informação de rodada */ } finally { clearTimeout(t); }
+    for (const nome of [model, ...(META_ALT[model] || [])]) {
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+      try { const r = await fetch(`${META_HOST[kind]}/data/${nome}/static/meta.json`, { signal: ctl.signal }); if (r.ok) { const j = await r.json(); const v = Number(j.last_run_initialisation_time); if (Number.isFinite(v) && v > 0) { out[kind + ':' + model] = v; return; } } }
+      catch (e) { /* tenta o próximo nome */ } finally { clearTimeout(t); }
+    }
   };
   const jobs = [];
   for (const row of rows) { const w = (row.wind || '').trim(), v = (row.wave || '').trim(); if (w) jobs.push(one('wind', w)); if (v) jobs.push(one('wave', v)); }

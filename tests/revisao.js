@@ -17,7 +17,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
     });
     await p.route('**/static/meta.json', r => {
       if (meta === 'falha') return r.abort();
-      const u = r.request().url(), gfs = /gfs/.test(u), run = gfs ? agora - 5 * H : agora - 11 * H;   // GFS 5 h atrás, ECMWF 11 h atrás
+      const u = r.request().url(), gfs = /gfs/.test(u), agoraS = Math.floor(Date.now() / 1000), run = gfs ? agoraS - 5 * H : agoraS - 11 * H;   // GFS 5 h atrás, ECMWF 11 h atrás (contados de agora, não da hora cheia)
+      if (/gfs_seamless/.test(u)) return r.fulfill({ status: 404, body: 'not found' });   // como na Open-Meteo real: o combinado não tem meta.json, o ncep_gfs013 tem
       r.fulfill({ json: { last_run_initialisation_time: run, last_run_availability_time: run + 4 * H, update_interval_seconds: 21600 } });
     });
     await p.route(/openstreetmap\.org\/.*\.png/, r => r.abort());
@@ -85,6 +86,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   await gera(p, '-22.9519, -43.1859', 3);
   let rel = await p.innerText('#report');
   ok('cabeçalho lista a rodada de cada modelo nomeado (vento e onda)', /Rodadas dos modelos: NOAA GFS \/ GFS-Wave: vento \d{2}\/\d{2} \d{2}:\d{2}Z, onda \d{2}\/\d{2} \d{2}:\d{2}Z · ECMWF IFS \/ WAM: vento .*, onda /.test(rel), (rel.match(/Rodada[^\n]*/) || [''])[0]);
+  ok('gfs_seamless sem meta.json: usa a rodada do ncep_gfs013 (vento do GFS aparece)', /NOAA GFS \/ GFS-Wave: vento \d{2}\/\d{2} \d{2}:\d{2}Z, onda/.test(rel), (rel.match(/Rodada[^\n]*/) || [''])[0]);
   ok('"melhor modelo" não entra na lista (não tem rodada única)', !/Open-Meteo \(melhor modelo\): vento/.test(rel));
   ok('idade informa a rodada mais antiga (11 h antes do relatório)', /A rodada mais antiga dos modelos é de 11 h antes deste relatório\./.test(rel), (rel.match(/rodada mais antiga[^\n]*/) || [''])[0]);
   const [dh] = await Promise.all([p.waitForEvent('download'), p.click('#rp-download')]);
