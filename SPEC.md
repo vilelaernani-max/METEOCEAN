@@ -218,7 +218,7 @@ Aceite: ordem acima; cada gráfico traz as séries pedidas; blocos de variáveis
 
 ## M3 Identidade
 - **Logotipo** (o selo circular do cartão enviado, recortado com fundo transparente), embutido no `index.html` (arquivo único; versão com fundo branco para o PDF). Discreto: no cabeçalho do app (cerca de 36 px), no cabeçalho do relatório na tela e no HTML baixado (cerca de 40 px, ao lado do título) e no PDF (cabeçalho, pequeno).
-- **"Desenvolvido por Ernani Vilela · Oceanógrafo Surveyor · © 2026"** com e-mail e WhatsApp do cartão (vilelaernani@gmail.com, (35) 99159-5388), em letra pequena e cor suave, no rodapé do app, no rodapé de todos os relatórios (tela, HTML, PDF) e na Ajuda.
+- **"Desenvolvido por Ernani Vilela · Oceanógrafo Surveyor · © 2026"** com e-mail e WhatsApp do cartão (contato@gruposolufacil.com.br, (35) 99159-5388), em letra pequena e cor suave, no rodapé do app, no rodapé de todos os relatórios (tela, HTML, PDF) e na Ajuda.
 - Aceite: logotipo visível sem atrapalhar o conteúdo (claro e escuro), imagem leve (até ~40 KB no total), rodapé presente nos três formatos.
 
 ## M4 Ajuda
