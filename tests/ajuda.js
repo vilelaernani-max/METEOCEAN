@@ -28,7 +28,7 @@ const SECOES = ['aj-gerar', 'aj-limites', 'aj-equip', 'aj-direcao', 'aj-relatori
   }
   const tudo = await p.textContent('#p-ajuda');
   ok('Ajuda cita os assuntos principais', ['equipamento', 'direção', 'resumido', 'completo', 'seta', 'Norte', 'backup', 'Marinha', 'Hs', 'janela'].every(w => new RegExp(w, 'i').test(tudo)), '');
-  ok('Ajuda traz o Desenvolvido por e os contatos', /Desenvolvido por\s+Ernani Vilela/.test(tudo) && /vilelaernani@gmail\.com/.test(tudo) && /\(35\) 99159-5388/.test(tudo));
+  ok('Ajuda traz o Desenvolvido por e os contatos', /Desenvolvido por\s+Ernani Vilela/.test(tudo) && /contato@gruposolufacil\.com\.br/.test(tudo) && /\(35\) 99159-5388/.test(tudo));
   ok('Ajuda não tem texto de teste nem lorem', !/lorem ipsum|\bTODO\b|xxx/.test(tudo));
 
   // pontos "?" e para onde levam

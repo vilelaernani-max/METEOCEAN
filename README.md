@@ -11,4 +11,4 @@ Apoio à decisão: não substitui o julgamento do responsável pela operação, 
 ## Licença
 CC BY-NC 4.0 (uso gratuito, sem fins comerciais, com crédito ao autor). Veja `LICENSE`. Previsões da Open-Meteo (CC BY 4.0; API gratuita só para uso não comercial), avisos da Marinha do Brasil e mapa © OpenStreetMap.
 
-Desenvolvido por Ernani Vilela · Oceanógrafo Surveyor · © 2026 · vilelaernani@gmail.com
+Desenvolvido por Ernani Vilela · Oceanógrafo Surveyor · © 2026 · contato@gruposolufacil.com.br

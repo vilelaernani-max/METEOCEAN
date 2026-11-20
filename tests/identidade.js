@@ -38,8 +38,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
   ok('logotipo no cabeçalho do app, carregado e com texto alternativo', lg.ok && /data:image\/webp/.test(lg.src) && /MetOcean/.test(lg.alt), JSON.stringify(lg));
   ok('logotipo discreto (até 44 px)', lg.w <= 44 && lg.h <= 44 && lg.w >= 28, JSON.stringify(lg));
   const foot = await p.textContent('footer.appfoot');
-  ok('rodapé do app: Desenvolvido por, papel, ano, e-mail e WhatsApp', DEV.test(foot) && /Oceanógrafo Surveyor/.test(foot) && /2026/.test(foot) && /vilelaernani@gmail\.com/.test(foot) && /\(35\) 99159-5388/.test(foot), foot);
-  ok('e-mail e WhatsApp são links', (await p.$$eval('footer.appfoot a', a => a.map(x => x.getAttribute('href')))).some(h => /^mailto:vilelaernani@gmail\.com/.test(h)) && (await p.$$eval('footer.appfoot a', a => a.map(x => x.getAttribute('href')))).some(h => /wa\.me\/5535991595388/.test(h)));
+  ok('rodapé do app: Desenvolvido por, papel, ano, e-mail e WhatsApp', DEV.test(foot) && /Oceanógrafo Surveyor/.test(foot) && /2026/.test(foot) && /contato@gruposolufacil\.com\.br/.test(foot) && /\(35\) 99159-5388/.test(foot), foot);
+  ok('e-mail e WhatsApp são links', (await p.$$eval('footer.appfoot a', a => a.map(x => x.getAttribute('href')))).some(h => /^mailto:contato@gruposolufacil\.com\.br/.test(h)) && (await p.$$eval('footer.appfoot a', a => a.map(x => x.getAttribute('href')))).some(h => /wa\.me\/5535991595388/.test(h)));
   ok('rodapé do app em letra pequena', await p.$eval('footer.appfoot', e => parseFloat(getComputedStyle(e).fontSize) <= 13));
 
   for (const modo of ['resumido', 'completo']) {
@@ -47,7 +47,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/nod
     await p.waitForFunction(() => { const i = document.querySelector('#report .rplogo'); return i && i.complete && i.getBoundingClientRect().width > 0; }, null, { timeout: 5000 }).catch(() => {});
     const rl = await p.$eval('#report .rplogo', i => ({ w: i.getBoundingClientRect().width, ok: i.complete && i.naturalWidth > 0, alt: i.alt }));
     ok(`${modo}: logotipo no relatório, discreto`, rl.ok && rl.w <= 52 && rl.w >= 30 && /MetOcean/.test(rl.alt), JSON.stringify(rl));
-    ok(`${modo}: rodapé do relatório com Desenvolvido por`, DEV.test(await p.textContent('#report .foot')) && /vilelaernani@gmail\.com/.test(await p.textContent('#report .foot')));
+    ok(`${modo}: rodapé do relatório com Desenvolvido por`, DEV.test(await p.textContent('#report .foot')) && /contato@gruposolufacil\.com\.br/.test(await p.textContent('#report .foot')));
     const [d] = await Promise.all([p.waitForEvent('download'), p.click('#rp-download')]);
     const html = fs.readFileSync(await d.path(), 'utf8');
     ok(`${modo}: nome do arquivo HTML traz data e hora`, /-\d{8}-\d{4}\.html$/.test(d.suggestedFilename()), d.suggestedFilename());
