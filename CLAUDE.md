@@ -27,3 +27,9 @@ Ao terminar cada entrega publicada:
 5. Avisar o Ernani do que foi registrado.
 
 Também na rotina: quando alguém testa, uma validação e os erros em Feedbacks; quando se planeja o próximo passo, um item no Roadmap; quando se paga algo, um gasto (pelo app). Uma vez por mês, conferir a situação do projeto na seção 5 do guia.
+
+## Código enxuto (regra do Ernani de 22/11/2026)
+- Menor mudança completa: precisa existir? Já existe no app (função, componente, padrão)? O navegador resolve? Dependência nova nunca por poucas linhas, e só com o sim do Ernani.
+- Cada linha mudada liga-se ao pedido: nada de "melhorar" código vizinho, comentário ou formatação; siga o estilo do arquivo.
+- Código morto encontrado é apontado no relatório, não apagado. Apague só o que a sua mudança deixou sem uso.
+- Saiu grande demais (200 linhas onde 50 bastam)? Reescreva menor antes de entregar.
